@@ -912,7 +912,7 @@ function knowledgeForm(id){
 function personDrawer(id){
   let p=state.people.find(x=>x.id===id);
   if(!p)return;
-  drawer(p.name,'Hồ sơ cán bộ',`<div class="drawer-body stack" style="padding:20px">
+  drawer(p.name,'Hồ sơ cán bộ',`<div class="drawer-body stack person-profile" style="padding:20px">
     <div class="avatar" style="width:64px;height:64px;font-size:24px">${esc(p.name[0])}</div>
     <div class="detail-list">
       ${[['Chức vụ',p.position],['Loại nhân sự',p.type],['Email',p.email||'—'],['Điện thoại',p.phone||'—'],['Ghi chú',p.note||'—']].map(([k,v])=>`<div class="detail-pair"><span>${k}</span><span>${esc(v)}</span></div>`).join('')}
@@ -1218,3 +1218,4 @@ window.addEventListener('hashchange',()=>{
 });
 
 render();
+

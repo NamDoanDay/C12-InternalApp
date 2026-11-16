@@ -37,3 +37,9 @@
 Các AC trong PRD/SPEC là mục tiêu nghiệm thu bản mới, chưa phải kết quả kiểm thử.
 
 
+
+## Điều chỉnh giao diện ngày 17/11/2026
+
+Quyết định mới nhất thay thế cách trình bày graph theo nhóm: Cây sơ đồ hiển thị theo cấp chức vụ Lãnh đạo quản lý/phụ trách → Chỉ huy tổ → Phó chỉ huy → Cán bộ/Tạm tuyển/Hợp đồng. Không hiển thị các nhóm chuyên môn thành nhánh cây. Dữ liệu nhóm, thành viên và quy tắc phân công/hiển thị task vẫn giữ nguyên. Dữ liệu hiện có chỉ xác định cấp chức vụ, không suy đoán quan hệ cấp trên trực tiếp giữa từng cá nhân.
+
+Các sửa giao diện đi kèm: khôi phục lưới card Kiến thức tổ; tab nhân sự có viền và trạng thái đang chọn rõ; tô nổi cả dòng khi hover; trình bày lại hồ sơ chi tiết và thẻ duyệt đăng ký; hai danh mục Công văn/Văn bản chia đôi desktop và xếp dọc trên màn nhỏ, tìm kiếm có icon; navigation dùng nhãn For you (Công việc); icon truy cập nhanh căn giữa hộp.

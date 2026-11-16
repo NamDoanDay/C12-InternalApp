@@ -143,11 +143,11 @@ render=function(){
   if(!me())return originalRender();
   originalRender();
 
-  // Navigation menu: "For you (Công việc của bạn)"
+  // Navigation menu: "For you (Công việc)"
   let navGroup=$('[data-group=resource]');
   if(navGroup){
     navGroup.innerHTML=`${icon('folder')}
-      <span class="nav-group-label">For you (Công việc của bạn)</span>
+      <span class="nav-group-label">For you (Công việc)</span>
       <span class="chevron-wrap ${groups.resource?'expanded':''}">${icon('chevron')}</span>`;
   }
   if(groups.resource){
@@ -588,3 +588,4 @@ function bindWorkspace(){
   $$('[data-legacy]').forEach(e=>e.onclick=()=>legacyDrawer(e.dataset.legacy));
   $('#legacyToggle')?.addEventListener('click',()=>{resourceLegacy=!resourceLegacy;render()});
 }
+

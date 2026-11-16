@@ -657,7 +657,7 @@ function catalogsWorkspace(){
         <span class="grow"></span>
         <button class="btn text" data-catalog-new="${kind}">${icon('plus')} Thêm mới</button>
       </div>
-      <div class="catalog-search-wrap">
+      <div class="catalog-search-wrap">${icon('search')}
         <input data-catalog-search="${kind}" placeholder="Tìm số, ngày, trích yếu..." aria-label="Tìm ${kind}">
       </div>
       <div id="table-${kind}">${catalogWorkspaceTable(kind)}</div>
@@ -682,3 +682,4 @@ function catalogWorkspaceTable(kind,query=''){
     ${list.length?'':'<div class="empty">Chưa có dữ liệu.</div>'}
   </div>`;
 }
+
