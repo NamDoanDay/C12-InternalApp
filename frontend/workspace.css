@@ -28,7 +28,7 @@
 .welcome-main {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .welcome-title-row {
@@ -863,6 +863,9 @@
   padding: 6px 10px;
   font-size: 12px;
   font-weight: 500;
+}
+.task-document-section .task-document-section .resource-appendix-section{
+  background: var(--surface);
 }
 
 /* =========================================================
