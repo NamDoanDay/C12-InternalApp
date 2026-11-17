@@ -24,21 +24,7 @@
 18. Thông báo task mới gửi admin + mọi người nhận + người thao tác, loại trùng người. Thêm người nhận gửi người mới ngay; nhóm chỉ xem không nhận giao việc. All/Unread, đánh dấu đọc, click mở task; user đang online phải thấy thay đổi. Realtime prototype trong tab cùng origin khác với backend đa thiết bị.
 19. Chỉ upload tài nguyên trong phiếu task; bỏ upload trực tiếp ở Quản lý tài nguyên. Các khả năng parser và giới hạn DOCX/XLSX cũ không tự mở rộng.
 
-## Nội dung cũ bị thay thế
-
-**Chốt sau cùng về phụ lục:** Đơn vị và Cơ quan là metadata chung task; **Hệ thống nằm ở từng dòng phụ lục**. Mỗi dòng phụ lục sinh một dòng Hệ thống riêng trong Dữ liệu tài nguyên; các đóng góp cùng Đơn vị + Cơ quan + Hệ thống từ nhiều task được gộp. Không cộng tổng các dòng. Quy tắc này thay yêu cầu chọn một Hệ thống ở header task.
-
-- Bốn hướng thiết kế là lịch sử, không là UI đang phát triển.
-- Cả user CRUD toàn bộ tài nguyên được thay bằng quyền ô theo task nguồn.
-- Timeline chỉ theo import được thay bằng lịch sử task có revision.
-- Upload trực tiếp màn tài nguyên bị bỏ; nhập tệp đi qua task.
-- Một kho Danh mục công văn được tách thành hai danh mục riêng.
-
-Các AC trong PRD/SPEC là mục tiêu nghiệm thu bản mới, chưa phải kết quả kiểm thử.
-
-
-
-## Điều chỉnh giao diện ngày 17/11/2026
+## Kết quả điều chỉnh giao diện ngày 17/11/2026
 
 Quyết định mới nhất thay thế cách trình bày graph theo nhóm: Cây sơ đồ hiển thị theo cấp chức vụ Lãnh đạo quản lý/phụ trách → Chỉ huy tổ → Phó chỉ huy → Cán bộ/Tạm tuyển/Hợp đồng. Không hiển thị các nhóm chuyên môn thành nhánh cây. Dữ liệu nhóm, thành viên và quy tắc phân công/hiển thị task vẫn giữ nguyên. Dữ liệu hiện có chỉ xác định cấp chức vụ, không suy đoán quan hệ cấp trên trực tiếp giữa từng cá nhân.
 

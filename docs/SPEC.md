@@ -3,6 +3,7 @@
 Nguồn quyết định: CHANGE_REQUIREMENTS.md. Ma trận quyền: PERMISSIONS.md. Các lựa chọn ghi **Đề xuất** là giải pháp triển khai, không phải câu trả lời của người dùng.
 
 ## 1. Điều hướng và giao diện
+
 Header gồm menu trái, tên C12 / P4 - T1 Internal App, tìm kiếm, sáng/tối, icon theme, thông báo và tài khoản.
 For you (Công việc của bạn) gồm Quản lý công việc, Thống kê, Quản lý tài nguyên, Danh mục Công văn / Văn bản. Chuyên môn tổ gồm Kiến thức tổ và Cây sơ đồ. Admin có Quản lý nhân sự.
 
@@ -13,6 +14,7 @@ Trang task admin có bộ lọc công văn, văn bản, nhóm, nút thêm và ba
 Hai danh mục hiển thị hai bảng riêng cạnh nhau trên desktop, xếp dọc trên màn nhỏ. Mỗi bảng có tìm kiếm và CRUD độc lập.
 
 ## 2. Task và phiếu tạo
+
 Task có ID nội bộ bất biến, mã hiển thị có thể thay đổi và loại OFFICIAL (theo công văn) hoặc DAILY (thường).
 Các trường chung: tiêu đề, mô tả, người nhận, ngày bắt đầu, hạn hoàn thành, trạng thái, liên kết công văn/văn bản, phụ lục tài nguyên và trường tùy chỉnh.
 
@@ -29,9 +31,11 @@ Upload DOCX/XLSX chỉ trong phiếu task: đọc tệp → preview → sửa/b�
 Phụ lục Tài nguyên cho thêm/sửa/xóa dòng và cột. Mỗi dòng có ID, tên tài nguyên/Hệ thống, đơn vị đăng ký, tệp và giá trị bổ sung. Đã chốt: **mỗi dòng phụ lục tạo một dòng Hệ thống trong bảng chính**; cùng Đơn vị + Cơ quan + Hệ thống được gộp giữa các task. Không cộng các dòng hoặc dùng bộ tổng riêng.
 
 ## 3. Trạng thái và thời gian
+
 Workflow chỉ có PROCESSING, GETTING_NUMBER, SIGNING, COMPLETED, tương ứng Đang xử lý, Đang lấy số, Đang trình ký, Đã hoàn thành. Mọi người được giao cập nhật cùng một trạng thái task.
 
 Ba trạng thái tổng hợp:
+
 - COMPLETED nếu workflow hoàn thành.
 - LATE nếu chưa hoàn thành và now > dueAt.
 - PROCESSING trong các trường hợp còn lại.
@@ -45,6 +49,7 @@ UI theo múi giờ môi trường Asia/Bangkok, ngày task dd/MM/yyyy HH:mm, l�
 Thẻ tổng hợp và thống kê dùng chung hàm, cùng phạm vi quyền; task nhiều người chỉ đếm một lần. **Đề xuất:** thẻ phản ánh cùng bộ lọc hiện tại của bảng.
 
 ## 4. Nhóm, mã và graph
+
 Sáu nhóm ban đầu: Hạ tầng HT; Mạng/Hạ tầng mạng HTM; Điện nước DN; Máy chủ MC; HPC-AI đề án HPCAI; Quản lý văn bản QLVB. Admin CRUD nhóm.
 
 Graph thể hiện Lãnh đạo phòng → Tổ trưởng → Tổ phó phụ trách nhóm → Thành viên/cán bộ tạm tuyển/nhân viên hợp đồng. Không dùng table thay graph. Node có tên, chức danh, nhóm và loại nhân sự. Person độc lập User; người chưa có tài khoản vẫn nằm graph.
@@ -58,6 +63,7 @@ Chuyển nhóm người nhận duy nhất của task OFFICIAL: giữ ID task/ng�
 **Đề xuất:** task nhiều người giữ Nhóm quản lý ban đầu. Xóa nhóm đang có người/task thì yêu cầu chuyển liên kết hoặc lưu trữ nhóm, không xóa vĩnh viễn làm đứt lịch sử.
 
 ## 5. Quyền
+
 Áp dụng PERMISSIONS ở mọi entry point: danh sách, tìm kiếm, notification, resource drawer, ID trực tiếp và revision cũ.
 
 Admin xem/sửa toàn bộ. User xem task nếu là người tạo, người nhận, thuộc Nhóm quản lý hoặc nhóm của một người nhận. Chỉ cùng nhóm không cấp quyền cập nhật.
@@ -67,6 +73,7 @@ User sửa task mình tạo nhưng chỉ tự giao cho mình. Due date chỉ adm
 **Đề xuất phân vùng:** Nhiệm vụ cá nhân là task tự tạo; Được giao cho tôi là task mình nhận do người khác tạo. Tab nhóm cho việc chỉ được xem.
 
 ## 6. Công văn và Văn bản
+
 Hai thực thể riêng, mỗi loại liên kết nhiều-nhiều với task. Trường chung: id, number, issuedAt, summary, sourceFiles, uploadedAt, confirmedAt, note.
 
 Không dùng số làm khóa toàn hệ thống vì có thể trùng cơ quan/năm. **Đề xuất:** cảnh báo khi trùng số/ngày/cơ quan, cho chọn mục đã có; không tự hợp nhất.
@@ -74,6 +81,7 @@ Metadata hiện tại ở danh mục có thể cập nhật; revision task giữ
 **Đề xuất:** mục đang được task tham chiếu dùng archive thay xóa vật lý; giao diện giải thích task liên quan.
 
 ## 7. Dữ liệu tài nguyên
+
 Một dòng theo Đơn vị + Cơ quan + Hệ thống, nhóm đơn vị sắp alphabet. Công văn đăng ký chứa nhiều số; cột Văn bản ngay sau đó. Mỗi công văn có schema cột riêng, header nhiều tầng như workbook. Cột thêm ở bảng độc lập trường tùy chỉnh task/sidebar; người tạo cột chọn cột chung hoặc nhóm công văn.
 
 Bộ lọc có số công văn/văn bản từ danh mục, nhóm và Được giao cho tôi. Lọc 952: loại dòng chỉ4267; dòng952+4651 giữ cả hai nhóm. **Đề xuất:** bộ lọc cá nhân giữ dòng có nguồn được giao user, vẫn giữ mọi nhóm nguồn được phép xem trên dòng đó.
@@ -87,6 +95,7 @@ Sửa tên Hệ thống chỉ đổi dòng nguồn và khóa projection của đ
 Legacy thiếu task nguồn: **đề xuất** chỉ admin xem ở chế độ chỉ đọc, chuyển thành task hợp lệ trước edit. Không tự bịa người nhận, ngày hay lịch sử.
 
 ## 8. Sidebar và revision
+
 Drawer bên phải có bốn vùng:
 **Hệ thống | Phân loại công văn | Lịch sử cập nhật task | Chi tiết.**
 
@@ -101,6 +110,7 @@ Phần Thông tin bổ sung bên dưới lấy snapshot task: mã/title, workflo
 Trang task dùng chung component chi tiết, không tạo hai phiên bản dữ liệu task khác nhau.
 
 ## 9. Thông báo và đồng bộ demo
+
 Tạo task gửi cho tập hợp admin + assignees + actor, loại trùng người. Thêm người nhận chỉ báo người mới. Người chỉ xem nhóm không nhận thông báo giao việc.
 Notification có id, eventId, taskId, recipientId, type, createdAt, readAt; một event chỉ một notification cho mỗi người. Có Tất cả/Chưa đọc, đánh dấu đọc và đánh dấu tất cả đã đọc. **Đề xuất:** click mở task và đánh dấu đọc, kiểm tra lại quyền tại thời điểm click.
 Không tự gửi notification comment/status khi chưa được yêu cầu; audit vẫn ghi.
@@ -108,9 +118,9 @@ Không tự gửi notification comment/status khi chưa được yêu cầu; aud
 Danh tính demo dùng sessionStorage từng tab. Dữ liệu nghiệp vụ và thông báo dùng localStorage chung; BroadcastChannel/storage event cập nhật tab user đang mở sau commit. Không đổi identity của tab khác. Đồng bộ chỉ trong cùng trình duyệt/origin, không phải realtime đa máy. Không lưu mật khẩu thật.
 
 ## 10. Nguồn được phép xem và lịch sử
+
 Tạo projection, tìm kiếm, đếm và drawer từ tập task **đã lọc quyền xem**. Không dùng projection admin rồi chỉ ẩn nút: công văn/giá trị/assignee/revision của task ngoài quyền không được lộ. Chọn ô mới nhất chỉ trong tập nguồn hợp lệ.
 
 Mọi thay đổi qua form hoặc inline dùng chung commit path. Revision là snapshot bất biến, có thay đổi cũ/mới, actor và thời gian; không chỉnh snapshot cũ bằng editor. Quyền xem revision cũ theo quyền task hiện tại là **đề xuất**.
 
 Migration ở TECH_ARCHITECTURE. Giữ dữ liệu v4, không reset khi tăng version. **Đề xuất import nhiều cặp đơn vị/cơ quan:** preview cho chọn một cặp cho task hiện tại hoặc tách task; không âm thầm thay thông tin chung để nhập hết.
-
