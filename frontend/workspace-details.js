@@ -194,12 +194,18 @@ function taskDrawer(id, revisionId = '') {
 // =========================================================
 // YÊU CẦU 3 & 4 & 6: TRANG QUẢN LÝ TÀI NGUYÊN
 // =========================================================
+let resourceSearch = '';
+
 function resourcesWorkspace() {
   let allRows = M.projectCells(state, me());
   let rows = allRows.filter(r => {
     if (resourceFilters.officials?.length > 0 && !resourceFilters.officials.some(id => r.officialIds.includes(id))) return false;
     if (resourceFilters.documents?.length > 0 && !resourceFilters.documents.some(id => r.documentIds.includes(id))) return false;
     if (resourceFilters.self && !r.tasks.some(id => taskBy(id).assigneeIds.includes(session))) return false;
+    if (resourceSearch) {
+      let q = resourceSearch.toLowerCase().trim();
+      if (!`${r.unit} ${r.agency} ${r.system}`.toLowerCase().includes(q)) return false;
+    }
     return true;
   });
 
@@ -229,7 +235,11 @@ function resourcesWorkspace() {
       <input type="checkbox" id="resourceSelf" ${resourceFilters.self ? 'checked' : ''}>
       <span>Được giao cho tôi</span>
     </label>
-    ${(resourceFilters.officials?.length || resourceFilters.documents?.length || resourceFilters.self) ?
+    <label class="task-search" style="max-width:320px;flex:1;min-width:200px">
+      ${icon('search')}
+      <input id="resourceSearchInput" value="${esc(resourceSearch)}" placeholder="Tìm đơn vị, cơ quan quản lý, hệ thống..." aria-label="Tìm kiếm tài nguyên">
+    </label>
+    ${(resourceFilters.officials?.length || resourceFilters.documents?.length || resourceFilters.self || resourceSearch) ?
       `<button class="btn text" id="clearResourceFilters">${icon('close')} Xóa bộ lọc</button>` : ''}
   `;
 

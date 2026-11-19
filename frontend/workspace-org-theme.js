@@ -15,9 +15,9 @@ function orgWorkspace(){
     </div>
     <div class="graph-scroll">
       <div class="org-graph" id="orgGraph">
-        <div class="graph-rank">${cards(level(0))||'<span class="muted">Chưa có lãnh đạo phòng</span>'}</div>
+        <div class="graph-level-label">Lãnh đạo phòng</div><div class="graph-rank">${cards(level(0))||'<span class="muted">Chưa có lãnh đạo phòng</span>'}</div>
         <div class="graph-trunk"></div>
-        <div class="graph-rank">${cards(level(1))||'<span class="muted">Chưa có chỉ huy tổ</span>'}</div>
+        <div class="graph-level-label">Tổ trưởng</div><div class="graph-rank">${cards(level(1))||'<span class="muted">Chưa có chỉ huy tổ</span>'}</div>
         <div class="graph-trunk"></div>
         <div class="graph-groups">
           ${state.taskGroups.filter(g=>!g.archived).map(g=>`<section class="graph-group" data-group-drop="${g.id}">
@@ -165,28 +165,39 @@ function calcLuminanceFromHex(hex){
 function applyPersonalTheme(){
   let settings=state.themeByUser[session]||{},
       root=document.documentElement;
-  root.dataset.theme='cloud';
+  root.dataset.theme=localStorage.getItem('c12-style')||'glassmorphism';
 
   let isDark=root.classList.contains('dark');
-  let color=settings.color||(isDark?'#60a5fa':'#2563eb');
+  let color=settings.color||(isDark?'#818cf8':'#4f46e5');
   root.style.setProperty('--action',color);
 
-  // Background styling
+  // Background styling (Gradient & Custom Image)
   let bg=settings.background||'';
-  root.style.setProperty('--workspace-bg',bg.startsWith('linear-gradient(')?bg:bg?`url("${bg.replace(/["\\\n\r]/g,'')}")`:'none');
-  document.body.classList.toggle('has-workspace-background',!!bg);
+  if(bg){
+    let cssBg=bg.startsWith('linear-gradient(')||bg.startsWith('radial-gradient(')?bg:`url("${bg.replace(/["\\\n\r]/g,'')}")`;
+    root.style.setProperty('--workspace-bg',cssBg);
+    document.body.style.setProperty('background',cssBg,'important');
+    document.body.style.setProperty('background-attachment','fixed','important');
+    document.body.style.setProperty('background-size','cover','important');
+    document.body.style.setProperty('background-position','center','important');
+    document.body.classList.add('has-workspace-background');
+  }else{
+    root.style.setProperty('--workspace-bg','');
+    document.body.style.removeProperty('background');
+    document.body.classList.remove('has-workspace-background');
+  }
 
   // Auto Contrast Check
   if(isDark){
     root.style.setProperty('--text-contrast-primary','#f8fafc');
     root.style.setProperty('--text-contrast-secondary','#cbd5e1');
-    root.style.setProperty('--table-row-hover','#1e293b');
-    root.style.setProperty('--table-cell-hover','#2d3d54');
+    root.style.setProperty('--table-row-hover','rgba(30,41,59,0.85)');
+    root.style.setProperty('--table-cell-hover','rgba(45,61,84,0.9)');
   }else{
     root.style.setProperty('--text-contrast-primary','#0f172a');
-    root.style.setProperty('--text-contrast-secondary','#475569');
-    root.style.setProperty('--table-row-hover','#f1f5f9');
-    root.style.setProperty('--table-cell-hover','#dbeafe');
+    root.style.setProperty('--text-contrast-secondary','#334155');
+    root.style.setProperty('--table-row-hover','rgba(241,245,249,0.75)');
+    root.style.setProperty('--table-cell-hover','rgba(219,234,254,0.85)');
   }
 }
 
@@ -228,6 +239,8 @@ function themesDialog(){
       s.background=d.backgroundUrl;
     }
     state.themeByUser[session]=s;
+    persist();
+    applyPersonalTheme();
     done('Đã lưu chủ đề không gian làm việc');
   });
 

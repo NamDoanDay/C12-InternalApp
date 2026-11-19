@@ -2,7 +2,7 @@
 'use strict';
 const clone=x=>JSON.parse(JSON.stringify(x)),id=()=>globalThis.crypto?.randomUUID?.()||'id-'+Date.now()+'-'+Math.random().toString(36).slice(2),now=()=>new Date().toISOString();
 const GROUPS=[['HT','Hạ tầng'],['HTM','Mạng / Hạ tầng mạng'],['DN','Điện nước'],['MC','Máy chủ'],['HPCAI','HPC-AI đề án'],['QLVB','Quản lý văn bản']];
-function bucket(t,time=Date.now()){return t.status==='done'?'done':time>new Date(t.due).getTime()?'late':'processing'}
+function bucket(t,time=Date.now()){if(t.status==='done')return 'done';if(time>new Date(t.due).getTime())return 'late';if(t.status==='init')return 'init';return 'processing'}
 function overdueDays(t,time=Date.now()){return bucket(t,time)==='late'?Math.ceil((time-new Date(t.due).getTime())/86400000):0}
 const personGroup=(s,userId)=>s.people.find(p=>p.id===s.users.find(u=>u.id===userId)?.personId)?.groupId||'';
 function participatingGroups(s,t){return [...new Set([t.managementGroupId,...t.assigneeIds.map(u=>personGroup(s,u))].filter(Boolean))]}

@@ -1,4 +1,8 @@
 'use strict';
+let taskDraftFiles = {}, taskDraftDocuments = {};
+function stageTaskDocument(kind,id,patch){const key=kind+':'+id;taskDraftDocuments[key]={kind,id,...taskDraftDocuments[key],...patch};}
+function taskDocument(kind,id){return {...docBy(kind,id),...taskDraftDocuments[kind+':'+id]};}
+function commitTaskAttachments(){state.files||={};Object.assign(state.files,taskDraftFiles);for(const patch of Object.values(taskDraftDocuments)){const {kind,id,...values}=patch;Object.assign(docBy(kind,id),values)}taskDraftFiles={};taskDraftDocuments={};}
 
 function emptyTask() {
   let userGroup = M.personGroup(state, session) || (state.taskGroups[0]?.id || 'g-HT');
@@ -34,6 +38,7 @@ function emptyTask() {
 function taskForm(id, fromLegacy) {
   let existing = id ? taskBy(id) : null;
   if (existing && !M.canEdit(state, me(), existing)) return toast('Bạn không có quyền sửa task.');
+  taskDraftFiles = {}; taskDraftDocuments = {};
   formTask = M.clone(existing || emptyTask());
   if (!formTask.customTable) {
     formTask.customTable = {
@@ -200,7 +205,7 @@ function renderTaskForm() {
             <label class="field">
               <span>Loại công việc</span>
               <select name="type" ${lock}>
-                <option value="document" ${t.type === 'document' ? 'selected' : ''}>Theo công văn</option>
+                <option value="document" ${t.type === 'document' ? 'selected' : ''}>Xử lý văn bản</option>
                 <option value="daily" ${t.type === 'daily' ? 'selected' : ''}>Task thường</option>
               </select>
             </label>
@@ -224,13 +229,14 @@ function renderTaskForm() {
             <div class="divider"></div>
             <h3>Người được giao</h3>
             ${admin() ? `
-              <label class="field">
+              <label class="field assignee-group-selector">
                 <span>Lọc theo nhóm cán bộ</span>
-                <select id="assigneeGroup" multiple size="3">
+                <select id="assigneeGroupSelect">
+                  <option value="">Tất cả các nhóm</option>
                   ${state.taskGroups.filter(g => !g.archived).map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}
                 </select>
               </label>
-              <div class="assignee-picker" id="assigneeList">
+              <div class="assignee-list-modern" id="assigneeList">
                 ${assigneeChoices(t)}
               </div>
             `: `
@@ -285,6 +291,7 @@ function renderTaskForm() {
     capture();
     try {
       M.saveTask(state, me(), formTask);
+      commitTaskAttachments();
       persist();
       formTask = null;
       $('#overlay').innerHTML = '';
@@ -296,12 +303,7 @@ function renderTaskForm() {
     }
   };
 
-  let cancel = () => {
-    if (confirm('Đóng phiếu? Các công văn/văn bản đã lưu vào danh mục vẫn được giữ.')) {
-      formTask = null;
-      $('#overlay').innerHTML = '';
-    }
-  };
+  let cancel = () => { formTask = null; closeOverlay(); };
 
   $('#closeTaskEditor').onclick = cancel;
   $('#cancelTask').onclick = cancel;
@@ -395,9 +397,10 @@ function renderTaskForm() {
   $$('[data-doc-file]').forEach(input => input.onchange = async () => {
     try {
       let refs = await storeFiles(input.files);
-      docBy(input.dataset.kind, input.dataset.docFile).files = refs;
-      persist(); renderTaskForm();
-    } catch (err) { toast(err.message) }
+      if(formTask!==t)return;
+      stageTaskDocument(input.dataset.kind,input.dataset.docFile,{files:refs});
+      if(formTask===t)renderTaskForm();
+    } catch (err) { if(formTask===t)toast(err.message) }
   });
 
   $('#addTaskResourceRow')?.addEventListener('click', () => {
@@ -423,8 +426,8 @@ function renderTaskForm() {
     capture();
     try {
       t.resources.find(r => r.id === input.dataset.resourceFile).files.push(...await storeFiles(input.files));
-      renderTaskForm();
-    } catch (err) { toast(err.message) }
+      if(formTask===t)renderTaskForm();
+    } catch (err) { if(formTask===t)toast(err.message) }
   });
 
   $('#addTaskCustom')?.addEventListener('click', () => {
@@ -450,11 +453,16 @@ function renderTaskForm() {
     capture();
     try {
       t.attachments.push(...await storeFiles($('#taskAttachment').files));
-      renderTaskForm();
-    } catch (err) { toast(err.message) }
+      if(formTask===t)renderTaskForm();
+    } catch (err) { if(formTask===t)toast(err.message) }
   });
 
   $('#importTaskResource')?.addEventListener('click', () => { capture(); taskImportPanel() });
+  $('#assigneeGroupSelect')?.addEventListener('change', e => {
+    capture();
+    let gid = e.target.value;
+    $('#assigneeList').innerHTML = assigneeChoices(formTask, gid ? [gid] : []);
+  });
   $('#taskEditor input[name=title]')?.focus?.();
 }
 
@@ -497,10 +505,19 @@ function captureTaskForm() {
 }
 
 function assigneeChoices(t, groupIds = []) {
-  return state.users.filter(u => u.status === 'approved' && (!groupIds.length || groupIds.includes(M.personGroup(state, u.id)))).map(u => `
-    <label><input type="checkbox" data-assignee="${u.id}" ${t.assigneeIds.includes(u.id) ? 'checked' : ''}>
-    <span>${esc(u.name)}<small>${esc(groupName(M.personGroup(state, u.id)))}</small></span></label>
-  `).join('');
+  let list = state.users.filter(u => u.status === 'approved' && (!groupIds.length || groupIds.includes(M.personGroup(state, u.id))));
+  if (!list.length) return '<p class="small muted" style="padding:12px;text-align:center">Không có thành viên nào trong nhóm này.</p>';
+  return list.map(u => {
+    let grp = groupName(M.personGroup(state, u.id));
+    return `
+      <label class="assignee-choice-row">
+        <input type="checkbox" data-assignee="${u.id}" ${t.assigneeIds.includes(u.id) ? 'checked' : ''}>
+        <div class="assignee-choice-info">
+          <strong>${esc(u.name)}</strong>
+          <span class="assignee-group-badge">${esc(grp)}</span>
+        </div>
+      </label>`;
+  }).join('');
 }
 
 function taskCatalogTable(kind, ids) {
@@ -509,7 +526,7 @@ function taskCatalogTable(kind, ids) {
       <thead><tr><th>Số</th><th>Ngày phát hành</th><th>Trích yếu</th><th>Tệp đính kèm</th><th></th></tr></thead>
       <tbody>
         ${ids.map(id => {
-    let d = docBy(kind, id);
+    let d = taskDocument(kind, id);
     return d ? `<tr>
             <td><button class="link-button" type="button" data-task-doc-edit="${id}" data-kind="${kind}"><strong>${esc(d.no)}</strong></button></td>
             <td>${day(d.date)}</td>
@@ -554,25 +571,22 @@ function taskResourceEditor(t) {
 }
 
 async function storeFiles(files) {
-  state.files ||= {};
-  let refs = [];
-  for (let file of files) {
-    if (file.size > 2 * 1024 * 1024) throw Error('Prototype giới hạn 2 MB mỗi tệp.');
-    let url = await new Promise((resolve, reject) => {
-      let r = new FileReader();
-      r.onload = () => resolve(r.result);
-      r.onerror = () => reject(Error('Không đọc được tệp.'));
-      r.readAsDataURL(file);
-    }), fid = M.id();
-    state.files[fid] = { id: fid, name: file.name, size: file.size, type: file.type, url };
-    refs.push({ id: fid, name: file.name, size: file.size });
+  const draftAtStart=formTask, overlayAtStart=$('#overlay')?.firstElementChild;
+  let refs=[], pending={};
+  for(const file of files){
+    if(file.size>2*1024*1024)throw Error('Prototype giới hạn 2 MB mỗi tệp.');
+    const url=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('Không đọc được tệp.'));r.readAsDataURL(file)});
+    const id=M.id();pending[id]={id,name:file.name,size:file.size,type:file.type,url};refs.push({id,name:file.name,size:file.size});
   }
+  if((draftAtStart && formTask!==draftAtStart)|| (overlayAtStart && !overlayAtStart.isConnected))return [];
+  if(draftAtStart)Object.assign(taskDraftFiles,pending);
+  else {state.files||={};Object.assign(state.files,pending)}
   return refs;
 }
 
 function fileLinks(refs = [], remove = false) {
   return refs.map(f => {
-    let source = state.files?.[f.id];
+    let source = taskDraftFiles[f.id] || state.files?.[f.id];
     return `<span class="file-pill">${icon('file')}${source ? `<a href="${esc(source.url)}" download="${esc(f.name)}">${esc(f.name)}</a>` : esc(f.name)} <small>${Math.ceil((f.size || 0) / 1024)} KB</small></span>`;
   }).join('');
 }
@@ -628,7 +642,10 @@ function catalogEdit(kind, id, insideTask = false) {
     if (state[kind].some(x => x.id !== id && !x.archived && x.no.trim() === data.no.trim() && x.date === data.date)) throw Error('Đã có mục cùng số và ngày phát hành.');
     let files = [...(d.files || [])];
     if (f.elements.catalogFile.files.length) files.push(...await storeFiles(f.elements.catalogFile.files));
+    if(!f.isConnected)return;
     let obj = { ...d, ...data, files, id: id || M.id() };
+    // Explicitly saving a catalog record commits its files independently of a task draft.
+    state.files||={};for(const ref of files)if(taskDraftFiles[ref.id]){state.files[ref.id]=taskDraftFiles[ref.id];delete taskDraftFiles[ref.id]}
     delete obj.catalogFile;
     if (id) Object.assign(d, obj); else state[kind].push(obj);
     persist();

@@ -110,7 +110,7 @@ let state;
 try { state = JSON.parse(localStorage.getItem('c12-prototype-v4')) } catch { }
 if (state?.version !== 4) state = seed();
 
-let session = localStorage.getItem('c12-session') ?? 'admin',
+let session = sessionStorage.getItem('c12-v5-session') || localStorage.getItem('c12-session') || 'demo-u-g-HT',
   page = location.hash.slice(1) || 'home',
   q = '',
   collapsed = false,
@@ -126,7 +126,7 @@ const save = () => {
   try { localStorage.setItem('c12-prototype-v4', JSON.stringify(state)) } catch { toast('Bộ nhớ đã đầy. Hãy giảm tệp đính kèm.') }
 };
 
-const me = () => state.users.find(u => u.id === session);
+const me = () => state.users.find(u => u.id === session) || state.users.find(u => u.role === 'user') || state.users[0];
 const admin = () => me()?.role === 'admin';
 const key = r => [r.unit, r.agency, r.system].map(x => String(x).trim().toLocaleLowerCase('vi')).join('|');
 const latest = (r, d) => r.snapshots.filter(s => s.doc === d).sort((a, b) => new Date(b.confirmedAt) - new Date(a.confirmedAt))[0];
@@ -204,13 +204,13 @@ function renderHeader() {
       <button type="button" class="theme-pill-toggle" data-action="theme" aria-label="Chuyển chế độ sáng / tối" title="Chuyển chế độ Sáng / Tối">
         <span class="pill-track">
           <span class="pill-thumb"></span>
-          <span class="pill-icon sun">${icon('sun')}</span>
-          <span class="pill-icon moon">${icon('moon')}</span>
+          <span class="pill-icon sun">🔆</span>
+          <span class="pill-icon moon">🌙</span>
         </span>
         <span class="pill-label">${isDark ? 'DARK' : 'LIGHT'}</span>
       </button>
       <button type="button" class="icon-btn" data-action="themes" aria-label="Đổi chủ đề không gian làm việc" title="Đổi chủ đề giao diện">
-        ${icon('palette')}
+        <span style="font-size:20px">🎨</span>
       </button>
       <button type="button" class="icon-btn notification-trigger" data-action="notifications" aria-label="Thông báo" title="Thông báo hệ thống">
         ${icon('bell')}
@@ -251,21 +251,28 @@ function render() {
     ${admin() ? `<div class="divider"></div>${nav('personnel', 'Quản lý nhân sự', 'users')}` : ''}
     <div class="nav-foot">
       <span class="chip active">Cloud Console · ${admin() ? 'Admin' : 'User'}</span>
-      <p class="small muted" style="margin-top:10px">Hệ thống quản trị nội bộ P4/T1 · V5.1</p>
+      <p class="small muted" style="margin-top:10px">Hệ thống quản trị nội bộ Phòng 4 Tổ 1</p>
     </div>
   </aside>
   <main class="main" id="main">
     ${view()}
   </main>
-  ${account ? `<div class="account-menu">
-    <strong style="color:var(--text-contrast-primary)">${esc(me().name)}</strong>
-    <span class="small muted">${esc(me().email)}</span>
-    <span class="chip active">${admin() ? 'Admin' : 'User'} · Phiên đăng nhập</span>
-    <div class="divider"></div>
-    <button data-action="settings">Cài đặt tài khoản</button>
-    <button data-action="switch">Chuyển sang vai trò ${admin() ? 'User' : 'Admin'} demo</button>
-    <button data-action="reset">Khôi phục dữ liệu mẫu</button>
-    <button data-action="logout">Đăng xuất</button>
+  ${account ? `<div class="account-backdrop" data-action="account"></div>
+  <div class="account-menu">
+    <div class="account-menu-header">
+      <div class="account-menu-avatar">${esc(me()?.name?.[0] || 'U')}</div>
+      <div class="account-menu-info">
+        <strong>${esc(me()?.name || 'Người dùng')}</strong>
+        <span>${esc(me()?.email || 'user@c12.demo')}</span>
+        <span class="chip active" style="margin-top:4px;width:fit-content">${admin() ? 'Quản trị viên' : 'Thành viên'} · Demo</span>
+      </div>
+    </div>
+    <div class="account-menu-actions">
+      <button data-action="settings">${icon('settings')} Cài đặt tài khoản</button>
+      <button data-action="switch">${icon('refresh')} Chuyển sang vai trò ${admin() ? 'User' : 'Admin'} demo</button>
+      <button data-action="reset">${icon('reload')} Khôi phục dữ liệu mẫu</button>
+      <button data-action="logout" style="color:#ef4444">${icon('logout')} Đăng xuất</button>
+    </div>
   </div>`: ''}`;
 
   bind();
@@ -419,17 +426,63 @@ function catalogView() {
   </div>`;
 }
 
+let knowledgeFilters = { level: '', agency: '', type: '', q: '' };
+
 function knowledgeView() {
-  return head('Kiến thức tổ', '', btn('Thêm kiến thức', 'add-knowledge', 'plus', 'primary')) +
-    `<div class="knowledge-grid">
-    ${state.knowledge.map(k => `<button class="surface knowledge-card" data-knowledge="${k.id}">
-      <span class="chip active">${esc(k.type)}</span>
-      <h3 style="color:var(--text-contrast-primary)">${esc(k.title)}</h3>
-      <p class="muted">${esc(k.summary)}</p>
-      <span class="grow"></span>
-      <span class="flex between small muted">${k.files.length} tệp đính kèm ${icon('arrow')}</span>
-    </button>`).join('')}
-  </div>`;
+  let list = state.knowledge.filter(k => {
+    if (knowledgeFilters.level && (k.level || 'Trung ương') !== knowledgeFilters.level) return false;
+    if (knowledgeFilters.agency && (k.agency || 'Bộ Công an') !== knowledgeFilters.agency) return false;
+    if (knowledgeFilters.type && (k.docType || k.type) !== knowledgeFilters.type) return false;
+    if (knowledgeFilters.q && !`${k.title} ${k.no} ${k.summary}`.toLowerCase().includes(knowledgeFilters.q.toLowerCase())) return false;
+    return true;
+  });
+
+  return head('Kiến thức tổ', '', btn('Thêm kiến thức mới', 'add-knowledge', 'plus', 'primary')) +
+    `<div class="filters" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <label class="field" style="margin:0"><span>Cấp ban hành</span>
+        <select id="kfLevel">
+          <option value="">Tất cả cấp</option>
+          ${['Trung ương', 'Địa phương'].map(x => `<option value="${x}" ${knowledgeFilters.level === x ? 'selected' : ''}>${x}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field" style="margin:0"><span>Cơ quan ban hành</span>
+        <select id="kfAgency">
+          <option value="">Tất cả cơ quan</option>
+          ${['Bộ Công an', 'Chính phủ', 'Quốc hội', 'Thủ tướng Chính phủ', 'Chủ tịch nước', 'Bộ Thông tin và Truyền thông', 'Bộ Khoa học và Công nghệ'].map(x => `<option value="${x}" ${knowledgeFilters.agency === x ? 'selected' : ''}>${x}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field" style="margin:0"><span>Loại văn bản</span>
+        <select id="kfType">
+          <option value="">Tất cả loại</option>
+          ${['Thông tư', 'Nghị định', 'Quyết định', 'Luật', 'Nghị quyết', 'Hướng dẫn', 'Quy định'].map(x => `<option value="${x}" ${knowledgeFilters.type === x ? 'selected' : ''}>${x}</option>`).join('')}
+        </select>
+      </label>
+      ${(knowledgeFilters.level || knowledgeFilters.agency || knowledgeFilters.type) ? `<button class="btn text" id="kfClear">Xóa bộ lọc (${list.length}/${state.knowledge.length})</button>` : ''}
+    </div>
+    <div class="knowledge-grid-modern">
+      ${list.map(k => `
+        <article class="knowledge-card-modern">
+          <div class="knowledge-badges-row">
+            <span class="k-badge-type">${esc(k.docType || k.type || 'Thông tư')}</span>
+            <span class="k-badge-no">Số ${esc(k.no || '183/2026/TT-BCA')}</span>
+            <span class="k-badge-level">${esc(k.level || 'Trung ương')}</span>
+          </div>
+          <div class="knowledge-card-title">${esc(k.title)}</div>
+          <p class="muted" style="margin:0;font-size:13px;line-height:1.4">${esc(k.summary)}</p>
+          <div class="knowledge-meta-text">
+            <div>Cơ quan ban hành: <strong>${esc(k.agency || 'Bộ Công an')}</strong></div>
+            <div>Ngày ban hành: <strong>${esc(k.issueDate || '30/10/2026')}</strong> - Ngày hiệu lực: <strong>${esc(k.effectiveDate || '30/04/2027')}</strong></div>
+          </div>
+          <div class="knowledge-actions-bar">
+            <button type="button" class="knowledge-action-link" data-knowledge="${k.id}">${icon('eye')} Xem toàn văn</button>
+            <button type="button" class="knowledge-action-link" data-knowledge="${k.id}">⭐ Thuộc tính</button>
+            <button type="button" class="knowledge-action-link" data-knowledge="${k.id}">📄 Văn bản liên quan</button>
+            <button type="button" class="knowledge-action-link" data-knowledge="${k.id}">${icon('paperclip')} File đính kèm (${k.files.length})</button>
+          </div>
+        </article>
+      `).join('')}
+      ${list.length ? '' : '<div class="empty span2">Không có tài liệu phù hợp bộ lọc.</div>'}
+    </div>`;
 }
 
 function orgView() {
@@ -517,6 +570,10 @@ function bindMain() {
   [['fMonth', 'month'], ['fDoc', 'doc'], ['fLevel', 'level']].forEach(([id, k]) => {
     if ($('#' + id)) $('#' + id).onchange = e => { filters[k] = e.target.value; render() }
   });
+  $('#kfLevel')?.addEventListener('change', e => { knowledgeFilters.level = e.target.value; render() });
+  $('#kfAgency')?.addEventListener('change', e => { knowledgeFilters.agency = e.target.value; render() });
+  $('#kfType')?.addEventListener('change', e => { knowledgeFilters.type = e.target.value; render() });
+  $('#kfClear')?.addEventListener('click', () => { knowledgeFilters = { level: '', agency: '', type: '', q: '' }; render() });
   $('#catalogSearch')?.addEventListener('input', e => $('#catalogResult').innerHTML = docTable(state.docs.filter(d => `${d.no} ${d.date} ${day(d.date)} ${d.summary}`.toLowerCase().includes(e.target.value.toLowerCase()))));
   $$('tr[tabindex]').forEach(e => e.onkeydown = k => { if (k.key === 'Enter') e.click() });
 }
@@ -555,6 +612,18 @@ function action(a) {
     }
     return;
   }
+  if (a === 'login-user') {
+    let u = state.users.find(x => x.role === 'user' && x.status === 'approved') || state.users.find(x => x.id === 'demo-u-g-HT') || state.users[0];
+    login(u.id);
+    toast('Đã đăng nhập tài khoản User demo');
+    return;
+  }
+  if (a === 'login-admin') {
+    let u = state.users.find(x => x.role === 'admin' && x.status === 'approved') || state.users.find(x => x.id === 'admin') || state.users[0];
+    login(u.id);
+    toast('Đã đăng nhập tài khoản Admin demo');
+    return;
+  }
   switch (a) {
     case 'nav': collapsed = !collapsed; render(); break;
     case 'theme':
@@ -590,7 +659,9 @@ function action(a) {
 }
 
 function closeOverlay() {
-  if ($('#editForm')?.dataset.dirty === 'true' && !confirm('Bỏ các thay đổi chưa lưu?')) return;
+  if (typeof formTask !== 'undefined') formTask = null;
+  if (typeof taskDraftFiles !== 'undefined') taskDraftFiles = {};
+  if (typeof taskDraftDocuments !== 'undefined') taskDraftDocuments = {};
   $('#overlay').innerHTML = '';
   drawerState = null;
   returnFocus?.focus?.();
@@ -635,7 +706,7 @@ function modal(title, body, onSave, wide = false, saveText = 'Lưu thay đổi')
   f.onsubmit = async e => {
     e.preventDefault();
     try { await onSave(Object.fromEntries(new FormData(f)), f) }
-    catch (err) { $('#formError').textContent = err.message }
+    catch (err) { if (f.isConnected && $('#formError')) $('#formError').textContent = err.message }
   };
   setTimeout(() => $('#overlay input,#overlay select,#overlay textarea,#overlay button')?.focus(), 20);
 }
@@ -665,34 +736,39 @@ function drawer(title, subtitle, body, large = false) {
 function auth(register = false) {
   $('#app').className = '';
   $('#app').innerHTML = `<div class="auth-page">
-    <section class="auth-intro">
-      <div class="flex gap"><span class="brand-mark">C12</span><strong style="color:var(--text-contrast-primary)">C12 / P4 - T1 Internal App</strong></div>
-      <div>
-        <span class="chip active">Cloud Console Nội Bộ</span>
-        <h1 style="margin:20px 0 16px;color:var(--text-contrast-primary)">Không gian làm việc<br>Phòng 4 · Tổ 1</h1>
-        <p class="muted">Văn bản, công việc, tài nguyên và kiến thức nghiệp vụ trong cùng một hệ thống duy nhất.</p>
-      </div>
-      <footer class="small muted">Hệ thống C12 Console V5.1</footer>
-    </section>
-    <section class="auth-card">
-      <form id="authForm">
+    <div class="auth-card-wrap">
+      <section class="auth-intro">
+        <div class="flex gap"><span class="brand-mark">C12</span><strong style="color:var(--text-contrast-primary)">C12 / P4 - T1 Internal App</strong></div>
         <div>
-          <h2 style="color:var(--text-contrast-primary)">${register ? 'Đăng ký tài khoản' : 'Chào mừng trở lại'}</h2>
-          <p class="muted" style="margin-top:6px">${register ? 'Tài khoản cần admin phê duyệt.' : 'Đăng nhập để vào không gian làm việc.'}</p>
+          <span class="chip active">Cloud Console Nội Bộ</span>
+          <h1 style="margin:20px 0 16px;color:var(--text-contrast-primary)">Không gian làm việc<br>Phòng 4 · Tổ 1</h1>
+          <p class="muted">Văn bản, công việc, tài nguyên và kiến thức nghiệp vụ trong cùng một hệ thống duy nhất.</p>
         </div>
-        ${register ? field('Họ và tên', 'name', '', 'text', true) : ''}
-        ${field('Email', 'email', '', 'email', true)}
-        ${field('Mật khẩu demo', 'password', '', 'password', true)}
-        <p class="error" id="authError" role="alert"></p>
-        <button type="submit" class="btn primary" style="min-height:42px">${register ? 'Gửi yêu cầu đăng ký' : 'Đăng nhập'}</button>
-        ${register ? btn('Quay lại đăng nhập', 'auth-login', '', 'text') : `
-        <div class="demo-options">
-          ${btn('Đăng nhập Admin demo', 'login-admin', '', 'primary')}
-          ${btn('Đăng nhập User demo', 'login-user')}
+        <footer class="small muted">Hệ thống C12 Console V5.1</footer>
+      </section>
+      <section class="auth-card">
+        <div class="auth-tabs">
+          <button type="button" class="auth-tab-btn ${!register ? 'active' : ''}" data-action="auth-login">Đăng nhập</button>
+          <button type="button" class="auth-tab-btn ${register ? 'active' : ''}" data-action="auth-register">Đăng ký</button>
         </div>
-        ${btn('Chưa có tài khoản? Đăng ký', 'auth-register', '', 'text')}`}
-      </form>
-    </section>
+        <form id="authForm">
+          <div>
+            <h2 style="color:var(--text-contrast-primary);margin:0 0 6px">${register ? 'Đăng ký tài khoản' : 'Chào mừng trở lại'}</h2>
+            <p class="muted" style="margin:0">${register ? 'Tài khoản cần admin phê duyệt.' : 'Đăng nhập để vào không gian làm việc.'}</p>
+          </div>
+          ${register ? field('Họ và tên', 'name', '', 'text', true) : ''}
+          ${field('Email', 'email', '', 'email', true)}
+          ${field('Mật khẩu demo', 'password', '', 'password', true)}
+          <p class="error" id="authError" role="alert"></p>
+          <button type="submit" class="btn primary" style="min-height:42px">${register ? 'Gửi yêu cầu đăng ký' : 'Đăng nhập'}</button>
+          ${register ? btn('Quay lại đăng nhập', 'auth-login', '', 'text') : `
+          <div class="demo-options">
+            ${btn('Đăng nhập User demo', 'login-user', '', 'primary')}
+            ${btn('Đăng nhập Admin demo', 'login-admin')}
+          </div>`}
+        </form>
+      </section>
+    </div>
   </div>`;
 
   document.onclick = e => {
@@ -826,23 +902,48 @@ function rowForm(id) {
 }
 
 function docDrawer(id) {
-  let d = state.docs.find(x => x.id === id);
+  let d = state.docs?.find(x => x.id === id) || state.officials?.find(x => x.id === id) || state.documents?.find(x => x.id === id);
   if (!d) return;
-  drawer('Công văn ' + d.no, 'Chi tiết công văn', `<div class="drawer-body stack" style="padding:20px">
-    <div class="detail-list">
-      ${[['Số', d.no], ['Ngày ban hành', day(d.date)], ['Cơ quan ban hành', d.agency || '—'], ['Trích yếu', d.summary], ['Ghi chú', d.note || '—']].map(([k, v]) => `<div class="detail-pair"><span>${k}</span><span>${esc(v)}</span></div>`).join('')}
-    </div>
-    <div class="flex gap">
-      <button class="btn" id="editDoc">${icon('edit')}Chỉnh sửa</button>
-      <button class="btn danger" id="deleteDoc">${icon('trash')}Xóa</button>
-    </div>
-  </div>`);
-  $('#editDoc').onclick = () => docForm(id);
-  $('#deleteDoc').onclick = () => {
-    if (confirm('Xóa khỏi danh mục? Snapshot tài nguyên được giữ.')) {
-      state.docs = state.docs.filter(x => x.id !== id); done('Đã xóa công văn');
+  drawer('Thông tin chi tiết', d.no ? ('Công văn ' + d.no) : 'Chi tiết văn bản', `
+    <div class="doc-detail-view">
+      <div class="doc-detail-badge">${icon('fileText')} ${esc(d.no || 'Văn bản')}</div>
+      <div class="doc-meta-card">
+        <div class="doc-meta-row"><span>Số công văn / văn bản</span><strong>${esc(d.no || '—')}</strong></div>
+        <div class="doc-meta-row"><span>Ngày ban hành</span><strong>${day(d.date) || '—'}</strong></div>
+        <div class="doc-meta-row"><span>Cơ quan ban hành</span><strong>${esc(d.agency || '—')}</strong></div>
+        <div class="doc-meta-row"><span>Trích yếu nội dung</span><strong>${esc(d.summary || '—')}</strong></div>
+        <div class="doc-meta-row"><span>Ghi chú</span><p style="margin:0;color:var(--muted)">${esc(d.note || '—')}</p></div>
+      </div>
+      ${(d.files && d.files.length) ? `
+      <div class="doc-meta-card">
+        <span style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase">Tệp đính kèm (${d.files.length})</span>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+          ${d.files.map(f => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--app);border-radius:8px">
+            <span style="font-size:13px;font-weight:500">${icon('paperclip')} ${esc(f.name || 'Tệp đính kèm')}</span>
+            <a href="${esc(f.url || f.data || '#')}" download="${esc(f.name || 'file')}" class="btn text" style="padding:4px 8px">${icon('download')} Tải về</a>
+          </div>`).join('')}
+        </div>
+      </div>` : ''}
+      <div class="flex gap" style="margin-top:8px">
+        <button class="btn" id="editDoc">${icon('edit')} Chỉnh sửa</button>
+        <button class="btn danger" id="deleteDoc">${icon('trash')} Xóa</button>
+      </div>
+    </div>`);
+  $('#editDoc')?.addEventListener('click', () => {
+    let kind = state.officials?.some(x => x.id === id) ? 'officials' : 'documents';
+    if (typeof catalogEdit !== 'undefined') catalogEdit(kind, id);
+    else docForm(id);
+  });
+  $('#deleteDoc')?.addEventListener('click', () => {
+    if (typeof catalogEdit !== 'undefined') {
+      let kind = state.officials?.some(x => x.id === id) ? 'officials' : 'documents';
+      let item = state[kind]?.find(x => x.id === id);
+      if (item) { item.archived = true; persist(); done('Đã lưu trữ mục'); }
+    } else {
+      state.docs = state.docs.filter(x => x.id !== id);
+      done('Đã xóa công văn');
     }
-  };
+  });
 }
 
 function docForm(id) {
@@ -868,7 +969,7 @@ function knowledgeDrawer(id) {
     <p style="line-height:1.75;color:var(--text-contrast-primary)">${esc(k.summary)}</p>
     <div class="notice">${esc(k.note || 'Tài liệu chuyên môn nội bộ')}</div>
     <h3 style="color:var(--text-contrast-primary)">Tệp đính kèm</h3>
-    ${k.files.map((f, i) => `<div class="flex between"><span class="flex gap">${icon('file')}<a href="${esc(f.data)}" download="${esc(f.name)}">${esc(f.name)}</a></span><button class="icon-btn" data-remove-file="${i}" aria-label="Xóa tệp">${icon('trash')}</button></div>`).join('') || '<p class="muted">Chưa có tệp đính kèm.</p>'}
+    ${k.files.map((f, i) => `<div class="flex between"><span class="flex gap">${icon('file')}<a href="${esc(f.data || state.files?.[f.id]?.url || '#')}" download="${esc(f.name)}">${esc(f.name)}</a></span><button class="icon-btn" data-remove-file="${i}" aria-label="Xóa tệp">${icon('trash')}</button></div>`).join('') || '<p class="muted">Chưa có tệp đính kèm.</p>'}
     <label class="field"><span>Thêm tệp đính kèm (tối đa 2 MB / tệp)</span><input id="attachKnowledge" type="file" multiple></label>
     <div class="flex gap">
       <button class="btn" id="editKnowledge">${icon('edit')}Chỉnh sửa</button>
@@ -903,7 +1004,31 @@ function knowledgeDrawer(id) {
 
 function knowledgeForm(id) {
   let k = state.knowledge.find(x => x.id === id) || {};
-  modal(id ? 'Sửa kiến thức' : 'Thêm kiến thức', `${field('Tiêu đề', 'title', k.title, 'text', true)}${field('Loại tài liệu', 'type', k.type || 'Tài liệu', 'text', true)}<label class="field"><span>Trích yếu</span><textarea name="summary" required>${esc(k.summary)}</textarea></label><label class="field"><span>Ghi chú / nguồn</span><textarea name="note">${esc(k.note)}</textarea></label>`, d => {
+  modal(id ? 'Sửa kiến thức' : 'Thêm kiến thức', `
+    <div class="form-grid">
+      <div class="span2">${field('Tiêu đề văn bản / tài liệu', 'title', k.title, 'text', true)}</div>
+      ${field('Số ký hiệu', 'no', k.no || '183/2026/TT-BCA', 'text', true)}
+      <label class="field"><span>Loại văn bản *</span>
+        <select name="docType">
+          ${['Thông tư', 'Nghị định', 'Quyết định', 'Luật', 'Nghị quyết', 'Hướng dẫn', 'Quy định'].map(t => `<option value="${t}" ${(k.docType || k.type) === t ? 'selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field"><span>Cấp ban hành *</span>
+        <select name="level">
+          ${['Trung ương', 'Địa phương'].map(l => `<option value="${l}" ${k.level === l ? 'selected' : ''}>${l}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field"><span>Cơ quan ban hành *</span>
+        <select name="agency">
+          ${['Bộ Công an', 'Chính phủ', 'Quốc hội', 'Thủ tướng Chính phủ', 'Chủ tịch nước', 'Bộ Thông tin và Truyền thông', 'Bộ Khoa học và Công nghệ', 'Cơ quan khác'].map(a => `<option value="${a}" ${k.agency === a ? 'selected' : ''}>${a}</option>`).join('')}
+        </select>
+      </label>
+      ${field('Ngày ban hành', 'issueDate', k.issueDate || k.date || '2026-10-30', 'date')}
+      ${field('Ngày hiệu lực', 'effectiveDate', k.effectiveDate || '2027-04-30', 'date')}
+      <div class="span2"><label class="field"><span>Trích yếu nội dung *</span><textarea name="summary" required rows="3">${esc(k.summary || '')}</textarea></label></div>
+      <div class="span2"><label class="field"><span>Ghi chú / nguồn</span><textarea name="note" rows="2">${esc(k.note || '')}</textarea></label></div>
+    </div>`, d => {
+    d.type = d.docType;
     if (id) Object.assign(k, d); else state.knowledge.push({ id: uid(), ...d, files: [] });
     done('Đã lưu kiến thức');
   });
@@ -912,10 +1037,11 @@ function knowledgeForm(id) {
 function personDrawer(id) {
   let p = state.people.find(x => x.id === id);
   if (!p) return;
+  let grpName = (typeof groupName === 'function') ? groupName(p.groupId) : (state.taskGroups?.find(g => g.id === p.groupId)?.name || 'Chưa phân nhóm');
   drawer(p.name, 'Hồ sơ cán bộ', `<div class="drawer-body stack person-profile" style="padding:20px">
     <div class="avatar" style="width:64px;height:64px;font-size:24px">${esc(p.name[0])}</div>
     <div class="detail-list">
-      ${[['Chức vụ', p.position], ['Loại nhân sự', p.type], ['Email', p.email || '—'], ['Điện thoại', p.phone || '—'], ['Ghi chú', p.note || '—']].map(([k, v]) => `<div class="detail-pair"><span>${k}</span><span>${esc(v)}</span></div>`).join('')}
+      ${[['Chức vụ', p.position], ['Nhóm chuyên môn', grpName], ['Loại nhân sự', p.type], ['Email', p.email || '—'], ['Điện thoại', p.phone || '—'], ['Ghi chú', p.note || '—']].map(([k, v]) => `<div class="detail-pair"><span>${k}</span><span>${esc(v)}</span></div>`).join('')}
     </div>
     ${admin() ? '<div class="flex gap"><button class="btn" id="editPerson">Chỉnh sửa hồ sơ</button><button class="btn danger" id="deletePerson">Xóa nhân sự</button></div>' : '<div class="notice">Chỉ admin được cập nhật nhân sự và cây tổ.</div>'}
   </div>`);

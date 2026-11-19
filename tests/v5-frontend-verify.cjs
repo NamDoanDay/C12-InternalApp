@@ -55,6 +55,9 @@ class Element {
   }
   addEventListener(event, handler) {}
   focus() {}
+  insertAdjacentHTML(position, html) { this.innerHTML_val += html; }
+  scrollIntoView() {}
+  setSelectionRange() {}
   setAttribute(k, v) { this.attributes[k] = String(v); }
   getAttribute(k) { return this.attributes[k] || null; }
   removeAttribute(k) { delete this.attributes[k]; }
@@ -90,13 +93,13 @@ globalThis.document = {
 
 const store = {};
 globalThis.localStorage = {
-  getItem: (k) => store[k] || null,
+  getItem: (k) => Object.hasOwn(store, k) ? store[k] : null,
   setItem: (k, v) => { store[k] = String(v); },
   removeItem: (k) => { delete store[k]; }
 };
 const sessStore = {};
 globalThis.sessionStorage = {
-  getItem: (k) => sessStore[k] || null,
+  getItem: (k) => Object.hasOwn(sessStore, k) ? sessStore[k] : null,
   setItem: (k, v) => { sessStore[k] = String(v); },
   removeItem: (k) => { delete sessStore[k]; }
 };
@@ -119,8 +122,16 @@ const detailsCode = fs.readFileSync(path.join(__dirname, '../frontend/workspace-
 const orgThemeCode = fs.readFileSync(path.join(__dirname, '../frontend/workspace-org-theme.js'), 'utf8');
 
 const vm = require('node:vm');
-// Run in global scope
-vm.runInThisContext(appCode + '\n' + workspaceCode + '\n' + formsCode + '\n' + detailsCode + '\n' + orgThemeCode);
+// Evaluate classic scripts separately, in actual HTML order. This catches TDZ
+// and late override regressions that concatenating only five scripts misses.
+const html = fs.readFileSync(path.join(__dirname, '../frontend/index.html'), 'utf8');
+const scriptFiles = [...html.matchAll(/<script\s+defer\s+src="([^"?]+)(?:\?[^" ]*)?"/g)].map(m => m[1]);
+assert(scriptFiles.includes('ui-repair.js'), 'Latest UI override is covered');
+for (const file of scriptFiles) {
+  if (file === 'model.js') continue;
+  vm.runInThisContext(fs.readFileSync(path.join(__dirname, '../frontend', file), 'utf8'), {filename:file});
+}
+assert.equal(me().role, 'user', 'Fresh prototype defaults to User demo');
 console.log('✓ All scripts evaluated in unified browser context');
 
 // Test Requirements Verification:
@@ -239,3 +250,52 @@ console.log('✓ Yêu cầu 9: Contrast Engine tự động tính toán độ t�
 console.log('\n========================================');
 console.log('ALL 9 REQUIREMENTS VERIFIED SUCCESSFULLY!');
 console.log('========================================');
+
+// November 17 requirement regressions (render/data checks, not browser layout).
+console.log('\n--- Latest UI requirement regressions ---');
+assert(homeWorkspace().includes('Phòng 4. Tổ 1 HPC-AI'));
+assert(homeWorkspace().includes('Version 1.0'));
+assert(!homeWorkspace().includes('Xem toàn bộ danh mục'));
+for (const g of state.taskGroups.filter(g=>!g.archived)) assert(homeWorkspace().includes(esc(g.name)));
+const savedRole = session;
+session = 'admin';
+activeTaskFilter = {groups:[],officials:[],documents:[],bucket:''};
+const testTask = visibleTasks()[0];
+assert(testTask, 'Seed includes visible tasks');
+for (const query of [testTask.title, testTask.code, fmt(testTask.start), fmt(testTask.due)]) {
+  taskSearch=query;
+  assert(tasksView().includes(`data-task="${testTask.id}"`), 'Task matches title/code/start/due search');
+}
+taskSearch='NO-MATCH-TEST-1738';
+assert(!tasksView().includes('data-task='), 'Unmatched search excludes all rows');
+taskSearch='';
+const taskHTML=taskList([testTask]);
+for (const label of ['STT','Title','Mã công việc (Task)','Trạng thái','Ngày bắt đầu','Ngày kết thúc']) assert(taskHTML.includes(label));
+const originalKnowledge=state.knowledge;
+state.knowledge=[{id:'verify-k',title:'Kiến thức thử',type:'Thông tư',level:'Trung ương',agency:'Bộ Công an',no:'123/TT',date:'2026-11-17',effectiveDate:'2027-01-01',summary:'Trích yếu thử',files:[]}];
+knowledgeFilters={level:'Trung ương',agency:'Bộ Công an',type:'Thông tư'};
+assert(knowledgeView().includes('Kiến thức thử'));
+knowledgeFilters.level='Địa phương';
+assert(!knowledgeView().includes('Kiến thức thử'));
+knowledgeFilters={level:'',agency:'',type:''};
+state.knowledge=originalKnowledge;
+const graphHTML=orgWorkspace();
+assert(graphHTML.includes('data-group-drop='));
+assert(graphHTML.includes('org-unassigned'));
+assert(graphHTML.includes('data-person-drag='));
+session=savedRole;
+assert(!orgWorkspace().includes('draggable="true"'), 'User cannot mutate organization');
+const savedState=JSON.stringify(state);
+const savedFilters=JSON.stringify(activeTaskFilter);
+const savedPage=page;
+formTask=M.clone(testTask);
+formTask.title='UNSAVED TITLE';
+overlayEl.innerHTML='<div>Draft</div>';
+globalThis.confirm=()=>{throw Error('Dismiss must not prompt')};
+closeOverlay();
+assert.equal(overlayEl.innerHTML,'');
+assert.equal(formTask,null);
+assert.equal(JSON.stringify(state),savedState, 'Closing task draft does not mutate saved state');
+assert.equal(JSON.stringify(activeTaskFilter),savedFilters);
+assert.equal(page,savedPage);
+console.log('PASS Latest UI render/data regressions; visual/layout validation is separate.');

@@ -3,8 +3,8 @@ names.tasks = 'Quản lý công việc';
 names.catalog = 'Danh mục Công văn / Văn bản';
 
 const M = C12Model,
-  WF = { processing: 'Đang xử lý', number: 'Đang lấy số', signing: 'Đang trình ký', done: 'Đã hoàn thành' },
-  BUCKET = { done: 'Đã hoàn thành', processing: 'Đang xử lý', late: 'Chậm muộn' };
+  WF = { init: 'Khởi tạo', processing: 'Đang xử lý', number: 'Đang lấy số', signing: 'Đang trình ký', done: 'Đã hoàn thành' },
+  BUCKET = { done: 'Đã hoàn thành', processing: 'Đang xử lý', late: 'Chậm muộn', init: 'Khởi tạo' };
 
 const originalRender = render,
   originalView = view,
@@ -15,6 +15,7 @@ const originalRender = render,
   originalImportForm = importForm;
 
 // Multi-select task filters: OR within same filter, AND across different filters
+let taskSearch = '';
 let activeTaskFilter = { groups: [], officials: [], documents: [], bucket: '' },
   openDropdownKey = '',
   taskTab = 'mine',
@@ -38,7 +39,7 @@ else {
   localStorage.setItem('c12-prototype-v5', JSON.stringify(state));
 }
 
-session = sessionStorage.getItem('c12-v5-session') !== null ? sessionStorage.getItem('c12-v5-session') : (session || 'admin');
+session = sessionStorage.getItem('c12-v5-session') !== null ? sessionStorage.getItem('c12-v5-session') : session;
 
 const persist = () => {
   try {
@@ -257,14 +258,17 @@ function homeWorkspace() {
     </div>
     <div class="welcome-side-card">
       <div class="welcome-side-head">
-        <span>THÔNG TIN NỘI BỘ TỔ 1</span>
+        <span style="font-weight:700; font-size:16px;">THÔNG TIN NỘI BỘ TỔ 1</span>
         ${icon('bell')}
       </div>
       <div class="welcome-side-content">
+        <h4>Phòng 4. Tổ 1 HPC-AI</h4>
+        <div class="team-counts"><span><strong>👮‍♂️ ${state.people.length}</strong> cán bộ</span><span>💼 <strong>${state.taskGroups.filter(g => !g.archived).length}</strong> nhóm</span></div>
         Hệ thống đang vận hành phiên bản Cloud Console <strong>Version 1.0</strong>.
         Hiện có <strong>${ts.length}</strong> công việc trong phạm vi theo dõi.
-        ${lateCount > 0 ? `<span style="color:#ef4444;display:block;margin-top:4px">⚠️ <strong>${lateCount}</strong> công việc chậm muộn cần xử lý.</span>` : ''}
-        ${unreadCount > 0 ? `<span style="color:var(--action);display:block;margin-top:2px">📬 Bạn có <strong>${unreadCount}</strong> thông báo mới.</span>` : ''}
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 16px 0;">
+        ${lateCount > 0 ? `<span style="color:#ef4444;display:block;margin-top:12px">⚠️ <strong>${lateCount}</strong> công việc chậm muộn cần xử lý.</span>` : ''}
+        ${unreadCount > 0 ? `<span style="color:var(--action);display:block;margin-top:4px">📬 Bạn có <strong>${unreadCount}</strong> thông báo mới.</span>` : ''}
       </div>
     </div>
   </div>
@@ -296,7 +300,7 @@ function homeWorkspace() {
 
   <div class="section-title">
     <h2>Công văn gần đây</h2>
-    ${btn('Xem toàn bộ danh mục', 'go-catalog', '', 'text')}
+
   </div>
   <div class="surface">${docTable(state.docs)}</div>
   `;
@@ -344,18 +348,7 @@ function summaryCards(ts) {
 }
 
 function taskList(ts) {
-  return ts.length ? `<div class="task-list">
-    ${ts.map(t => `<button class="task-row" data-task="${t.id}">
-      <span class="task-dot"></span>
-      <span class="task-title">
-        <strong>${esc(t.title)}</strong>
-        <small>${esc(t.assigneeIds.map(userName).join(', '))}</small>
-      </span>
-      <span class="task-code">${esc(t.code)}</span>
-      ${badge(t)}
-      <span class="small muted">${fmt(t.due)}</span>
-    </button>`).join('')}
-  </div>`: '<div class="empty">Chưa có công việc phù hợp với bộ lọc.</div>';
+  return `<div class="table-scroll task-table-wrap"><table class="data-table task-data-table"><thead><tr><th>STT</th><th>Title</th><th>Mã công việc (Task)</th><th>Trạng thái</th><th>Ngày bắt đầu</th><th>Ngày kết thúc</th></tr></thead><tbody>${ts.map((t, i) => `<tr data-task="${t.id}" tabindex="0"><td>${i + 1}</td><td><strong>${esc(t.title)}</strong><small class="task-assignees">${esc(t.assigneeIds.map(userName).join(', '))}</small></td><td>${esc(t.code)}</td><td>${badge(t)}</td><td>${fmt(t.start)}</td><td>${fmt(t.due)}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Chưa có công việc phù hợp.</td></tr>'}</tbody></table></div>`;
 }
 
 // =========================================================
@@ -413,9 +406,15 @@ function taskMatchesFilters(t) {
   return true;
 }
 
+let taskViewMode = 'board';
+let kanbanTab = 'all';
+let statsActiveGroup = '';
+let calSelectedDate = '2026-11-18';
+let calMonth = 10, calYear = 2026;
+
 function tasksView() {
   let all = visibleTasks(),
-    filtered = all.filter(taskMatchesFilters);
+    filtered = all.filter(taskMatchesFilters).filter(t => [t.title, t.code, fmt(t.start), fmt(t.due), t.start, t.due].join(' ').toLocaleLowerCase('vi').includes(taskSearch.toLocaleLowerCase('vi')));
 
   let filtersHtml = `<div class="filters task-filters" style="gap:12px;display:flex;align-items:center;flex-wrap:wrap">
     ${renderMultiSelect('Nhóm quản lý', 'groups', state.taskGroups.filter(g => !g.archived).map(g => [g.id, g.name]), activeTaskFilter.groups)}
@@ -425,46 +424,248 @@ function tasksView() {
       `<button class="btn text" id="clearTaskFilters">${icon('close')} Xóa bộ lọc (${filtered.length}/${all.length})</button>` : ''}
   </div>`;
 
+  let ongoingList = filtered.filter(t => t.status === 'processing' || (!t.status && M.bucket(t) !== 'done' && M.bucket(t) !== 'late')),
+    doneList = filtered.filter(t => t.status === 'done' || M.bucket(t) === 'done'),
+    upcomingList = filtered.filter(t => t.status === 'init' || new Date(t.start) > Date.now()),
+    lateList = filtered.filter(t => t.status === 'paused' || M.bucket(t) === 'late');
+
   return head('Quản lý công việc', '', btn('Tạo công việc mới', 'new-task', 'plus', 'primary')) +
     summaryCards(all) +
-    filtersHtml +
-    (admin() ?
-      `<div class="surface">${taskList(filtered)}</div>` :
-      `<div class="task-two-panels">
-      <section class="surface">
-        <h2>Nhiệm vụ cá nhân (${filtered.filter(t => t.creatorId === session).length})</h2>
-        ${taskList(filtered.filter(t => t.creatorId === session))}
-      </section>
-      <section class="surface">
-        <h2>Được giao cho tôi (${filtered.filter(t => t.creatorId !== session && t.assigneeIds.includes(session)).length})</h2>
-        ${taskList(filtered.filter(t => t.creatorId !== session && t.assigneeIds.includes(session)))}
-      </section>
+    `<div class="kanban-header-bar">
+      <div class="kanban-tabs">
+        <button type="button" class="kanban-tab-btn ${kanbanTab === 'all' ? 'active' : ''}" data-kanban-tab="all">All Task (${filtered.length})</button>
+        <button type="button" class="kanban-tab-btn ${kanbanTab === 'ongoing' ? 'active' : ''}" data-kanban-tab="ongoing">On Going (${ongoingList.length})</button>
+        <button type="button" class="kanban-tab-btn ${kanbanTab === 'done' ? 'active' : ''}" data-kanban-tab="done">Completed (${doneList.length})</button>
+        <button type="button" class="kanban-tab-btn ${kanbanTab === 'upcoming' ? 'active' : ''}" data-kanban-tab="upcoming">Upcoming (${upcomingList.length})</button>
+        <button type="button" class="kanban-tab-btn ${kanbanTab === 'paused' ? 'active' : ''}" data-kanban-tab="paused">Paused (${lateList.length})</button>
+      </div>
+      <div class="view-toggle-btns">
+        <button type="button" class="view-toggle-btn ${taskViewMode === 'board' ? 'active' : ''}" data-task-view-mode="board">
+          ${icon('folder')} Bảng Kanban
+        </button>
+        <button type="button" class="view-toggle-btn ${taskViewMode === 'table' ? 'active' : ''}" data-task-view-mode="table">
+          ${icon('file')} Danh sách Table
+        </button>
+      </div>
     </div>
-    <section class="surface group-task-panel">
-      <h2>Công việc cùng nhóm (${filtered.filter(t => t.creatorId !== session && !t.assigneeIds.includes(session)).length})</h2>
-      ${taskList(filtered.filter(t => t.creatorId !== session && !t.assigneeIds.includes(session)))}
-    </section>`
+    <div class="controls-container">
+      <label class="task-search">
+        ${icon('search')}
+        <input id="taskSearch" value="${esc(taskSearch)}" placeholder="Tìm title, mã task, ngày bắt đầu hoặc ngày kết thúc..." aria-label="Tìm công việc">
+      </label>
+      ${filtersHtml}
+    </div>` +
+    (taskViewMode === 'board' ?
+      renderKanbanBoard(filtered, { ongoingList, doneList, upcomingList, lateList }) :
+      renderTableTasks(filtered)
     );
+}
+
+function renderKanbanBoard(allFiltered, { ongoingList, doneList, upcomingList, lateList }) {
+  let showCol = colKey => kanbanTab === 'all' || kanbanTab === colKey;
+
+  return `<div class="kanban-board">
+    ${showCol('ongoing') ? `
+    <div class="kanban-column">
+      <div class="kanban-col-head">
+        <div class="kanban-col-title"><span class="col-dot blue"></span> On Going</div>
+        <span class="kanban-col-count">${ongoingList.length}</span>
+      </div>
+      ${ongoingList.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
+    </div>` : ''}
+
+    ${showCol('done') ? `
+    <div class="kanban-column">
+      <div class="kanban-col-head">
+        <div class="kanban-col-title"><span class="col-dot green"></span> Completed</div>
+        <span class="kanban-col-count">${doneList.length}</span>
+      </div>
+      ${doneList.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
+    </div>` : ''}
+
+    ${showCol('upcoming') ? `
+    <div class="kanban-column">
+      <div class="kanban-col-head">
+        <div class="kanban-col-title"><span class="col-dot yellow"></span> Upcoming</div>
+        <span class="kanban-col-count">${upcomingList.length}</span>
+      </div>
+      ${upcomingList.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
+    </div>` : ''}
+
+    ${showCol('paused') ? `
+    <div class="kanban-column">
+      <div class="kanban-col-head">
+        <div class="kanban-col-title"><span class="col-dot red"></span> Paused</div>
+        <span class="kanban-col-count">${lateList.length}</span>
+      </div>
+      ${lateList.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
+    </div>` : ''}
+  </div>`;
+}
+
+function renderKanbanCard(t) {
+  let isLate = M.bucket(t) === 'late',
+    isDone = M.bucket(t) === 'done',
+    pct = isDone ? 100 : t.status === 'init' ? 25 : isLate ? 40 : 75;
+
+  return `<div class="kanban-card" data-task="${t.id}" tabindex="0">
+    <div class="kanban-card-head">
+      <strong>${esc(t.title)}</strong>
+      <button type="button" class="icon-btn-sm" style="color:var(--muted)">···</button>
+    </div>
+    <div class="kanban-card-desc">${esc(t.description || 'Nội dung và phân công chi tiết công việc.')}</div>
+    <div class="kanban-card-tags">
+      <span class="kanban-tag">${esc(groupName(t.managementGroupId))}</span>
+      <span class="kanban-tag ${isLate ? 'high' : 'med'}">${isLate ? 'High' : 'Normal'}</span>
+      <span class="kanban-tag" style="background:rgba(59,130,246,0.12);color:#2563eb">${esc(t.code)}</span>
+    </div>
+    <div class="kanban-card-meta">
+      <span>📅 ${fmt(t.due)}</span>
+      <span>@ ${esc(t.unit || 'Phòng 4 · Tổ 1')}</span>
+    </div>
+    <div class="kanban-progress-bar-wrap">
+      <div class="kanban-progress-bar">
+        <div class="kanban-progress-fill" style="width:${pct}%"></div>
+      </div>
+      <span class="kanban-progress-text">${pct}%</span>
+    </div>
+    <div class="kanban-card-foot">
+      <div class="kanban-card-assignees">
+        ${t.assigneeIds.slice(0, 3).map(uid => `<span class="kanban-avatar-overlap" title="${esc(userName(uid))}">${esc(userName(uid)[0])}</span>`).join('')}
+      </div>
+      <span class="kanban-attachment-badge">${icon('paperclip')} ${t.attachments?.length || 1}</span>
+    </div>
+  </div>`;
+}
+
+function renderTableTasks(filtered) {
+  if (admin()) {
+    return `<div class="surface">${taskList(filtered)}</div>`;
+  }
+  return `<div class="task-two-panels">
+    <section class="surface">
+      <h2>Nhiệm vụ cá nhân (${filtered.filter(t => t.creatorId === session).length})</h2>
+      ${taskList(filtered.filter(t => t.creatorId === session))}
+    </section>
+    <section class="surface">
+      <h2>Được giao cho tôi (${filtered.filter(t => t.creatorId !== session && t.assigneeIds.includes(session)).length})</h2>
+      ${taskList(filtered.filter(t => t.creatorId !== session && t.assigneeIds.includes(session)))}
+    </section>
+  </div>
+  <section class="surface group-task-panel">
+    <h2>Công việc cùng nhóm (${filtered.filter(t => t.creatorId !== session && !t.assigneeIds.includes(session)).length})</h2>
+    ${taskList(filtered.filter(t => t.creatorId !== session && !t.assigneeIds.includes(session)))}
+  </section>`;
 }
 
 function statsWorkspace() {
   let ts = visibleTasks();
+
+  // Activities
+  let activities = [
+    { actor: 'Nguyễn Minh An', initials: 'MA', color: '#3b82f6', action: 'Tạo công việc Task-HT-01', time: '18/11/2026 | 08:30', date: '2026-11-18' },
+    { actor: 'Trần Minh Bình', initials: 'MB', color: '#8b5cf6', action: 'Cập nhật tài nguyên hệ thống Cà Mau', time: '18/11/2026 | 09:15', date: '2026-11-18' },
+    { actor: 'Lê Ngọc Chi', initials: 'NC', color: '#10b981', action: 'Hoàn thành nhiệm vụ kiểm tra vận hành', time: '18/11/2026 | 11:20', date: '2026-11-18' },
+    { actor: 'Phạm Quốc Dũng', initials: 'QD', color: '#f59e0b', action: 'Thêm tài liệu kiến thức mới', time: '17/11/2026 | 14:00', date: '2026-11-17' },
+    { actor: 'Vũ Hoàng Hà', initials: 'HH', color: '#ef4444', action: 'Điều chuyển nhân sự sang nhóm Mạng', time: '16/11/2026 | 16:45', date: '2026-11-16' },
+  ];
+
+  let filteredActivities = calSelectedDate ? activities.filter(a => a.date === calSelectedDate) : activities;
+
   return head('Thống kê công việc') +
     summaryCards(ts) +
-    `<section class="surface panel-pad">
-    <h2>Theo nhóm quản lý</h2>
-    <div class="stats-groups" style="margin-top:16px">
-      ${state.taskGroups.filter(g => !g.archived).map(g => {
-      let list = ts.filter(t => t.managementGroupId === g.id);
-      return `<div style="display:grid;grid-template-columns:1.5fr repeat(3,1fr);padding:14px 0;border-bottom:1px solid var(--border)">
-          <strong>${esc(g.name)} (${esc(g.code)})</strong>
-          <span>${list.length} task</span>
-          <span style="color:#059669">${list.filter(t => M.bucket(t) === 'done').length} hoàn thành</span>
-          <span style="color:#dc2626">${list.filter(t => M.bucket(t) === 'late').length} chậm muộn</span>
-        </div>`;
-    }).join('')}
-    </div>
-  </section>`;
+    `<div class="stats-grid-layout">
+      <!-- CỘT TRÁI: THEO NHÓM QUẢN LÝ (ACCORDION) -->
+      <section class="surface panel-pad">
+        <h2 style="margin:0 0 16px">Theo nhóm quản lý</h2>
+        <p class="small muted" style="margin:0 0 16px">Click vào một nhóm để mở rộng xem các công việc chi tiết thuộc nhóm đó.</p>
+        <div class="stats-groups">
+          ${state.taskGroups.filter(g => !g.archived).map(g => {
+            let list = ts.filter(t => t.managementGroupId === g.id);
+            let isExpanded = statsActiveGroup === g.id;
+            return `
+            <div style="border-bottom:1px solid var(--border)">
+              <div class="stats-group-row" data-stats-group="${g.id}" style="display:grid;grid-template-columns:1.5fr repeat(3,1fr) 30px;padding:14px 10px;align-items:center;cursor:pointer;border-radius:8px;background:${isExpanded ? 'var(--tint)' : 'transparent'};transition:background 0.15s">
+                <strong>${esc(g.name)} (${esc(g.code)})</strong>
+                <span>${list.length} task</span>
+                <span style="color:#059669">${list.filter(t => M.bucket(t) === 'done').length} hoàn thành</span>
+                <span style="color:#dc2626">${list.filter(t => M.bucket(t) === 'late').length} chậm muộn</span>
+                <span class="chevron-wrap ${isExpanded ? 'expanded' : ''}" style="display:flex;justify-content:center">${icon('chevron')}</span>
+              </div>
+              ${isExpanded ? `
+                <div style="padding:12px 16px 16px;background:rgba(0,0,0,0.02);border-radius:8px;margin:6px 0 10px">
+                  <h4 style="margin:0 0 10px;font-size:13px;color:var(--text-contrast-secondary)">Danh sách công việc thuộc ${esc(g.name)} (${list.length}):</h4>
+                  ${list.length ? `
+                    <div class="table-scroll">
+                      <table class="data-table" style="font-size:13px">
+                        <thead><tr><th>Mã task</th><th>Tiêu đề</th><th>Trạng thái</th><th>Người nhận</th><th>Hạn</th></tr></thead>
+                        <tbody>
+                          ${list.map(t => `<tr data-task="${t.id}" tabindex="0" style="cursor:pointer">
+                            <td><strong>${esc(t.code)}</strong></td>
+                            <td>${esc(t.title)}</td>
+                            <td>${badge(t)}</td>
+                            <td>${esc(t.assigneeIds.map(userName).join(', '))}</td>
+                            <td>${fmt(t.due)}</td>
+                          </tr>`).join('')}
+                        </tbody>
+                      </table>
+                    </div>
+                  ` : '<p class="small muted" style="margin:0">Chưa có công việc nào thuộc nhóm này.</p>'}
+                </div>
+              ` : ''}
+            </div>`;
+          }).join('')}
+        </div>
+      </section>
+
+      <!-- CỘT PHẢI: CALENDAR & ACTIVITY WIDGET -->
+      <aside>
+        <div class="calendar-widget">
+          <div class="calendar-head">
+            <span>Calender</span>
+            <span style="color:var(--muted)">${icon('chevron')}</span>
+          </div>
+          <div class="calendar-month-nav">
+            <span style="font-weight:600;font-size:14px">Tháng 11 · 2026</span>
+            <div style="display:flex;gap:6px">
+              <button type="button" class="icon-btn-sm" id="calPrevMonth">‹</button>
+              <button type="button" class="icon-btn-sm" id="calNextMonth">›</button>
+            </div>
+          </div>
+          <div class="calendar-days-grid">
+            ${['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map(d => `<span class="calendar-day-label">${d}</span>`).join('')}
+            ${/* Empty slots for Nov 1, 2026 (Sunday starts at 0) */ ''}
+            ${Array.from({ length: 30 }, (_, i) => {
+              let dayNum = i + 1;
+              let dateStr = `2026-11-${String(dayNum).padStart(2, '0')}`;
+              let isSelected = calSelectedDate === dateStr;
+              let isToday = dayNum === 18;
+              return `<button type="button" class="calendar-day-btn ${isSelected ? 'selected' : ''} ${isToday ? 'today' : ''}" data-cal-day="${dateStr}">
+                ${dayNum}
+              </button>`;
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="activity-widget">
+          <div class="activity-head">
+            <h3>Activity</h3>
+            <button type="button" class="link-button" id="activityViewAll" style="font-size:12px;font-weight:600;color:var(--action)">View All</button>
+          </div>
+          <div class="activity-list">
+            ${filteredActivities.map(a => `
+              <div class="activity-item">
+                <div class="activity-avatar" style="background:${a.color}">${a.initials}</div>
+                <div class="activity-content">
+                  <strong>${esc(a.action)}</strong>
+                  <small>${a.actor} · ${a.time}</small>
+                </div>
+              </div>
+            `).join('') || '<p class="small muted" style="padding:10px 0;text-align:center">Không có hoạt động nào trong ngày đã chọn.</p>'}
+          </div>
+        </div>
+      </aside>
+    </div>`;
 }
 
 function workspaceSearch() {
@@ -477,7 +678,37 @@ function workspaceSearch() {
 // EVENT BINDINGS
 // =========================================================
 function bindWorkspace() {
-  document.documentElement.dataset.theme = 'cloud';
+  document.documentElement.dataset.theme = localStorage.getItem('c12-style') || 'glassmorphism';
+
+  // Kanban tabs
+  $$('[data-kanban-tab]').forEach(btn => btn.onclick = () => {
+    kanbanTab = btn.dataset.kanbanTab;
+    render();
+  });
+
+  // Task view mode toggle (Kanban vs Table)
+  $$('[data-task-view-mode]').forEach(btn => btn.onclick = () => {
+    taskViewMode = btn.dataset.taskViewMode;
+    render();
+  });
+
+  // Stats group accordion toggle
+  $$('[data-stats-group]').forEach(row => row.onclick = () => {
+    let gid = row.dataset.statsGroup;
+    statsActiveGroup = statsActiveGroup === gid ? '' : gid;
+    render();
+  });
+
+  // Stats calendar day click
+  $$('[data-cal-day]').forEach(btn => btn.onclick = () => {
+    calSelectedDate = calSelectedDate === btn.dataset.calDay ? '' : btn.dataset.calDay;
+    render();
+  });
+
+  $('#activityViewAll')?.addEventListener('click', () => {
+    calSelectedDate = '';
+    render();
+  });
 
   // Task click to view detail drawer
   $$('[data-task]').forEach(e => e.onclick = () => taskDrawer(e.dataset.task));
@@ -586,6 +817,15 @@ function bindWorkspace() {
   $$('[data-resource-detail]').forEach(e => e.onclick = () => resourceWorkspaceDrawer(e.dataset.resourceDetail));
   $$('[data-cell]').forEach(e => { e.onclick = ev => { ev.stopPropagation(); editWorkspaceCell(e) } });
   $$('[data-legacy]').forEach(e => e.onclick = () => legacyDrawer(e.dataset.legacy));
+  $('#resourceSearchInput')?.addEventListener('input', e => {
+    resourceSearch = e.target.value;
+    render();
+  });
+  $('#clearResourceFilters')?.addEventListener('click', () => {
+    resourceFilters = { officials: [], documents: [], groups: [], levels: [], month: '', self: false };
+    resourceSearch = '';
+    render();
+  });
   $('#legacyToggle')?.addEventListener('click', () => { resourceLegacy = !resourceLegacy; render() });
 }
 

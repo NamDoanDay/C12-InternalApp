@@ -52,9 +52,7 @@ Thẻ tổng hợp và thống kê dùng chung hàm, cùng phạm vi quyền; ta
 
 Sáu nhóm ban đầu: Hạ tầng HT; Mạng/Hạ tầng mạng HTM; Điện nước DN; Máy chủ MC; HPC-AI đề án HPCAI; Quản lý văn bản QLVB. Admin CRUD nhóm.
 
-Graph thể hiện Lãnh đạo phòng → Tổ trưởng → Tổ phó phụ trách nhóm → Thành viên/cán bộ tạm tuyển/nhân viên hợp đồng. Không dùng table thay graph. Node có tên, chức danh, nhóm và loại nhân sự. Person độc lập User; người chưa có tài khoản vẫn nằm graph.
-
-Mỗi người chỉ thuộc một nhóm tại một thời điểm. Admin kéo thả sang nhóm khác hoặc dùng menu Chuyển nhóm cho bàn phím/mobile. Không tạo bản sao hồ sơ hoặc chu kỳ graph.
+Graph thể hiện Lãnh đạo phòng → Tổ trưởng → Các Tổ phó (là người phụ trách nhóm) → Các Thành viên/cán bộ tạm tuyển/nhân viên hợp đồng thuộc vào từng nhóm cụ thể. Dùng graph, cây sơ đồ tổ có thể kéo thả thành viên và sau khi kéo sang nhóm khác thì sẽ cập nhật lại nhóm cho thành viên đó. Thiết kế khung hình (border) riêng cho từng nhóm và có label tên nhóm, tức là hiển thị các nhóm chuyên môn thành nhánh cây. Những thành viên chưa có ở nhóm nào thì vào chung 1 card, có thể kéo thả các thành viên này vào các nhóm và gán vào cập nhật lại nhóm. Node có tên, chức danh, nhóm và loại nhân sự. Person độc lập User; người chưa có tài khoản vẫn nằm graph. Nhóm chưa có tổ phó hiển thị Chưa phân công, không tự gán người phụ trách. Giữ thao tác chọn nhóm thay thế cho bàn phím/mobile.
 
 Mã OFFICIAL theo Nhóm quản lý, ví dụ Task-HT-01; DAILY dùng Task-DAILY-01. **Đề xuất:** số tăng riêng từng tiền tố, không tái sử dụng; mã cũ lưu alias; số có tối thiểu hai chữ số nhưng không giới hạn 99.
 
