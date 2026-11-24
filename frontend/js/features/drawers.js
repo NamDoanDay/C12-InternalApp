@@ -3,27 +3,28 @@ function auth(register = false) {
   $('#app').innerHTML = `<div class="auth-page">
     <div class="auth-card-wrap">
       <section class="auth-card">
-        <div class="auth-brand"><span class="brand-mark">C12</span><span>C12 / P4 - T1 Internal App</span></div>
-        <div class="auth-tabs">
-          <button type="button" class="auth-tab-btn ${!register ? 'active' : ''}" data-action="auth-login">Đăng nhập</button>
-          <button type="button" class="auth-tab-btn ${register ? 'active' : ''}" data-action="auth-register">Đăng ký</button>
-        </div>
         <form id="authForm">
           <div>
-            <h2 style="color:var(--text-contrast-primary);margin:0 0 6px">${register ? 'Đăng ký tài khoản' : 'Chào mừng trở lại'}</h2>
-            <p class="muted" style="margin:0">${register ? 'Tài khoản cần admin phê duyệt.' : 'Đăng nhập để vào không gian làm việc.'}</p>
+            <h2>${register ? 'Tạo tài khoản' : 'Đăng nhập'}</h2>
+            <p class="auth-subtitle">${register ? 'Gửi yêu cầu để quản trị viên phê duyệt.' : 'Chào mừng bạn trở lại không gian làm việc.'}</p>
           </div>
-          ${register ? field('Họ và tên', 'name', '', 'text', true) : ''}
-          ${field('Email', 'email', '', 'email', true)}
-          ${field('Mật khẩu demo', 'password', '', 'password', true)}
+          <div class="auth-tabs">
+            <button type="button" class="auth-tab-btn ${!register ? 'active' : ''}" data-action="auth-login">Đăng nhập</button>
+            <button type="button" class="auth-tab-btn ${register ? 'active' : ''}" data-action="auth-register">Đăng ký</button>
+          </div>
+          ${register ? `<label class="auth-input-wrap"><span class="sr-only">Họ và tên</span>${icon('users')}<input name="name" type="text" autocomplete="name" placeholder="Họ và tên" aria-label="Họ và tên" required></label>` : ''}
+          <label class="auth-input-wrap"><span class="sr-only">Email</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 4H4a2 2 0 0 0-2 2v.4l10 6.25L22 6.4V6a2 2 0 0 0-2-2ZM2 8.75V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8.75l-9.47 5.92a1 1 0 0 1-1.06 0L2 8.75Z"/></svg><input name="email" type="email" autocomplete="username" placeholder="Email" aria-label="Email" required></label>
+          <label class="auth-input-wrap"><span class="sr-only">Mật khẩu</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 9V7a5 5 0 0 0-10 0v2a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-7a3 3 0 0 0-3-3ZM9 7a3 3 0 0 1 6 0v2H9V7Z"/></svg><input id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" aria-label="Mật khẩu" required><button class="auth-password-toggle" id="toggleAuthPassword" type="button" aria-label="Hiện mật khẩu">${icon('eye')}</button></label>
+          ${!register ? `<label class="auth-remember"><input type="checkbox" checked><span>Ghi nhớ đăng nhập</span></label>` : ''}
           <p class="error" id="authError" role="alert"></p>
-          <button type="submit" class="btn primary" style="min-height:42px">${register ? 'Gửi yêu cầu đăng ký' : 'Đăng nhập'}</button>
+          <button type="submit" class="btn primary auth-submit">${register ? 'Gửi yêu cầu đăng ký' : 'Đăng nhập'}</button>
           ${register ? btn('Quay lại đăng nhập', 'auth-login', '', 'text') : `
-          <div class="demo-options">
+          <div class="demo-divider">Hoặc trải nghiệm nhanh</div>
             ${btn('Đăng nhập User demo', 'login-user', '', 'primary')}
             ${btn('Đăng nhập Admin demo', 'login-admin')}
           </div>`}
         </form>
+        ${!register ? `<p class="auth-footer">Chưa có tài khoản? <button type="button" data-action="auth-register">Đăng ký</button></p>` : ''}
       </section>
     </div>
   </div>`;
@@ -33,6 +34,12 @@ function auth(register = false) {
     if (a === 'auth-register') auth(true);
     else if (a === 'auth-login') auth();
     else if (a) action(a);
+  };
+
+  $('#toggleAuthPassword').onclick = () => {
+    let input = $('#authPassword'), visible = input.type === 'password';
+    input.type = visible ? 'text' : 'password';
+    $('#toggleAuthPassword').setAttribute('aria-label', visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
   };
 
   $('#authForm').onsubmit = e => {
