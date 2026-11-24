@@ -27,8 +27,10 @@ assert(fs.existsSync(path.join(frontendDir, 'login-bg.jpg')), 'Tệp login-bg.jp
 assert(stylesCss.includes('login-bg.jpg'), 'CSS phải có background login-bg.jpg');
 assert(stylesCss.includes('.auth-card-wrap'), 'CSS phải có .auth-card-wrap cho card kính mờ');
 assert(appJs.includes('auth-card-wrap'), 'app.js auth() phải wrap bằng auth-card-wrap');
-assert(appJs.includes('auth-tabs'), 'app.js auth() phải có tab chuyển Đăng nhập / Đăng ký');
-assert(appJs.includes('Đăng nhập User demo'), 'Phải có nút Đăng nhập User demo');
+assert(!appJs.includes('auth-tabs'), 'Màn đăng nhập không còn thanh tab phía trên');
+assert(appJs.includes('User Name'), 'Màn đăng nhập có trường tên đăng nhập');
+assert(appJs.includes("Don't have an account?"), 'Liên kết đăng ký hiển thị cuối card');
+assert(!appJs.includes('Đăng nhập User demo'), 'Màn đăng nhập không còn nút demo');
 console.log('✓ Màn hình đăng nhập & hình nền wallpaper anime hồ nước/chú cáo hoàn tất');
 
 // Test 2: Đăng nhập mặc định là tài khoản User

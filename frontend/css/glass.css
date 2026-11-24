@@ -1,4 +1,4 @@
-/* Shared glass surface treatment for the internal console. */
+/* Shared Liquid Glass surfaces. Blur is reserved for top-level chrome/overlays. */
 html,
 body {
   min-height: 100%;
@@ -32,12 +32,37 @@ body.has-workspace-background::before {
   background: var(--workspace-bg) center / cover fixed no-repeat;
 }
 
+/* Only large, independent planes blur; nested cards and table cells stay crisp. */
 .header,
 .sidebar,
 .surface,
 .nav-foot,
 .auth-card,
-.auth-intro,
+.drawer,
+.modal,
+.account-menu,
+.filter-dropdown-menu,
+.filter-multi-dropdown,
+.assignee-picker,
+.task-editor,
+.task-detail {
+  background-color: var(--glass-bg, rgba(255, 255, 255, 0.36));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.55));
+  box-shadow: var(--glass-shadow, 0 12px 32px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7));
+}
+
+.header,
+.sidebar,
+.drawer,
+.modal,
+.account-menu,
+.filter-dropdown-menu,
+.filter-multi-dropdown {
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* Nested surfaces use translucent fills without stacking blur filters. */
 .welcome-banner,
 .activity-widget,
 .calendar-widget,
@@ -58,95 +83,52 @@ body.has-workspace-background::before {
 .catalog-split,
 .person-profile,
 .group-task-panel,
-.drawer,
-.modal,
-.account-menu,
-.filter-dropdown-menu,
-.filter-multi-dropdown,
-.assignee-picker,
-.task-editor,
-.task-detail,
 .panel,
-.card {
-  background-color: var(--glass-bg, rgba(255, 255, 255, 0.68));
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.68));
-  box-shadow: var(--glass-shadow, 0 16px 44px rgba(3, 20, 45, 0.16));
-  -webkit-backdrop-filter: blur(18px) saturate(145%);
-  backdrop-filter: blur(18px) saturate(145%);
+.card,
+.task-editor-side {
+  background-color: color-mix(in srgb, var(--glass-bg, rgba(255, 255, 255, 0.36)) 82%, transparent);
+  border-color: var(--glass-border, rgba(255, 255, 255, 0.55));
+  box-shadow: var(--glass-shadow, 0 12px 32px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7));
 }
 
 .header {
-  background-color: color-mix(in srgb, var(--glass-bg) 84%, transparent);
-  border-color: rgba(255, 255, 255, 0.38);
+  background-color: color-mix(in srgb, var(--glass-bg) 90%, transparent);
+  border-bottom-color: var(--glass-border);
 }
 
 .sidebar {
-  background-color: color-mix(in srgb, var(--glass-bg) 76%, transparent);
-  border-color: rgba(255, 255, 255, 0.32);
+  background-color: color-mix(in srgb, var(--glass-bg) 88%, transparent);
+  border-right-color: var(--glass-border);
 }
 
 .main {
+  min-width: 0;
   background: transparent;
 }
 
-.team-group-list {
-  display: grid;
-  gap: 6px;
-  margin: 12px 0;
-  padding: 0;
-  list-style: none;
-}
-
-.team-group-list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 7px 9px;
-  color: var(--text-contrast-secondary);
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 10px;
-}
-
-.team-group-list li strong {
-  color: var(--text-contrast-primary);
-  text-align: right;
-}
-
 .auth-card,
-.auth-intro,
 .welcome-banner,
+.activity-widget,
+.calendar-widget,
+.summary-card,
+.quick-card,
+.task-two-panels > section,
+.org-workspace,
+.org-tree,
+.kanban-column,
+.graph-group,
+.org-unassigned,
 .knowledge-card,
 .knowledge-card-modern,
-.kanban-card,
-.drawer,
-.modal,
-.account-menu {
-  border-radius: 18px;
-}
-
 .data-table,
 .dynamic-data-table,
-.custom-table-container {
-  overflow: hidden;
-  border-color: rgba(255, 255, 255, 0.48);
-  background: color-mix(in srgb, var(--surface) 86%, transparent);
-}
-
-.data-table thead,
-.dynamic-data-table thead,
-.custom-table-container thead {
-  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
-}
-
-.data-table tbody tr,
-.dynamic-data-table tbody tr {
-  background: color-mix(in srgb, var(--surface) 74%, transparent);
-}
-
-.data-table tbody tr:hover,
-.dynamic-data-table tbody tr:hover {
-  background: var(--table-row-hover);
+.custom-table-container,
+.catalog-split,
+.person-profile,
+.group-task-panel,
+.panel,
+.card {
+  border-radius: 18px;
 }
 
 .btn,
@@ -159,6 +141,7 @@ input,
 select,
 textarea {
   border-color: color-mix(in srgb, var(--glass-border) 76%, var(--border));
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .btn,
@@ -169,8 +152,29 @@ textarea {
 input,
 select,
 textarea {
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.btn,
+.icon-btn,
+.nav-link,
+.nav-group,
+.theme-pill-toggle,
+input,
+select,
+textarea {
+  background-color: color-mix(in srgb, var(--glass-bg) 72%, transparent);
+  border-radius: 12px;
+}
+
+.btn:hover,
+.icon-btn:hover,
+.nav-link:hover,
+.nav-group:hover,
+.theme-pill-toggle:hover {
+  background-color: color-mix(in srgb, var(--glass-bg) 92%, white 8%);
+  border-color: rgba(255, 255, 255, 0.72);
 }
 
 .nav-link.active,
@@ -179,54 +183,186 @@ textarea {
   border-color: color-mix(in srgb, var(--action) 42%, transparent);
 }
 
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--action) 72%, white);
+  outline-offset: 2px;
+}
+
+.data-table,
+.dynamic-data-table,
+.custom-table-container {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.table-scroll,
+.task-table-wrap,
+.custom-table-container {
+  max-width: 100%;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: 16px;
+}
+
+.data-table,
+.dynamic-data-table {
+  width: 100%;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.dynamic-data-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table thead,
+.dynamic-data-table thead {
+  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
+}
+
+.data-table tbody tr,
+.dynamic-data-table tbody tr {
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+}
+
+.data-table tbody tr:hover,
+.dynamic-data-table tbody tr:hover {
+  background: var(--table-row-hover);
+}
+
+.welcome-banner {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+}
+
+.welcome-banner > *,
+.task-two-panels > section,
+.drawer-body,
+.modal-body,
+.drawer-head,
+.modal-head {
+  min-width: 0;
+}
+
 .drawer,
 .modal {
-  background-color: color-mix(in srgb, var(--surface) 94%, transparent);
+  max-width: min(100vw, 1150px);
+  overflow: hidden;
 }
 
-.account-menu {
-  background-color: color-mix(in srgb, var(--surface) 96%, transparent);
+.drawer-body,
+.modal-body {
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-@supports not ((backdrop-filter: blur(1px))) {
+.drawer-triple,
+.task-two-panels,
+.catalog-split {
+  min-width: 0;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
   .header,
   .sidebar,
   .surface,
   .auth-card,
-  .auth-intro,
+  .drawer,
+  .modal,
+  .account-menu,
+  .filter-dropdown-menu,
+  .filter-multi-dropdown,
+  .assignee-picker,
+  .task-editor,
+  .task-detail {
+    background-color: rgba(238, 244, 250, 0.92);
+  }
+
   .welcome-banner,
   .activity-widget,
   .calendar-widget,
+  .summary-card,
+  .quick-card,
+  .task-two-panels > section,
+  .org-workspace,
+  .org-tree,
+  .kanban-card,
+  .kanban-column,
+  .graph-group,
+  .org-unassigned,
   .knowledge-card,
   .knowledge-card-modern,
   .data-table,
   .dynamic-data-table,
-  .drawer,
-  .modal,
-  .account-menu,
-  .card,
-  .panel {
-    background-color: rgba(255, 255, 255, 0.94);
+  .custom-table-container,
+  .catalog-split,
+  .person-profile,
+  .group-task-panel,
+  .panel,
+  .card {
+    background-color: rgba(238, 244, 250, 0.88);
   }
 
   html.dark .header,
   html.dark .sidebar,
   html.dark .surface,
   html.dark .auth-card,
-  html.dark .auth-intro,
+  html.dark .drawer,
+  html.dark .modal,
+  html.dark .account-menu,
+  html.dark .filter-dropdown-menu,
+  html.dark .filter-multi-dropdown,
+  html.dark .assignee-picker,
+  html.dark .task-editor,
+  html.dark .task-detail,
   html.dark .welcome-banner,
   html.dark .activity-widget,
   html.dark .calendar-widget,
+  html.dark .summary-card,
+  html.dark .quick-card,
+  html.dark .task-two-panels > section,
+  html.dark .org-workspace,
+  html.dark .org-tree,
+  html.dark .kanban-card,
+  html.dark .kanban-column,
+  html.dark .graph-group,
+  html.dark .org-unassigned,
   html.dark .knowledge-card,
   html.dark .knowledge-card-modern,
   html.dark .data-table,
   html.dark .dynamic-data-table,
-  html.dark .drawer,
-  html.dark .modal,
-  html.dark .account-menu,
-  html.dark .card,
-  html.dark .panel {
-    background-color: rgba(15, 23, 42, 0.95);
+  html.dark .custom-table-container,
+  html.dark .catalog-split,
+  html.dark .person-profile,
+  html.dark .group-task-panel,
+  html.dark .panel,
+  html.dark .card {
+    background-color: rgba(15, 23, 42, 0.92);
+  }
+}
+
+@media (max-width: 1200px) {
+  .welcome-banner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .header-center {
+    min-width: 0;
+    margin-inline: 12px;
+  }
+
+  .brand {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 32vw;
   }
 }
 
@@ -238,8 +374,191 @@ textarea {
   .header,
   .sidebar,
   .drawer,
-  .modal {
-    -webkit-backdrop-filter: blur(14px) saturate(130%);
-    backdrop-filter: blur(14px) saturate(130%);
+  .modal,
+  .account-menu {
+    -webkit-backdrop-filter: blur(12px) saturate(130%);
+    backdrop-filter: blur(12px) saturate(130%);
+  }
+
+  .header {
+    padding-inline: 10px;
+    gap: 8px;
+  }
+
+  .header-left,
+  .header-right {
+    gap: 6px;
+  }
+
+  .header-center {
+    flex: 1 1 auto;
+    margin-inline: 4px;
+  }
+
+  .header-right .theme-pill-toggle {
+    display: none;
+  }
+
+  .drawer.wide-drawer,
+  .modal.wide,
+  .task-editor-drawer,
+  .task-editor {
+    width: 100vw;
+    min-width: 0;
+    max-width: 100vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* Keep a collapsed navigation completely out of view and interaction. */
+.collapsed .sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border-width: 0 !important;
+  overflow: hidden !important;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transform: translateX(-100%);
+}
+
+.sidebar {
+  visibility: visible;
+}
+
+/* App content can shrink without creating a page-level horizontal scrollbar. */
+html,
+body,
+#app,
+.main {
+  min-width: 0;
+  max-width: 100%;
+}
+
+body,
+#app,
+.main {
+  overflow-x: clip;
+}
+
+.main {
+  padding: 20px 24px;
+}
+
+/* Filter controls and knowledge cards use an even, resilient grid. */
+.knowledge-filters {
+  min-width: 0;
+  gap: 16px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 18px;
+}
+
+.knowledge-filters .field {
+  min-width: min(180px, 100%);
+}
+
+.knowledge-filters .field > span,
+.knowledge-meta,
+.knowledge-meta-text,
+.knowledge-card p,
+.knowledge-card-modern p {
+  color: var(--text-contrast-secondary, #334155);
+}
+
+.knowledge-filters select,
+.knowledge-filters input {
+  color: var(--text-contrast-primary, #0f172a);
+  background-color: color-mix(in srgb, var(--surface) 82%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.knowledge-grid,
+.knowledge-grid-modern {
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.knowledge-card,
+.knowledge-card-modern {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 18px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.knowledge-card h3,
+.knowledge-card p,
+.knowledge-card-modern h3,
+.knowledge-card-modern p,
+.knowledge-card-title,
+.knowledge-meta,
+.knowledge-meta-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.knowledge-meta,
+.knowledge-meta-text {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.knowledge-links,
+.knowledge-actions-bar {
+  min-width: 0;
+  gap: 8px;
+}
+
+html.dark .knowledge-filters .field > span,
+html.dark .knowledge-meta,
+html.dark .knowledge-meta-text,
+html.dark .knowledge-card p,
+html.dark .knowledge-card-modern p {
+  color: #dbe5f2;
+}
+
+html.dark .knowledge-filters select,
+html.dark .knowledge-filters input {
+  color: #f8fafc;
+  background-color: rgba(15, 23, 42, 0.72);
+}
+
+html.dark .knowledge-filters select option {
+  color: #f8fafc;
+  background: #0f172a;
+}
+
+@media (max-width: 720px) {
+  .main {
+    padding: 16px;
+  }
+
+  .knowledge-filters {
+    padding: 16px;
+  }
+
+  .knowledge-grid,
+  .knowledge-grid-modern {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
   }
 }

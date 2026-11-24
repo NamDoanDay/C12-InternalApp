@@ -5,26 +5,18 @@ function auth(register = false) {
       <section class="auth-card">
         <form id="authForm">
           <div>
-            <h2>${register ? 'Tạo tài khoản' : 'Đăng nhập'}</h2>
+            <h2>${register ? 'Đăng ký' : 'Đăng nhập'}</h2>
             <p class="auth-subtitle">${register ? 'Gửi yêu cầu để quản trị viên phê duyệt.' : 'Chào mừng bạn trở lại không gian làm việc.'}</p>
           </div>
-          <div class="auth-tabs">
-            <button type="button" class="auth-tab-btn ${!register ? 'active' : ''}" data-action="auth-login">Đăng nhập</button>
-            <button type="button" class="auth-tab-btn ${register ? 'active' : ''}" data-action="auth-register">Đăng ký</button>
-          </div>
-          ${register ? `<label class="auth-input-wrap"><span class="sr-only">Họ và tên</span>${icon('users')}<input name="name" type="text" autocomplete="name" placeholder="Họ và tên" aria-label="Họ và tên" required></label>` : ''}
-          <label class="auth-input-wrap"><span class="sr-only">Email</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 4H4a2 2 0 0 0-2 2v.4l10 6.25L22 6.4V6a2 2 0 0 0-2-2ZM2 8.75V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8.75l-9.47 5.92a1 1 0 0 1-1.06 0L2 8.75Z"/></svg><input name="email" type="email" autocomplete="username" placeholder="Email" aria-label="Email" required></label>
-          <label class="auth-input-wrap"><span class="sr-only">Mật khẩu</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 9V7a5 5 0 0 0-10 0v2a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-7a3 3 0 0 0-3-3ZM9 7a3 3 0 0 1 6 0v2H9V7Z"/></svg><input id="authPassword" name="password" type="password" autocomplete="current-password" placeholder="Mật khẩu" aria-label="Mật khẩu" required><button class="auth-password-toggle" id="toggleAuthPassword" type="button" aria-label="Hiện mật khẩu">${icon('eye')}</button></label>
+          <label class="auth-input-wrap"><span class="sr-only">${register ? 'Họ và tên' : 'Tên đăng nhập'}</span>${icon('users')}<input name="${register ? 'name' : 'username'}" type="text" autocomplete="${register ? 'name' : 'username'}" placeholder="${register ? 'Họ và tên' : 'User Name'}" aria-label="${register ? 'Họ và tên' : 'Tên đăng nhập'}" required></label>
+          ${register ? `<label class="auth-input-wrap"><span class="sr-only">Email</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 4H4a2 2 0 0 0-2 2v.4l10 6.25L22 6.4V6a2 2 0 0 0-2-2ZM2 8.75V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8.75l-9.47 5.92a1 1 0 0 1-1.06 0L2 8.75Z"/></svg><input name="email" type="email" autocomplete="email" placeholder="Email" aria-label="Email" required></label>` : ''}
+          <label class="auth-input-wrap"><span class="sr-only">Mật khẩu</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 9V7a5 5 0 0 0-10 0v2a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-7a3 3 0 0 0-3-3ZM9 7a3 3 0 0 1 6 0v2H9V7Z"/></svg><input id="authPassword" name="password" type="password" autocomplete="${register ? 'new-password' : 'current-password'}" placeholder="Mật khẩu" aria-label="Mật khẩu" required><button class="auth-password-toggle" id="toggleAuthPassword" type="button" aria-label="Hiện mật khẩu">${icon('eye')}</button></label>
           ${!register ? `<label class="auth-remember"><input type="checkbox" checked><span>Ghi nhớ đăng nhập</span></label>` : ''}
           <p class="error" id="authError" role="alert"></p>
           <button type="submit" class="btn primary auth-submit">${register ? 'Gửi yêu cầu đăng ký' : 'Đăng nhập'}</button>
-          ${register ? btn('Quay lại đăng nhập', 'auth-login', '', 'text') : `
-          <div class="demo-divider">Hoặc trải nghiệm nhanh</div>
-            ${btn('Đăng nhập User demo', 'login-user', '', 'primary')}
-            ${btn('Đăng nhập Admin demo', 'login-admin')}
-          </div>`}
         </form>
-        ${!register ? `<p class="auth-footer">Chưa có tài khoản? <button type="button" data-action="auth-register">Đăng ký</button></p>` : ''}
+        <p class="auth-footer"><span>${register ? 'Already have an account?' : "Don't have an account?"}</span><button type="button" data-action="${register ? 'auth-login' : 'auth-register'}">${register ? 'Login' : 'Signup'}</button></p>
+        ${!register ? `<div class="auth-demo-links" aria-label="Đăng nhập demo">${btn('User demo', 'login-user', '', 'text')} ${btn('Admin demo', 'login-admin', '', 'text')}</div>` : ''}
       </section>
     </div>
   </div>`;
@@ -39,7 +31,12 @@ function auth(register = false) {
   $('#toggleAuthPassword').onclick = () => {
     let input = $('#authPassword'), visible = input.type === 'password';
     input.type = visible ? 'text' : 'password';
-    $('#toggleAuthPassword').setAttribute('aria-label', visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+    let toggle = $('#toggleAuthPassword');
+    toggle.setAttribute('aria-label', visible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+    toggle.setAttribute('aria-pressed', String(visible));
+    toggle.innerHTML = visible
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4 10 7-0.5 1.1-1.2 2.1-2 3M6.2 6.2C3.8 7.5 2.5 9.7 2 12c.7 1.6 1.8 3 3.3 4.1A10.5 10.5 0 0 0 12 19c.8 0 1.6-.1 2.3-.3"/></svg>'
+      : icon('eye');
   };
 
   $('#authForm').onsubmit = e => {
@@ -50,7 +47,8 @@ function auth(register = false) {
       state.users.push({ id: uid(), name: d.name, email: d.email, role: 'user', status: 'pending', personId: '' });
       save(); auth(); toast('Đã gửi đăng ký. Chờ admin phê duyệt.');
     } else {
-      let u = state.users.find(u => u.email.toLowerCase() === d.email.toLowerCase());
+      let identity = d.username.trim().toLocaleLowerCase('vi');
+      let u = state.users.find(u => u.email.toLowerCase() === identity || u.name.toLocaleLowerCase('vi') === identity);
       if (!u || u.status !== 'approved') return $('#authError').textContent = 'Tài khoản không có hoặc chưa được duyệt.';
       login(u.id);
     }
