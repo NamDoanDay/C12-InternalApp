@@ -27,11 +27,11 @@ function renderHeader() {
       </div>
     </div>
     <div class="header-right">
-      <button type="button" class="theme-pill-toggle" data-action="theme" aria-label="Chuyển chế độ sáng / tối" title="Chuyển chế độ Sáng / Tối">
+      <button type="button" class="theme-pill-toggle" data-action="theme" aria-label="Chuyển chế độ sáng / tối" aria-pressed="${isDark}" title="Chuyển chế độ Sáng / Tối">
         <span class="pill-track">
           <span class="pill-thumb"></span>
-          <span class="pill-icon sun">🔆</span>
-          <span class="pill-icon moon">🌙</span>
+          <span class="pill-icon sun">${icon('sun')}</span>
+          <span class="pill-icon moon">${icon('moon')}</span>
         </span>
         <span class="pill-label">${isDark ? 'DARK' : 'LIGHT'}</span>
       </button>

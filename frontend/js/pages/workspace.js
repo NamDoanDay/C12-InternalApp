@@ -264,10 +264,6 @@ function homeWorkspace() {
       <div class="welcome-side-content">
         <h4>Phòng 4. Tổ 1 HPC-AI</h4>
         <div class="team-counts"><span><strong>👮‍♂️ ${state.people.length}</strong> cán bộ</span><span>💼 <strong>${state.taskGroups.filter(g => !g.archived).length}</strong> nhóm</span></div>
-        <ul class="team-group-list" aria-label="Nhóm chuyên môn và người phụ trách">${state.taskGroups.filter(g => !g.archived).map(g => {
-          let lead = state.people.find(p => p.groupId === g.id && Number(p.rank) === 2);
-          return `<li><span>${esc(g.name)}</span><strong>${esc(lead?.name || 'Chưa phân công')}</strong></li>`;
-        }).join('')}</ul>
         Hệ thống đang vận hành phiên bản Cloud Console <strong>Version 1.0</strong>.
         Hiện có <strong>${ts.length}</strong> công việc trong phạm vi theo dõi.
         <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 16px 0;">
