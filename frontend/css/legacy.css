@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap");
-
 /* =========================================================
    C12 INTERNAL APP - V5.1 STYLES
    ========================================================= */
@@ -1017,7 +1015,7 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: center;
   padding: 32px 16px;
-  background: url("login-bg.jpg") no-repeat center center fixed;
+  background: url("../login-bg.jpg") no-repeat center center fixed;
   background-size: cover;
   position: relative;
 }

@@ -7,12 +7,16 @@ console.log('=== TEST SUITE: KIỂM THỬ TOÀN DIỆN CẬP NHẬT GIAO DIỆN 
 
 // 1. Kiểm tra các tệp tin frontend
 const frontendDir = path.join(__dirname, '..', 'frontend');
-const appJs = fs.readFileSync(path.join(frontendDir, 'app.js'), 'utf8');
-const workspaceJs = fs.readFileSync(path.join(frontendDir, 'workspace.js'), 'utf8');
-const workspaceFormsJs = fs.readFileSync(path.join(frontendDir, 'workspace-forms.js'), 'utf8');
-const workspaceDetailsJs = fs.readFileSync(path.join(frontendDir, 'workspace-details.js'), 'utf8');
-const workspaceOrgThemeJs = fs.readFileSync(path.join(frontendDir, 'workspace-org-theme.js'), 'utf8');
-const stylesCss = fs.readFileSync(path.join(frontendDir, 'styles.css'), 'utf8');
+const readFrontend = file => fs.readFileSync(path.join(frontendDir, file), 'utf8');
+const appJs = [
+  'js/core/foundation.js', 'js/pages/app-shell.js', 'js/components/dialogs.js',
+  'js/features/drawers.js', 'js/features/imports.js'
+].map(readFrontend).join('\n');
+const workspaceJs = readFrontend('js/pages/workspace.js');
+const workspaceFormsJs = readFrontend('js/features/task-forms.js');
+const workspaceDetailsJs = readFrontend('js/features/details.js');
+const workspaceOrgThemeJs = readFrontend('js/features/org-theme.js');
+const stylesCss = ['css/legacy.css', 'css/workspace.css', 'css/glass.css'].map(readFrontend).join('\n');
 const indexHtml = fs.readFileSync(path.join(frontendDir, 'index.html'), 'utf8');
 const specMd = fs.readFileSync(path.join(__dirname, '..', 'docs', 'SPEC.md'), 'utf8');
 const changeReqMd = fs.readFileSync(path.join(__dirname, '..', 'docs', 'CHANGE_REQUIREMENTS.md'), 'utf8');

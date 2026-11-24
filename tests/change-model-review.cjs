@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const M = require('../frontend/model.js');
+const M = require('../frontend/js/core/model.js');
 const failures=[]; let passed=0;
 function check(name,fn){try{fn();passed++;console.log('PASS',name)}catch(e){failures.push(name);console.log('FAIL',name,e.message)}}
 function fixture(){return {users:[{id:'a',role:'admin',personId:'pa'},{id:'u',role:'user',personId:'pu'},{id:'v',role:'user',personId:'pv'},{id:'w',role:'user',personId:'pw'}],people:[{id:'pa',groupId:'g1'},{id:'pu',groupId:'g1'},{id:'pv',groupId:'g2'},{id:'pw',groupId:'g3'}],taskGroups:[{id:'g1',code:'HT'},{id:'g2',code:'MC'},{id:'g3',code:'DN'}],tasks:[],officials:[{id:'d1',no:'952',date:'2026-11-01',summary:'Công văn mẫu'}],documents:[],counters:{},notifications:[],orgAudit:[]}}

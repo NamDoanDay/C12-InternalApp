@@ -36,6 +36,7 @@ class Element {
     this.dataset = {};
     this.style = {
       setProperty: (k, v) => { this.style[k] = v; },
+      removeProperty: (k) => { delete this.style[k]; },
       getPropertyValue: (k) => this.style[k] || ''
     };
     this.innerHTML_val = '';
@@ -109,26 +110,31 @@ globalThis.BroadcastChannel = class { postMessage() {} };
 console.log('--- Testing V5 Frontend Architecture ---');
 
 // 1. Check Model
-const M = require('../frontend/model.js');
+const M = require('../frontend/js/core/model.js');
 globalThis.C12Model = M;
 assert(typeof M.saveTask === 'function', 'model.js loaded successfully');
 console.log('✓ model.js loaded');
 
 // Read files content
-const appCode = fs.readFileSync(path.join(__dirname, '../frontend/app.js'), 'utf8');
-const workspaceCode = fs.readFileSync(path.join(__dirname, '../frontend/workspace.js'), 'utf8');
-const formsCode = fs.readFileSync(path.join(__dirname, '../frontend/workspace-forms.js'), 'utf8');
-const detailsCode = fs.readFileSync(path.join(__dirname, '../frontend/workspace-details.js'), 'utf8');
-const orgThemeCode = fs.readFileSync(path.join(__dirname, '../frontend/workspace-org-theme.js'), 'utf8');
+const readFrontend = file => fs.readFileSync(path.join(__dirname, '../frontend', file), 'utf8');
+const appCode = [
+  'js/core/foundation.js', 'js/pages/app-shell.js', 'js/components/dialogs.js',
+  'js/features/drawers.js', 'js/features/imports.js'
+].map(readFrontend).join('\n');
+const workspaceCode = readFrontend('js/pages/workspace.js');
+const formsCode = readFrontend('js/features/task-forms.js');
+const detailsCode = readFrontend('js/features/details.js');
+const orgThemeCode = readFrontend('js/features/org-theme.js');
 
 const vm = require('node:vm');
 // Evaluate classic scripts separately, in actual HTML order. This catches TDZ
 // and late override regressions that concatenating only five scripts misses.
 const html = fs.readFileSync(path.join(__dirname, '../frontend/index.html'), 'utf8');
 const scriptFiles = [...html.matchAll(/<script\s+defer\s+src="([^"?]+)(?:\?[^" ]*)?"/g)].map(m => m[1]);
-assert(scriptFiles.includes('ui-repair.js'), 'Latest UI override is covered');
+assert(scriptFiles.includes('js/core/ui-repair.js'), 'Latest UI override is covered');
 for (const file of scriptFiles) {
-  if (file === 'model.js') continue;
+  if (/^https?:\/\//i.test(file)) continue;
+  if (file.endsWith('/model.js')) continue;
   vm.runInThisContext(fs.readFileSync(path.join(__dirname, '../frontend', file), 'utf8'), {filename:file});
 }
 assert.equal(me().role, 'user', 'Fresh prototype defaults to User demo');

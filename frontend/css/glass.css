@@ -1,0 +1,245 @@
+/* Shared glass surface treatment for the internal console. */
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  position: relative;
+  isolation: isolate;
+  background: transparent !important;
+}
+
+body::before {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  background:
+    linear-gradient(135deg, rgba(10, 38, 74, 0.45), rgba(8, 71, 91, 0.24)),
+    url("../login-bg.jpg") center / cover no-repeat;
+  pointer-events: none;
+  transform: translateZ(0);
+}
+
+html.dark body::before {
+  background:
+    linear-gradient(135deg, rgba(4, 12, 28, 0.76), rgba(7, 29, 48, 0.58)),
+    url("../login-bg.jpg") center / cover no-repeat;
+}
+
+body.has-workspace-background::before {
+  background: var(--workspace-bg) center / cover fixed no-repeat;
+}
+
+.header,
+.sidebar,
+.surface,
+.nav-foot,
+.auth-card,
+.auth-intro,
+.welcome-banner,
+.activity-widget,
+.calendar-widget,
+.summary-card,
+.quick-card,
+.task-two-panels > section,
+.org-workspace,
+.org-tree,
+.kanban-card,
+.kanban-column,
+.graph-group,
+.org-unassigned,
+.knowledge-card,
+.knowledge-card-modern,
+.data-table,
+.dynamic-data-table,
+.custom-table-container,
+.catalog-split,
+.person-profile,
+.group-task-panel,
+.drawer,
+.modal,
+.account-menu,
+.filter-dropdown-menu,
+.filter-multi-dropdown,
+.assignee-picker,
+.task-editor,
+.task-detail,
+.panel,
+.card {
+  background-color: var(--glass-bg, rgba(255, 255, 255, 0.68));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.68));
+  box-shadow: var(--glass-shadow, 0 16px 44px rgba(3, 20, 45, 0.16));
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+
+.header {
+  background-color: color-mix(in srgb, var(--glass-bg) 84%, transparent);
+  border-color: rgba(255, 255, 255, 0.38);
+}
+
+.sidebar {
+  background-color: color-mix(in srgb, var(--glass-bg) 76%, transparent);
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+.main {
+  background: transparent;
+}
+
+.team-group-list {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-group-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 9px;
+  color: var(--text-contrast-secondary);
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 10px;
+}
+
+.team-group-list li strong {
+  color: var(--text-contrast-primary);
+  text-align: right;
+}
+
+.auth-card,
+.auth-intro,
+.welcome-banner,
+.knowledge-card,
+.knowledge-card-modern,
+.kanban-card,
+.drawer,
+.modal,
+.account-menu {
+  border-radius: 18px;
+}
+
+.data-table,
+.dynamic-data-table,
+.custom-table-container {
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.48);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+}
+
+.data-table thead,
+.dynamic-data-table thead,
+.custom-table-container thead {
+  background: color-mix(in srgb, var(--surface-card) 92%, transparent);
+}
+
+.data-table tbody tr,
+.dynamic-data-table tbody tr {
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+}
+
+.data-table tbody tr:hover,
+.dynamic-data-table tbody tr:hover {
+  background: var(--table-row-hover);
+}
+
+.btn,
+.icon-btn,
+.nav-link,
+.nav-group,
+.theme-pill-toggle,
+.chip,
+input,
+select,
+textarea {
+  border-color: color-mix(in srgb, var(--glass-border) 76%, var(--border));
+}
+
+.btn,
+.icon-btn,
+.nav-link,
+.nav-group,
+.theme-pill-toggle,
+input,
+select,
+textarea {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.nav-link.active,
+.nav-group.open {
+  background: color-mix(in srgb, var(--action) 20%, var(--glass-bg));
+  border-color: color-mix(in srgb, var(--action) 42%, transparent);
+}
+
+.drawer,
+.modal {
+  background-color: color-mix(in srgb, var(--surface) 94%, transparent);
+}
+
+.account-menu {
+  background-color: color-mix(in srgb, var(--surface) 96%, transparent);
+}
+
+@supports not ((backdrop-filter: blur(1px))) {
+  .header,
+  .sidebar,
+  .surface,
+  .auth-card,
+  .auth-intro,
+  .welcome-banner,
+  .activity-widget,
+  .calendar-widget,
+  .knowledge-card,
+  .knowledge-card-modern,
+  .data-table,
+  .dynamic-data-table,
+  .drawer,
+  .modal,
+  .account-menu,
+  .card,
+  .panel {
+    background-color: rgba(255, 255, 255, 0.94);
+  }
+
+  html.dark .header,
+  html.dark .sidebar,
+  html.dark .surface,
+  html.dark .auth-card,
+  html.dark .auth-intro,
+  html.dark .welcome-banner,
+  html.dark .activity-widget,
+  html.dark .calendar-widget,
+  html.dark .knowledge-card,
+  html.dark .knowledge-card-modern,
+  html.dark .data-table,
+  html.dark .dynamic-data-table,
+  html.dark .drawer,
+  html.dark .modal,
+  html.dark .account-menu,
+  html.dark .card,
+  html.dark .panel {
+    background-color: rgba(15, 23, 42, 0.95);
+  }
+}
+
+@media (max-width: 720px) {
+  body::before {
+    background-position: 58% center;
+  }
+
+  .header,
+  .sidebar,
+  .drawer,
+  .modal {
+    -webkit-backdrop-filter: blur(14px) saturate(130%);
+    backdrop-filter: blur(14px) saturate(130%);
+  }
+}

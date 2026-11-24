@@ -1,0 +1,10 @@
+{
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.5",
+    "tailwindcss": "^4.3.5"
+  },
+  "scripts": {
+    "build:css": "tailwindcss -i frontend/css/app.css -o frontend/assets/app.css --minify",
+    "watch:css": "tailwindcss -i frontend/css/app.css -o frontend/assets/app.css --watch"
+  }
+}
