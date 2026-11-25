@@ -1,0 +1,953 @@
+/* Final UI consistency layer: keeps page surfaces, controls, and drawers crisp. */
+:root {
+  --ui-surface-radius: 18px;
+  --ui-surface-gap: 16px;
+  --ui-edge-light: rgba(255, 255, 255, 0.42);
+  --ui-shadow-soft: 0 10px 26px rgba(15, 23, 42, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  --status-processing: #3b82f6;
+  --status-done: #22c55e;
+  --status-late: #ef4444;
+}
+
+html.dark {
+  --ui-edge-light: rgba(255, 255, 255, 0.12);
+  --ui-shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
+#app,
+#app .main,
+.surface,
+.drawer,
+.modal,
+.drawer-body,
+.modal-body,
+.task-editor-layout,
+.resource-v7-form,
+.resource-v7-detail,
+.knowledge-grid,
+.knowledge-grid-modern,
+.catalog-split,
+.task-two-panels {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+#app,
+#app .main {
+  overflow-x: clip;
+}
+
+/* One shared theme surface for popup chrome and its body. */
+.drawer,
+.modal,
+.drawer-head,
+.modal-head,
+.drawer-body,
+.modal-body,
+.modal-foot,
+.task-detail-drawer .task-version-list,
+.task-detail-drawer .task-detail-body,
+.resource-detail-drawer .resource-four-zones,
+.resource-detail-drawer .resource-four-zones > aside,
+.resource-detail-drawer .resource-task-content {
+  background-color: var(--glass-shell-bg, var(--glass-bg));
+  color: var(--text-primary);
+}
+
+.drawer-head,
+.modal-head {
+  border-bottom-color: color-mix(in srgb, var(--glass-border) 74%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.surface .data-table,
+.surface .dynamic-data-table,
+.surface .custom-table-container,
+.surface .activity-list,
+.surface .stats-groups,
+.surface .kanban-column,
+.surface .knowledge-card,
+.surface .knowledge-card-modern,
+.surface .quick-card,
+.surface .summary-card {
+  border: 1px solid var(--glass-border);
+  background-color: var(--glass-content-bg);
+  box-shadow: var(--ui-shadow-soft);
+}
+
+.surface .data-table tbody tr,
+.surface .dynamic-data-table tbody tr,
+.surface .custom-table-container tbody tr {
+  background-color: var(--glass-row-bg);
+}
+
+.surface .data-table tbody tr:hover,
+.surface .dynamic-data-table tbody tr:hover,
+.surface .custom-table-container tbody tr:hover {
+  background-color: var(--glass-row-hover);
+}
+
+.surface .btn:not(.primary):not(.danger):not(.text),
+.surface .icon-btn,
+.surface input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.surface select,
+.surface textarea,
+.filter-dropdown-menu,
+.filter-multi-dropdown,
+.assignee-picker {
+  color: var(--text-primary);
+  border-color: var(--glass-border);
+  background-color: var(--glass-control-bg);
+}
+
+.surface .btn:not(.primary):not(.danger):not(.text):hover,
+.surface .icon-btn:hover {
+  border-color: var(--ui-edge-light);
+  background-color: var(--glass-row-hover);
+}
+
+.knowledge-grid,
+.knowledge-grid-modern {
+  gap: var(--ui-surface-gap);
+  align-items: stretch;
+}
+
+.knowledge-card,
+.knowledge-card-modern {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--ui-surface-radius);
+  background-color: var(--glass-content-bg);
+  box-shadow: var(--ui-shadow-soft);
+  overflow-wrap: anywhere;
+}
+
+.knowledge-card h3,
+.knowledge-card p,
+.knowledge-card-modern h3,
+.knowledge-card-modern p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.knowledge-links,
+.knowledge-actions-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.knowledge-links .btn,
+.knowledge-actions-bar .btn {
+  max-width: 100%;
+  white-space: normal;
+}
+
+.resource-v7-form {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.resource-v7-form > .surface {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 16px;
+}
+
+.resource-v7-detail {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(210px, 280px) minmax(0, 1fr);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.resource-v7-timeline,
+.resource-v7-snapshot {
+  min-width: 0;
+  overflow: visible;
+}
+
+.resource-v7-timeline {
+  border-right-color: var(--glass-border);
+  background: var(--glass-shell-bg, var(--glass-bg));
+}
+
+.resource-v7-snapshot > .table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.resource-v7-table tr[data-resource-v7]:focus-visible,
+.catalog-v7-panel tr[data-catalog-v7-row]:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: -2px;
+  background-color: var(--glass-row-hover);
+}
+
+.knowledge-action:focus-visible,
+.surface .btn:focus-visible,
+.surface .icon-btn:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+
+.resource-v7-drawer,
+.task-editor-drawer,
+.task-editor {
+  max-width: min(96vw, 1240px);
+  min-width: min(768px, 96vw);
+}
+
+.task-status-chart,
+.task-primary-document,
+.resource-v7-form > .surface {
+  border-color: var(--glass-border);
+  background-color: var(--glass-content-bg);
+  box-shadow: var(--ui-shadow-soft);
+}
+
+.stats-groups {
+  border-color: var(--glass-border);
+  background: var(--glass-content-bg);
+  box-shadow: var(--ui-shadow-soft);
+}
+
+.stats-groups .stats-group-row {
+  background: var(--glass-row-bg) !important;
+  border-color: var(--glass-border);
+}
+
+.stats-groups .stats-group-row:hover {
+  background: var(--glass-row-hover) !important;
+}
+
+.nav-foot {
+  border-color: var(--glass-border);
+  background-color: var(--glass-shell-bg, var(--glass-bg));
+  box-shadow: var(--ui-shadow-soft);
+}
+
+/* Image 1: keep palette choices readable in narrow modal drawers. */
+.text-palette-presets {
+  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  gap: 10px;
+}
+
+.text-palette-option {
+  min-height: 48px;
+  padding: 9px 12px;
+  line-height: 1.3;
+  overflow-wrap: normal;
+}
+
+.text-palette-option > span:last-child {
+  min-width: 0;
+  text-wrap: balance;
+}
+
+.text-custom-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.text-custom-row label,
+.text-custom-row input[type="color"] {
+  grid-row: 1;
+}
+
+.text-custom-row input[type="color"] {
+  justify-self: end;
+}
+
+.text-custom-row #textColorStatus {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+
+.text-custom-row .text-reset {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
+  min-height: 40px;
+  padding-inline: 14px;
+}
+
+/* Image 2: three workflow buckets, always equal on desktop. */
+.kanban-board {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.kanban-column {
+  min-width: 0;
+}
+
+/* Images 3: filters first, status summary second, workspace controls + results together. */
+.task-filters-surface,
+.task-workspace-surface {
+  min-width: 0;
+  padding: 16px;
+  margin: 0 0 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--ui-surface-radius);
+  background: var(--glass-bg);
+  box-shadow: var(--ui-shadow-soft);
+}
+
+.task-filters-surface .controls-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.task-filters-surface .task-search {
+  flex: 1 1 360px;
+  min-width: min(100%, 300px);
+  max-width: none;
+}
+
+.task-filters-surface .task-search input {
+  width: 100%;
+  min-width: 0;
+}
+
+.task-filters-surface .task-filters {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.task-filters-surface .task-filters > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.task-filter-divider {
+  height: 1px;
+  margin: 16px 0;
+  background: color-mix(in srgb, var(--glass-border) 78%, transparent);
+}
+
+.task-filters-surface .task-status-chart {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.task-filters-surface .task-status-legend {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.task-filters-surface .task-status-legend > strong {
+  grid-column: 1 / -1;
+  width: auto;
+}
+
+.task-filters-surface .task-status-legend > span {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass-control-bg);
+  color: var(--text-primary);
+}
+
+.task-filters-surface .task-status-legend > .status-legend-row > span {
+  min-width: 0;
+}
+
+.task-filters-surface .task-status-legend > .status-legend-row > b {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-workspace-surface .kanban-board {
+  margin-top: 16px;
+}
+
+.task-workspace-surface > .data-table,
+.task-workspace-surface > .table-scroll {
+  margin-top: 16px;
+}
+
+/* Images 4–5: keep modal sections and their controls inside the scroll area. */
+.resource-v7-form > .surface,
+.task-editor-main > .surface,
+.task-editor-main > .task-attachments-section,
+.task-editor-main > .custom-table-container {
+  min-width: 0;
+  min-height: max-content;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.resource-v7-form .toolbar,
+.task-editor-main .toolbar,
+.custom-table-header-bar {
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.resource-v7-form .toolbar h3,
+.task-editor-main .toolbar h3,
+.custom-table-header-bar > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.resource-v7-form .table-scroll,
+.task-editor-main .table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+}
+
+.resource-v7-form .dynamic-data-table,
+.task-editor-main .dynamic-data-table {
+  min-width: max-content;
+}
+
+.task-editor-layout {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: auto;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--glass-shell-bg, var(--glass-bg));
+}
+
+.task-editor-main,
+.task-editor-side {
+  min-width: 0;
+  overflow: visible;
+  background: var(--glass-shell-bg, var(--glass-bg));
+}
+
+.task-editor-drawer > form {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+}
+
+.task-editor-drawer .drawer-head,
+.task-editor-drawer .modal-foot {
+  flex: 0 0 auto;
+  background: var(--glass-shell-bg, var(--glass-bg));
+}
+
+.task-editor-main > .task-primary-document,
+.task-editor-main > .task-attachments-section,
+.task-editor-main > .custom-table-container {
+  border: 1px solid var(--glass-border) !important;
+  border-radius: var(--ui-surface-radius) !important;
+  background: var(--glass-content-bg) !important;
+  box-shadow: var(--ui-shadow-soft);
+  padding: 16px;
+}
+
+.task-editor-main .custom-table-header-bar .flex {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-editor-main .custom-table-header-bar .btn {
+  white-space: nowrap;
+}
+
+.task-editor-main .field,
+.task-editor-side .field {
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .task-filters-surface .controls-container {
+    align-items: stretch;
+  }
+
+  .kanban-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .text-palette-presets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .text-custom-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .text-custom-row #textColorStatus {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .text-custom-row .text-reset {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    justify-self: start;
+  }
+
+  .resource-v7-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .task-filters-surface,
+  .task-workspace-surface {
+    padding: 12px;
+  }
+
+  .task-filters-surface .task-status-chart {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .task-filters-surface .task-status-pie {
+    width: 56px;
+    height: 56px;
+    flex-basis: 56px;
+  }
+
+  .task-filters-surface .task-status-pie::after {
+    inset: 9px;
+  }
+
+  .task-filters-surface .task-status-legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-filters-surface .task-status-legend > strong {
+    grid-column: 1 / -1;
+  }
+
+  .task-filters-surface .task-status-legend > span {
+    justify-content: flex-start;
+    padding: 7px 9px;
+    white-space: normal;
+  }
+
+  .task-editor-main,
+  .task-editor-side {
+    padding: 16px;
+  }
+
+  .kanban-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resource-v7-timeline {
+    border-right: 0;
+    border-bottom: 1px solid var(--glass-border);
+  }
+
+  .resource-v7-form .form-grid,
+  .task-primary-document .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resource-v7-drawer,
+  .task-editor-drawer,
+  .task-editor {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* Donut chart: centered filtered total with a vertical, right-aligned legend. */
+.task-filters-surface .task-status-chart {
+  gap: 24px;
+}
+
+.task-filters-surface .task-status-pie {
+  position: relative;
+  display: grid;
+  flex: 0 0 104px;
+  width: 104px;
+  height: 104px;
+  place-items: center;
+  border: 1px solid var(--glass-border);
+  background: conic-gradient(
+    var(--status-done) 0 var(--done-pct),
+    var(--status-processing) var(--done-pct) calc(var(--done-pct) + var(--processing-pct)),
+    var(--status-late) calc(var(--done-pct) + var(--processing-pct)) 100%
+  );
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.26);
+}
+
+.task-filters-surface .task-status-pie::after {
+  inset: 15px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-shell-bg, var(--glass-bg));
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.task-filters-surface .task-status-pie.is-empty {
+  background: conic-gradient(var(--glass-border) 0 100%);
+}
+
+.task-status-total {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 1px;
+  color: var(--text-primary);
+  text-align: center;
+  line-height: 1.15;
+}
+
+.task-status-total strong {
+  font-size: 23px;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-status-total small {
+  color: var(--text-secondary);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.task-filters-surface .task-status-legend {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: 8px;
+}
+
+.task-filters-surface .task-status-legend > strong {
+  grid-column: 1;
+  margin-bottom: 2px;
+  font-size: 14px;
+}
+
+.task-status-legend i.processing { background-color: var(--status-processing); }
+.task-status-legend i.done { background-color: var(--status-done); }
+.task-status-legend i.late { background-color: var(--status-late); }
+
+@media (max-width: 760px) {
+  .task-filters-surface .task-status-pie {
+    flex-basis: 76px;
+    width: 76px;
+    height: 76px;
+  }
+
+  .task-filters-surface .task-status-pie::after {
+    inset: 12px;
+  }
+
+  .task-status-total strong {
+    font-size: 19px;
+  }
+}
+
+@media (max-width: 420px) {
+  .task-filters-surface .task-status-chart {
+    gap: 10px;
+  }
+
+  .task-filters-surface .task-status-pie {
+    flex-basis: 64px;
+    width: 64px;
+    height: 64px;
+  }
+
+  .task-filters-surface .task-status-pie::after {
+    inset: 10px;
+  }
+
+  .task-filters-surface .task-status-legend > .status-legend-row {
+    grid-template-columns: 9px minmax(0, 1fr) auto;
+    gap: 7px;
+    padding: 8px;
+    font-size: 12px;
+  }
+}
+
+/* Header search: half-height, centered controls within the floating header. */
+#app .header {
+  align-items: center;
+}
+
+#app .header-center {
+  height: 100%;
+  min-height: 0;
+  align-items: center;
+}
+
+#app .global-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 50%;
+  min-height: 30px;
+  max-height: 36px;
+  min-width: 0;
+}
+
+#app .global-search input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0 42px 0 38px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass-control-bg);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+#app .global-search > svg,
+#app .global-search kbd {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+#app .global-search > svg {
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  color: var(--text-icon);
+}
+
+#app .global-search kbd {
+  right: 10px;
+  display: grid;
+  min-width: 22px;
+  min-height: 22px;
+  place-items: center;
+  padding: 0 5px;
+  border-color: var(--glass-border);
+  border-radius: 6px;
+  background: var(--glass-content-bg);
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+/* Crisp donut ring: cut a true transparent hole instead of overlaying a translucent disc. */
+.task-filters-surface .task-status-pie {
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.task-filters-surface .task-status-pie::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    var(--status-done) 0 var(--done-pct),
+    var(--status-processing) var(--done-pct) calc(var(--done-pct) + var(--processing-pct)),
+    var(--status-late) calc(var(--done-pct) + var(--processing-pct)) 100%
+  );
+  -webkit-mask: radial-gradient(circle, transparent 0 35px, #000 37px);
+  mask: radial-gradient(circle, transparent 0 35px, #000 37px);
+}
+
+.task-filters-surface .task-status-pie::after {
+  content: none;
+}
+
+.task-filters-surface .task-status-pie.is-empty::before {
+  background: conic-gradient(var(--glass-border) 0 100%);
+}
+
+.task-status-total {
+  z-index: 1;
+  color: var(--text-primary);
+}
+
+.task-status-total strong {
+  color: var(--text-primary);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.task-status-total small {
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.task-filters-surface .task-status-legend > strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.task-filters-surface .task-status-legend > .status-legend-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  justify-content: initial;
+  gap: 10px;
+  padding: 5px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+  white-space: normal;
+}
+
+.task-status-legend > .status-legend-row > i {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+}
+
+.task-filters-surface .task-status-legend > .status-legend-row > b {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 750;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .task-filters-surface .task-status-pie::before {
+    -webkit-mask: radial-gradient(circle, transparent 0 24px, #000 26px);
+    mask: radial-gradient(circle, transparent 0 24px, #000 26px);
+  }
+}
+
+@media (max-width: 420px) {
+  .task-filters-surface .task-status-pie::before {
+    -webkit-mask: radial-gradient(circle, transparent 0 20px, #000 22px);
+    mask: radial-gradient(circle, transparent 0 20px, #000 22px);
+  }
+}
+
+/* Center the chart as one compact cluster and keep legend columns close. */
+.task-filters-surface .task-status-chart {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+  justify-content: center;
+  gap: 32px;
+}
+
+.task-filters-surface .task-status-pie {
+  flex: 0 0 132px;
+  width: 132px;
+  height: 132px;
+}
+
+.task-filters-surface .task-status-pie::before {
+  -webkit-mask: radial-gradient(circle, transparent 0 44px, #000 46px);
+  mask: radial-gradient(circle, transparent 0 44px, #000 46px);
+}
+
+.task-filters-surface .task-status-legend {
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 100%;
+}
+
+.task-filters-surface .task-status-legend > .status-legend-row {
+  grid-template-columns: 10px minmax(116px, max-content) 28px;
+  justify-content: start;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.task-filters-surface .task-status-legend > .status-legend-row > b {
+  text-align: right;
+}
+
+.task-status-total strong {
+  font-size: 26px;
+}
+
+.task-status-total small {
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .task-filters-surface .task-status-chart {
+    width: 100%;
+    gap: 20px;
+  }
+
+  .task-filters-surface .task-status-pie {
+    flex-basis: 88px;
+    width: 88px;
+    height: 88px;
+  }
+
+  .task-filters-surface .task-status-pie::before {
+    -webkit-mask: radial-gradient(circle, transparent 0 28px, #000 30px);
+    mask: radial-gradient(circle, transparent 0 28px, #000 30px);
+  }
+}
+
+@media (max-width: 420px) {
+  .task-filters-surface .task-status-chart {
+    gap: 12px;
+  }
+
+  .task-filters-surface .task-status-pie {
+    flex-basis: 72px;
+    width: 72px;
+    height: 72px;
+  }
+
+  .task-filters-surface .task-status-pie::before {
+    -webkit-mask: radial-gradient(circle, transparent 0 22px, #000 24px);
+    mask: radial-gradient(circle, transparent 0 22px, #000 24px);
+  }
+
+  .task-filters-surface .task-status-legend > .status-legend-row {
+    grid-template-columns: 9px minmax(100px, max-content) 24px;
+    gap: 6px;
+    font-size: 12px;
+  }
+}

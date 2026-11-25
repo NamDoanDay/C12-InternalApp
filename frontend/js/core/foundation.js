@@ -21,6 +21,7 @@ const paths = {
   check: 'M20 6 9 17l-5-5',
   plus: 'M12 5v14M5 12h14',
   upload: 'M12 16V3m-5 5 5-5 5 5M3 15v6h18v-6',
+  download: 'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
   close: 'm6 6 12 12M6 18 18 6',
   expand: 'M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5',
   filter: 'M3 5h18M6 12h12M10 19h4',

@@ -62,7 +62,13 @@ function closeOverlay() {
   $('#overlay').innerHTML = '';
   setModalScrollLock(false);
   drawerState = null;
-  returnFocus?.focus?.();
+  restoreOverlayFocus();
+}
+
+function restoreOverlayFocus() {
+  const target = returnFocus;
+  returnFocus = null;
+  if (target?.isConnected) requestAnimationFrame(() => target.isConnected && target.focus?.());
 }
 
 function done(message) {
@@ -70,10 +76,12 @@ function done(message) {
   $('#overlay').innerHTML = '';
   setModalScrollLock(false);
   render();
+  restoreOverlayFocus();
   if (message) toast(message);
 }
 
 let lockedPageScrollY = 0;
+let overlayKeyboardHandler = null;
 function setModalScrollLock(open) {
   let root = document.documentElement, body = document.body;
   if (!body) return;
@@ -81,6 +89,31 @@ function setModalScrollLock(open) {
   if (open && !wasLocked) lockedPageScrollY = window.scrollY || 0;
   root.classList.toggle('modal-open', open);
   body.classList.toggle('modal-open', open);
+  if (open && !overlayKeyboardHandler) {
+    overlayKeyboardHandler = e => {
+      if (!document.documentElement.classList.contains('modal-open')) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeOverlay();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const dialog = $('#overlay [role="dialog"]');
+      const focusable = [...(dialog?.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])') || [])]
+        .filter(el => el.getClientRects().length && !el.hasAttribute('hidden'));
+      if (!focusable.length) return;
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && (document.activeElement === first || !dialog.contains(document.activeElement))) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && (document.activeElement === last || !dialog.contains(document.activeElement))) {
+        e.preventDefault(); first.focus();
+      }
+    };
+    document.addEventListener('keydown', overlayKeyboardHandler);
+  } else if (!open && overlayKeyboardHandler) {
+    document.removeEventListener('keydown', overlayKeyboardHandler);
+    overlayKeyboardHandler = null;
+  }
   if (!open && wasLocked) window.scrollTo(0, lockedPageScrollY);
 }
 

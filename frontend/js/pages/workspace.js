@@ -436,15 +436,31 @@ function tasksView() {
 
   let lists = { processing: base.filter(t => M.bucket(t) === 'processing'), done: base.filter(t => M.bucket(t) === 'done'), late: base.filter(t => M.bucket(t) === 'late') };
   let tabs = [['all', '', 'Tổng công việc', base.length], ['processing', 'processing', 'Đang xử lý', counts.processing], ['done', 'done', 'Đã hoàn thành', counts.done], ['late', 'late', 'Chậm muộn', counts.late]];
-  let donePct = base.length ? counts.done / base.length * 100 : 0,
-    processingPct = base.length ? counts.processing / base.length * 100 : 0;
-  let chart = `<div class="task-status-chart" aria-label="Tổng hợp trạng thái công việc">
-    <div class="task-status-pie" style="--done-pct:${donePct}%;--processing-pct:${processingPct}%" role="img" aria-label="${counts.processing} đang xử lý, ${counts.done} đã hoàn thành, ${counts.late} chậm muộn"></div>
-    <div class="task-status-legend"><strong>Trạng thái trong phạm vi lọc</strong><span><i class="processing"></i>Đang xử lý <b>${counts.processing}</b></span><span><i class="done"></i>Đã hoàn thành <b>${counts.done}</b></span><span><i class="late"></i>Chậm muộn <b>${counts.late}</b></span></div>
+  let chartCounts = { processing: 0, done: 0, late: 0 };
+  filtered.forEach(t => chartCounts[M.bucket(t)]++);
+  let chartTotal = filtered.length,
+    donePct = chartTotal ? chartCounts.done / chartTotal * 100 : 0,
+    processingPct = chartTotal ? chartCounts.processing / chartTotal * 100 : 0;
+  let chart = `<div class="task-status-chart" aria-labelledby="taskStatusChartTitle">
+    <div class="task-status-pie ${chartTotal ? '' : 'is-empty'}" style="--done-pct:${donePct}%;--processing-pct:${processingPct}%" role="img" aria-label="${chartTotal} tổng công việc; ${chartCounts.processing} đang xử lý, ${chartCounts.done} đã hoàn thành, ${chartCounts.late} chậm muộn">
+      <span class="task-status-total" aria-hidden="true"><strong>${chartTotal}</strong><small>Tổng công việc</small></span>
+    </div>
+    <div class="task-status-legend"><strong id="taskStatusChartTitle">Trạng thái trong phạm vi lọc</strong><span class="status-legend-row"><i class="processing"></i><span>Đang xử lý</span><b>${chartCounts.processing}</b></span><span class="status-legend-row"><i class="done"></i><span>Đã hoàn thành</span><b>${chartCounts.done}</b></span><span class="status-legend-row"><i class="late"></i><span>Chậm muộn</span><b>${chartCounts.late}</b></span></div>
   </div>`;
 
   return head('Quản lý công việc', '', btn('Tạo công việc mới', 'new-task', 'plus', 'primary'), '', 'task-page-heading') +
-    `<section class="surface task-controls-surface">
+    `<section class="surface task-filters-surface">
+      <div class="controls-container">
+        <label class="task-search">
+          ${icon('search')}
+          <input id="taskSearch" value="${esc(taskSearch)}" placeholder="Tìm title, mã task, ngày bắt đầu hoặc ngày kết thúc..." aria-label="Tìm công việc">
+        </label>
+        ${filtersHtml}
+      </div>
+      <div class="task-filter-divider" aria-hidden="true"></div>
+      ${chart}
+    </section>
+    <section class="surface task-workspace-surface">
     <div class="kanban-header-bar">
       <div class="kanban-tabs">
         ${tabs.map(([id, bucket, title, count]) => `<button type="button" class="kanban-tab-btn ${bucketFilter === bucket ? 'active' : ''}" data-kanban-tab="${id}">${title} (${count})</button>`).join('')}
@@ -457,19 +473,11 @@ function tasksView() {
           ${icon('file')} Danh sách Table
         </button>
       </div>
-    </div>${chart}
-    <div class="controls-container">
-      <label class="task-search">
-        ${icon('search')}
-        <input id="taskSearch" value="${esc(taskSearch)}" placeholder="Tìm title, mã task, ngày bắt đầu hoặc ngày kết thúc..." aria-label="Tìm công việc">
-      </label>
-      ${filtersHtml}
     </div>` +
-    `</section>` +
     (taskViewMode === 'board' ?
       renderKanbanBoard(filtered, { processing: lists.processing.filter(t => !bucketFilter || bucketFilter === 'processing'), done: lists.done.filter(t => !bucketFilter || bucketFilter === 'done'), late: lists.late.filter(t => !bucketFilter || bucketFilter === 'late') }) :
       renderTableTasks(filtered)
-    );
+    ) + `</section>`;
 }
 
 function renderKanbanBoard(allFiltered, { processing, done, late }) {
