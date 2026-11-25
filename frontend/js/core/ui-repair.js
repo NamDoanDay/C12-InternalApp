@@ -1,5 +1,15 @@
 'use strict';
-const repairBaseBind = bindWorkspace; bindWorkspace = function () { repairBaseBind(); if (page === 'personnel' || page === 'accounts') { let bar = document.querySelector('.main>.toolbar'); if (bar) { bar.classList.add('personnel-tabs'); bar.querySelectorAll('[data-action]').forEach(b => b.setAttribute('aria-current', (page === 'accounts' && b.dataset.action === 'go-accounts' || page === 'personnel' && b.dataset.action === 'go-personnel') ? 'page' : 'false')) } let nav = document.querySelector('.sidebar [data-page=personnel]'); if (nav) { nav.classList.add('active'); nav.setAttribute('aria-current', 'page') } } };
+const repairBaseBind = bindWorkspace;
+bindWorkspace = function () {
+  repairBaseBind();
+  if (page === 'personnel' || page === 'accounts') {
+    let tabs = document.querySelector('.page-heading-extra .personnel-tabs');
+    tabs?.querySelectorAll('[data-action]').forEach(b => b.setAttribute('aria-current',
+      (page === 'accounts' && b.dataset.action === 'go-accounts' || page === 'personnel' && b.dataset.action === 'go-personnel') ? 'page' : 'false'));
+    let nav = document.querySelector('.sidebar [data-page=personnel]');
+    if (nav) { nav.classList.add('active'); nav.setAttribute('aria-current', 'page') }
+  }
+};
 
 
 const knowledgeLevels = ['Trung ương', 'Địa phương'];
@@ -8,6 +18,31 @@ const knowledgeTypes = ['Thông tư', 'Nghị định', 'Quyết định', 'Lu�
 knowledgeFilters = { level: '', agency: '', type: '', q: '' };
 function knowledgeSelect(label, name, value, options, filter = false) { return `<label class="field"><span>${label}</span><select ${filter ? `data-knowledge-filter="${name}"` : `name="${name}" required`}><option value="">${filter ? 'Tất cả' : 'Chọn ' + label.toLowerCase()}</option>${[...new Set([...options, ...(value ? [value] : [])])].map(v => `<option ${value === v ? 'selected' : ''} value="${esc(v)}">${esc(v)}</option>`).join('')}</select></label>` }
 knowledgeView = function () { let list = state.knowledge.filter(k => Object.entries(knowledgeFilters).every(([key, v]) => !v || k[key] === v)); return head('Kiến thức tổ', '', btn('Thêm kiến thức', 'add-knowledge', 'plus', 'primary')) + `<div class="knowledge-filters surface">${knowledgeSelect('Cấp ban hành', 'level', knowledgeFilters.level, knowledgeLevels, true)}${knowledgeSelect('Cơ quan ban hành', 'agency', knowledgeFilters.agency, [...knowledgeAgencies, ...state.knowledge.map(k => k.agency).filter(Boolean)], true)}${knowledgeSelect('Loại văn bản', 'type', knowledgeFilters.type, [...knowledgeTypes, ...state.knowledge.map(k => k.type)], true)}<button class="btn" id="clearKnowledgeFilters">Xóa bộ lọc</button></div><div class="knowledge-grid">${list.map(k => `<article class="surface knowledge-card"><span class="chip active">${esc(k.type)}</span><strong class="knowledge-number">Số: ${esc(k.no || 'Chưa cập nhật')}</strong><h3>${esc(k.title)}</h3><p class="muted">${esc(k.summary)}</p><div class="knowledge-meta"><span>Cấp ban hành: <strong>${esc(k.level || 'Chưa cập nhật')}</strong></span><span>Cơ quan ban hành: <strong>${esc(k.agency || 'Chưa cập nhật')}</strong></span><span>Ngày ban hành: ${k.date ? day(k.date) : '—'} · Ngày hiệu lực: ${k.effectiveDate ? day(k.effectiveDate) : '—'}</span></div><div class="knowledge-links">${[['Xem toàn văn', 'file'], ['Thuộc tính', 'settings'], ['Văn bản liên quan', 'book'], ['File đính kèm', 'folder']].map(([label, i]) => `<button class="btn text" style="border: 1px solid " data-knowledge="${k.id}" data-knowledge-section="${label}">${icon(i)}${label}</button>`).join('')}</div></article>`).join('') || '<div class="empty surface">Không có kiến thức phù hợp.</div>'}</div>` };
+knowledgeView = function () {
+  let list = state.knowledge.filter(k => Object.entries(knowledgeFilters).every(([key, v]) => !v || k[key] === v));
+  return head('Kiến thức tổ', '', btn('Thêm kiến thức', 'add-knowledge', 'plus', 'primary')) + `
+    <section class="surface knowledge-content-surface">
+      <div class="knowledge-filter-bar">
+        ${knowledgeSelect('Cấp ban hành', 'level', knowledgeFilters.level, knowledgeLevels, true)}
+        ${knowledgeSelect('Cơ quan ban hành', 'agency', knowledgeFilters.agency, [...knowledgeAgencies, ...state.knowledge.map(k => k.agency).filter(Boolean)], true)}
+        ${knowledgeSelect('Loại văn bản', 'type', knowledgeFilters.type, [...knowledgeTypes, ...state.knowledge.map(k => k.type).filter(Boolean)], true)}
+        <button class="btn" id="clearKnowledgeFilters">Xóa bộ lọc</button>
+      </div>
+      <div class="knowledge-grid">
+        ${list.map(k => `<article class="surface knowledge-card">
+          <span class="chip active">${esc(k.type)}</span>
+          <strong class="knowledge-number">Số: ${esc(k.no || 'Chưa cập nhật')}</strong>
+          <h3>${esc(k.title)}</h3><p class="muted">${esc(k.summary)}</p>
+          <div class="knowledge-meta">
+            <span>Cấp ban hành: <strong>${esc(k.level || 'Chưa cập nhật')}</strong></span>
+            <span>Cơ quan ban hành: <strong>${esc(k.agency || 'Chưa cập nhật')}</strong></span>
+            <span>Ngày ban hành: ${k.date ? day(k.date) : '—'} · Ngày hiệu lực: ${k.effectiveDate ? day(k.effectiveDate) : '—'}</span>
+          </div>
+          <div class="knowledge-links">${[['Xem toàn văn', 'file'], ['Thuộc tính', 'settings'], ['Văn bản liên quan', 'book'], ['File đính kèm', 'folder']].map(([label, i]) => `<button class="btn text knowledge-action-link" data-knowledge="${k.id}" data-knowledge-section="${label}">${icon(i)}${label}</button>`).join('')}</div>
+        </article>`).join('') || '<div class="empty surface">Không có kiến thức phù hợp.</div>'}
+      </div>
+    </section>`;
+};
 knowledgeForm = function (id) { let k = state.knowledge.find(x => x.id === id) || {}; modal(id ? 'Sửa kiến thức' : 'Thêm kiến thức', `<div class="form-grid">${field('Tiêu đề', 'title', k.title, 'text', true)}${field('Số văn bản', 'no', k.no, 'text', true)}${knowledgeSelect('Cấp ban hành', 'level', k.level, knowledgeLevels)}<label class="field"><span>Cơ quan ban hành</span><input name="agency" required list="knowledgeAgencyOptions" value="${esc(k.agency || '')}"><datalist id="knowledgeAgencyOptions">${knowledgeAgencies.map(v => `<option value="${v}">`).join('')}</datalist></label>${knowledgeSelect('Loại văn bản', 'type', k.type, knowledgeTypes)}${field('Ngày ban hành', 'date', k.date, 'date', true)}${field('Ngày hiệu lực', 'effectiveDate', k.effectiveDate, 'date')}<label class="field span2"><span>Trích yếu</span><textarea name="summary" required>${esc(k.summary || '')}</textarea></label><label class="field span2"><span>Nội dung toàn văn</span><textarea name="content">${esc(k.content || '')}</textarea></label><label class="field span2"><span>Văn bản liên quan</span><textarea name="related">${esc(k.related || '')}</textarea></label><label class="field span2"><span>Ghi chú / nguồn</span><textarea name="note">${esc(k.note || '')}</textarea></label><label class="field span2"><span>Tệp đính kèm</span><input name="knowledgeFiles" type="file" multiple></label></div>`, async (d, f) => { let files = [...(k.files || [])]; if (f.elements.knowledgeFiles.files.length) files.push(...await storeFiles(f.elements.knowledgeFiles.files)); if (!f.isConnected) return; delete d.knowledgeFiles; if (id) Object.assign(k, d, { files }); else state.knowledge.push({ id: uid(), ...d, files }); done('Đã lưu kiến thức') }) };
 const knowledgeDetailsBase = knowledgeDrawer;
 knowledgeDrawer = function (id) { knowledgeDetailsBase(id); let k = state.knowledge.find(x => x.id === id); if (!k) return; document.querySelector('#overlay .drawer-body .chip')?.insertAdjacentHTML('afterend', `<div class="detail-list knowledge-properties">${[['Số văn bản', k.no], ['Cấp ban hành', k.level], ['Cơ quan ban hành', k.agency], ['Ngày ban hành', k.date ? day(k.date) : ''], ['Ngày hiệu lực', k.effectiveDate ? day(k.effectiveDate) : '']].map(([a, b]) => `<div class="detail-pair"><span>${a}</span><span>${esc(b || 'Chưa cập nhật')}</span></div>`).join('')}</div><section class="knowledge-fulltext"><h3>Toàn văn</h3><p>${esc(k.content || 'Chưa có nội dung toàn văn. Xem tệp đính kèm nếu có.')}</p></section><section class="knowledge-related"><h3>Văn bản liên quan</h3><p>${esc(k.related || 'Chưa bổ sung văn bản liên quan.')}</p></section>`) };

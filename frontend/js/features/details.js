@@ -1,6 +1,6 @@
 'use strict';
 const legacyUpgradeHeader = upgradeHeader;
-upgradeHeader = function () { if (state.version !== 5) legacyUpgradeHeader() };
+upgradeHeader = function () { if (state.version < 7) legacyUpgradeHeader() };
 
 function taskDetailContent(t, current, readonly = false, docContext = '') {
   return `<div class="task-detail-title">
@@ -27,7 +27,7 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
   ${readonly ? '<p class="notice">Bản lịch sử chỉ đọc. Chọn bản hiện tại để cập nhật dữ liệu.</p>' : ''}
 
   <!-- Custom Table cho Task thường nếu có -->
-  ${t.type === 'daily' && t.customTable ? `
+  ${t.customTable ? `
     <div class="section-title"><h3>${esc(t.customTable.name || 'Bảng dữ liệu tùy chỉnh')}</h3></div>
     <div class="table-scroll compact-scroll">
       <table class="data-table">
@@ -39,50 +39,7 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
     </div>
   `: ''}
 
-  <!-- Tài liệu liên quan theo công văn -->
-  ${t.type === 'document' ? `
-    <div class="section-title"><h3>Tài liệu liên quan</h3></div>
-    <div class="task-linked-docs">
-      ${t.officialIds.map(id => {
-      let d = docBy('officials', id);
-      return d ? `<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
-          <span class="chip active">Công văn ${esc(d.no)}</span>
-          <span style="flex:1">${esc(d.summary)}</span>
-          ${fileLinks(d.files)}
-        </div>`: '';
-    }).join('')}
-      ${t.documentIds.map(id => {
-      let d = docBy('documents', id);
-      return d ? `<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
-          <span class="chip">Văn bản ${esc(d.no)}</span>
-          <span style="flex:1">${esc(d.summary)}</span>
-          ${fileLinks(d.files)}
-        </div>`: '';
-    }).join('')}
-    </div>
-
-    <div class="section-title"><h3>Phụ lục tài nguyên phần cứng</h3></div>
-    <div class="table-scroll compact-scroll">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Hệ thống</th>
-            <th>Tên tài nguyên</th>
-            ${t.resourceColumns.map(c => `<th>${esc(c)}</th>`).join('')}
-            <th>Tệp đính kèm</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${t.resources.map(r => `<tr>
-            <td><strong>${esc(r.system)}</strong></td>
-            <td>${esc(r.name)}</td>
-            ${t.resourceColumns.map(c => `<td>${esc(r.docValues?.[docContext || t.officialIds[0]]?.[c] ?? r.values[c] ?? '—')}</td>`).join('')}
-            <td>${fileLinks(r.files)}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-  `: ''}
+  ${t.type === 'document' ? `<section class="surface task-document-summary"><h3>Văn bản xử lý</h3><dl class="task-meta">${[['Loại văn bản',t.documentType],['Số văn bản',t.documentNumber||'—'],['Trích yếu',t.documentSummary||'—']].map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v||'—')}</dd></div>`).join('')}</dl></section>` : ''}
 
   <!-- Tệp đính kèm khác -->
   ${t.attachments?.length ? `
@@ -168,8 +125,8 @@ function taskDrawer(id, revisionId = '') {
     readonly = !!rev && rev.id !== current.revisions.at(-1).id;
 
   drawer(current.code, current.title, `
-    <div class="task-drawer-layout" style="display:grid;grid-template-columns:230px minmax(0,1fr);flex:1;overflow:hidden">
-      <aside class="task-version-list" style="padding:18px 12px;border-right:1px solid var(--border);overflow-y:auto">
+    <div class="task-drawer-layout">
+      <aside class="task-version-list">
         <h3 style="margin-bottom:12px">Lịch sử công việc</h3>
         <button class="quick-chip btn primary" id="currentTaskVersion" style="width:100%;text-align:left;margin-bottom:8px">Bản hiện tại</button>
         ${current.revisions.slice().reverse().map(r => `
@@ -180,11 +137,12 @@ function taskDrawer(id, revisionId = '') {
           </button>
         `).join('')}
       </aside>
-      <div class="task-detail-body" style="padding:24px;overflow-y:auto">
+      <div class="task-detail-body">
         ${taskDetailContent(shown, current, readonly)}
       </div>
     </div>
   `, true);
+  $('#overlay .drawer')?.classList.add('task-detail-drawer');
 
   $$('[data-task-revision]').forEach(e => e.onclick = () => taskDrawer(id, e.dataset.taskRevision));
   $('#currentTaskVersion').onclick = () => taskDrawer(id);
@@ -385,6 +343,8 @@ function resourceWorkspaceDrawer(key, system = '', docId = '', taskId = '', revI
       </div>
     </div>
   `, true);
+
+  $('#overlay .drawer')?.classList.add('resource-detail-drawer');
 
   $$('[data-system-key]').forEach(e => e.onclick = () => resourceWorkspaceDrawer(e.dataset.systemKey));
   $$('[data-classify]').forEach(e => e.onclick = () => resourceWorkspaceDrawer(currentRow.key, currentRow.system, e.dataset.classify));

@@ -10,6 +10,9 @@ function emptyTask() {
     type: 'document',
     title: '',
     description: '',
+    documentType: 'Công văn',
+    documentNumber: '',
+    documentSummary: '',
     managementGroupId: admin() ? '' : userGroup,
     unit: '',
     agency: '',
@@ -121,10 +124,20 @@ function renderTaskForm() {
               <textarea name="description" rows="3" ${lock} placeholder="Tóm tắt yêu cầu, nội dung chỉ đạo hoặc mục tiêu công việc...">${esc(t.description)}</textarea>
             </label>
 
-            <!-- KHỐI TỆP ĐÍNH KÈM KHÁC ĐƯỢC ĐẨY LÊN NGAY DƯỚI MÔ TẢ -->
+            ${t.type === 'document' ? `<section class="surface task-primary-document">
+              <h3>Văn bản xử lý</h3>
+              <div class="form-grid">
+                <label class="field"><span>Loại văn bản <span class="required">*</span></span><select name="documentType" ${lock}>${M.DOCUMENT_TYPES.map(type => `<option ${type === (t.documentType || 'Công văn') ? 'selected' : ''}>${esc(type)}</option>`).join('')}</select></label>
+                <label class="field"><span>Số văn bản (có thể để trống)</span><input name="documentNumber" value="${esc(t.documentNumber || '')}" ${lock} placeholder="Ví dụ: 2439/QĐ-TTg"></label>
+              </div>
+              <label class="field"><span>Trích yếu (có thể để trống)</span><textarea name="documentSummary" rows="2" ${lock} placeholder="Nhập trích yếu văn bản nếu có">${esc(t.documentSummary || '')}</textarea></label>
+              <p class="small muted">Văn bản sẽ được thêm hoặc liên kết vào Danh mục văn bản khi lưu task.</p>
+            </section>` : ''}
+
+            <!-- Tệp đính kèm độc lập với danh mục văn bản -->
             <div class="task-attachments-section" style="background:var(--app);padding:14px 18px;border-radius:10px;border:1px solid var(--border)">
               <div class="section-title" style="margin:0 0 10px;display:flex;align-items:center;justify-content:space-between">
-                <h3 style="margin:0">Tệp đính kèm khác</h3>
+                <h3 style="margin:0">Tệp đính kèm</h3>
                 <label class="btn text" style="cursor:pointer">
                   <input type="file" id="taskAttachment" multiple hidden>
                   ${icon('upload')} Tải tệp lên
@@ -133,16 +146,13 @@ function renderTaskForm() {
               <div>${fileLinks(t.attachments, true) || '<span class="small muted">Chưa có tệp đính kèm.</span>'}</div>
             </div>
 
-            <!-- PHÂN NHÁNH NGHIỆP VỤ: TASK THƯỜNG VS THEO CÔNG VĂN -->
-            ${t.type === 'daily' ? `
-              <!-- TASK THƯỜNG: BẢNG DỮ LIỆU TÙY CHỈNH (CUSTOM TABLE) -->
-              <div class="custom-table-container">
+            <div class="custom-table-container">
                 <div class="custom-table-header-bar">
                   <div>
-                    <span class="small muted" style="font-weight:600;text-transform:uppercase;color:var(--action)">Bảng dữ liệu tùy chỉnh (Custom Table)</span>
+                    <span class="small muted" style="font-weight:600;text-transform:uppercase;color:var(--action)">${t.type === 'document' ? 'Văn bản liên quan · Bảng dữ liệu tùy chỉnh' : 'Bảng dữ liệu tùy chỉnh (Custom Table)'}</span>
                     <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
                       <label style="font-weight:600;font-size:13.5px">Tên bảng:</label>
-                      <input class="custom-table-name-input" id="customTableName" value="${esc(t.customTable?.name || 'Bảng dữ liệu công việc')}" placeholder="Nhập tên bảng dữ liệu...">
+                      <input class="custom-table-name-input" id="customTableName" value="${esc(t.customTable?.name || 'Văn bản liên quan')}" placeholder="Nhập tên bảng dữ liệu...">
                     </div>
                   </div>
                   <div class="flex gap">
@@ -154,50 +164,6 @@ function renderTaskForm() {
                   ${renderCustomTableEditor(t)}
                 </div>
               </div>
-            `: `
-              <!-- THEO CÔNG VĂN: GIỮ NGUYÊN CÔNG VĂN, VĂN BẢN VÀ PHỤ LỤC TÀI NGUYÊN -->
-              <div class="task-document-section">
-                <div class="section-title" style="margin:0 0 10px;display:flex;align-items:center;justify-content:space-between">
-                  <h3 style="margin:0">Công văn đăng ký <span class="required">*</span></h3>
-                  <button type="button" class="btn text" id="addTaskOfficial">${icon('plus')} Chọn / tạo công văn</button>
-                </div>
-                ${taskCatalogTable('officials', t.officialIds)}
-
-                <div class="section-title" style="margin:16px 0 10px;display:flex;align-items:center;justify-content:space-between">
-                  <h3 style="margin:0">Văn bản chỉ đạo</h3>
-                  <button type="button" class="btn text" id="addTaskDocument">${icon('plus')} Chọn / tạo văn bản</button>
-                </div>
-                ${taskCatalogTable('documents', t.documentIds)}
-              </div>
-
-              <!-- PHỤ LỤC TÀI NGUYÊN: TÍCH HỢP 3 TRƯỜNG ĐƠN VỊ, CƠ QUAN, CẤP QUẢN LÝ -->
-              <div class="resource-appendix-section">
-                <div class="section-title" style="margin:16px 0 10px;display:flex;align-items:center;justify-content:space-between">
-                  <h3 style="margin:0">Phụ lục tài nguyên phần cứng</h3>
-                  <div class="flex gap">
-                    <button type="button" class="btn text" id="importTaskResource">${icon('upload')} Nhập DOCX / Excel</button>
-                    <button type="button" class="btn text" id="addTaskResourceColumn">${icon('plus')} Thêm cột</button>
-                  </div>
-                </div>
-
-                <!-- 3 TRƯỜNG TÍCH HỢP TRONG PHẦN PHỤ LỤC TÀI NGUYÊN -->
-                <div class="form-grid" style="background:var(--app);padding:14px;border-radius:8px;border:1px solid var(--border);margin-bottom:12px">
-                  ${field('Tên đơn vị *', 'unit', t.unit, 'text', t.type === 'document')}
-                  ${field('Cơ quan quản lý *', 'agency', t.agency, 'text', t.type === 'document')}
-                  <label class="field">
-                    <span>Cấp quản lý</span>
-                    <select name="level" id="taskLevel" ${lock}>
-                      <option value="Địa phương" ${t.level !== 'Bộ ngành' ? 'selected' : ''}>Địa phương</option>
-                      <option value="Bộ ngành" ${t.level === 'Bộ ngành' ? 'selected' : ''}>Bộ ngành</option>
-                    </select>
-                  </label>
-                </div>
-
-                ${taskResourceEditor(t)}
-                <button type="button" class="btn text" id="addTaskResourceRow" style="margin-top:8px">${icon('plus')} Thêm dòng tài nguyên</button>
-                <div id="taskImportArea"></div>
-              </div>
-            `}
           </div>
 
           <!-- SIDEBAR: METADATA & PHÂN QUYỀN -->
@@ -470,7 +436,7 @@ function captureTaskForm() {
   if (!formTask || !$('#taskEditor')) return;
   let f = $('#taskEditorForm');
   if (!f) return;
-  for (let k of ['title', 'description', 'type', 'status', 'managementGroupId', 'unit', 'agency', 'level']) {
+  for (let k of ['title', 'description', 'type', 'status', 'managementGroupId', 'unit', 'agency', 'level', 'documentType', 'documentNumber', 'documentSummary']) {
     let el = f.elements?.[k] || f.querySelector?.(`[name="${k}"]`);
     if (el && !el.disabled) formTask[k] = el.value;
   }

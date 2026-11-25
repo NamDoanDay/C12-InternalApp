@@ -62,13 +62,13 @@ function render() {
       <strong style="color:var(--text-contrast-primary)">Không gian điều hướng</strong>
     </div>
     ${nav('home', 'Trang chính', 'home')}
-    <button class="nav-group ${groups.resource ? 'open' : ''}" data-group="resource" aria-expanded="${groups.resource}">
+    <button class="nav-group" data-group="resource" aria-expanded="${groups.resource}">
       ${icon('folder')}
       <span class="nav-group-label">For you (Công việc của bạn)</span>
       <span class="chevron-wrap ${groups.resource ? 'expanded' : ''}">${icon('chevron')}</span>
     </button>
-    ${groups.resource ? nav('stats', 'Thống kê', '', true) + nav('resources', 'Quản lý tài nguyên', '', true) + nav('catalog', 'Danh mục công văn', '', true) : ''}
-    <button class="nav-group ${groups.team ? 'open' : ''}" data-group="team" aria-expanded="${groups.team}">
+    ${groups.resource ? nav('stats', 'Thống kê', '', true) + nav('resources', 'Quản lý tài nguyên', '', true) + nav('catalog', 'Danh mục văn bản', '', true) : ''}
+    <button class="nav-group" data-group="team" aria-expanded="${groups.team}">
       ${icon('book')}
       <span class="nav-group-label">Chuyên môn tổ</span>
       <span class="chevron-wrap ${groups.team ? 'expanded' : ''}">${icon('chevron')}</span>
@@ -107,12 +107,12 @@ function render() {
 // =========================================================
 // YÊU CẦU 3: TIÊU ĐỀ TRANG TỐI GIẢN (LOẠI BỎ PHỤ ĐỀ)
 // =========================================================
-const head = (t, s = '', a = '') => {
+const head = (t, s = '', a = '', extra = '', extraClass = '') => {
   let actionHtml = a || (typeof s === 'string' && (s.includes('<button') || s.includes('class="btn') || s.includes('data-action') || s.includes('<span class="chip')) ? s : '');
-  return `<div class="page-header">
+  return `<section class="surface page-heading-surface ${extraClass}"><div class="page-header">
     <h1 class="page-title">${esc(t)}</h1>
     ${actionHtml ? `<div class="flex gap">${actionHtml}</div>` : ''}
-  </div>`;
+  </div>${extra ? `<div class="page-heading-extra">${extra}</div>` : ''}</section>`;
 };
 
 function view() {
@@ -130,17 +130,16 @@ function view() {
 }
 
 function homeView() {
-  return `<div class="section-title"><h2>Truy cập nhanh</h2></div>
+  return head('Trang chính') + `<section class="surface home-quick-surface"><div class="section-title"><h2>Truy cập nhanh</h2></div>
   <div class="quick-grid">
     ${[
       ['resources', 'folder', 'Quản lý tài nguyên', 'Đối chiếu công văn và cập nhật nhu cầu hạ tầng.'],
-      ['catalog', 'file', 'Danh mục công văn', 'Tìm số, ngày ban hành và trích yếu văn bản.'],
+      ['catalog', 'file', 'Danh mục văn bản', 'Tìm số, ngày ban hành và trích yếu văn bản.'],
       ['knowledge', 'book', 'Kiến thức tổ', 'Tài liệu chuyên môn, hướng dẫn và tham khảo.'],
       ['org', 'tree', 'Cây sơ đồ tổ', 'Thành viên, vai trò và thông tin liên hệ.']
     ].map(([p, i, t, d]) => `<button class="quick-card" data-page="${p}"><span class="quick-icon">${icon(i)}</span><div><h3>${t}</h3><p>${d}</p></div>${icon('arrow')}</button>`).join('')}
-  </div>
-  <div class="section-title"><h2>Công văn gần đây</h2>${btn('Xem danh mục', 'go-catalog', '', 'text')}</div>
-  <div class="surface">${docTable(state.docs)}</div>`;
+  </div></section>
+  <section class="surface home-recent-surface"><div class="section-title"><h2>Công văn gần đây</h2></div>${docTable(state.docs)}</section>`;
 }
 
 function visibleRows() {
@@ -264,7 +263,7 @@ function knowledgeView() {
   });
 
   return head('Kiến thức tổ', '', btn('Thêm kiến thức mới', 'add-knowledge', 'plus', 'primary')) +
-    `<div class="filters" style="margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    `<section class="surface knowledge-content-surface"><div class="filters knowledge-filter-bar">
       <label class="field" style="margin:0"><span>Cấp ban hành</span>
         <select id="kfLevel">
           <option value="">Tất cả cấp</option>
@@ -308,7 +307,7 @@ function knowledgeView() {
         </article>
       `).join('')}
       ${list.length ? '' : '<div class="empty span2">Không có tài liệu phù hợp bộ lọc.</div>'}
-    </div>`;
+    </div></section>`;
 }
 
 function orgView() {
@@ -325,8 +324,8 @@ function orgView() {
 }
 
 function personnelView() {
-  return `<div class="toolbar">${btn('Hồ sơ nhân sự', 'go-personnel', '', 'text')}${btn('Tài khoản & duyệt đăng ký (' + state.users.filter(u => u.status === 'pending').length + ')', 'go-accounts', '', 'text')}</div>` +
-    head('Quản lý nhân sự', '', btn('Thêm nhân sự', 'add-person', 'plus', 'primary')) +
+  let tabs = `<nav class="personnel-tabs" aria-label="Quản lý nhân sự">${btn('Hồ sơ nhân sự', 'go-personnel', '', 'text')}${btn('Tài khoản & duyệt đăng ký (' + state.users.filter(u => u.status === 'pending').length + ')', 'go-accounts', '', 'text')}</nav>`;
+  return head('Quản lý nhân sự', '', btn('Thêm nhân sự', 'add-person', 'plus', 'primary'), tabs) +
     `<div class="surface table-scroll">
     <table class="data-table">
       <thead><tr><th>Họ và tên</th><th>Chức vụ</th><th>Loại nhân sự</th><th>Tài khoản</th></tr></thead>
@@ -343,8 +342,8 @@ function personnelView() {
 }
 
 function accountsView() {
-  return `<div class="toolbar">${btn('Hồ sơ nhân sự', 'go-personnel', '', 'text')}${btn('Tài khoản & duyệt đăng ký', 'go-accounts', '', 'text')}</div>` +
-    head('Tài khoản & duyệt đăng ký', '', btn('Thêm tài khoản', 'add-user', 'plus', 'primary')) +
+  let tabs = `<nav class="personnel-tabs" aria-label="Quản lý nhân sự">${btn('Hồ sơ nhân sự', 'go-personnel', '', 'text')}${btn('Tài khoản & duyệt đăng ký', 'go-accounts', '', 'text')}</nav>`;
+  return head('Tài khoản & duyệt đăng ký', '', btn('Thêm tài khoản', 'add-user', 'plus', 'primary'), tabs) +
     `<div class="surface">
     ${state.users.filter(u => u.status === 'pending').map(u => `<div class="pending-banner">
       <div><strong>${esc(u.name)}</strong><p class="muted small">${esc(u.email)} · Đang chờ duyệt</p></div>

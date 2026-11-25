@@ -4,6 +4,7 @@
 @import "./workspace.css";
 @import "./glass.css";
 @import "./pages/auth.css";
+@import "./rework-v7.css";
 
 @source "../index.html";
 @source "../js/**/*.js";

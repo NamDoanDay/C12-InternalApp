@@ -1,10 +1,10 @@
 'use strict';
 names.tasks = 'Quản lý công việc';
-names.catalog = 'Danh mục Công văn / Văn bản';
+names.catalog = 'Danh mục văn bản';
 
 const M = C12Model,
   WF = { init: 'Khởi tạo', processing: 'Đang xử lý', number: 'Đang lấy số', signing: 'Đang trình ký', done: 'Đã hoàn thành' },
-  BUCKET = { done: 'Đã hoàn thành', processing: 'Đang xử lý', late: 'Chậm muộn', init: 'Khởi tạo' };
+  BUCKET = { done: 'Đã hoàn thành', processing: 'Đang xử lý', late: 'Chậm muộn' };
 
 const originalRender = render,
   originalView = view,
@@ -16,10 +16,10 @@ const originalRender = render,
 
 // Multi-select task filters: OR within same filter, AND across different filters
 let taskSearch = '';
-let activeTaskFilter = { groups: [], officials: [], documents: [], bucket: '' },
+let activeTaskFilter = { groups: [], documents: [], types: [], bucket: '' },
   openDropdownKey = '',
   taskTab = 'mine',
-  resourceFilters = { officials: [], documents: [], groups: [], levels: [], month: '', self: false },
+  resourceFilters = { documents: [], groups: [], levels: [], month: '', self: false },
   resourceLegacy = false,
   formTask = null,
   taskCatalogKind = '',
@@ -29,21 +29,24 @@ let activeTaskFilter = { groups: [], officials: [], documents: [], bucket: '' },
   selectedResourceDoc = '',
   themeOpen = false;
 
-let v5;
-try { v5 = JSON.parse(localStorage.getItem('c12-prototype-v5')) } catch { }
-if (v5?.version === 5) state = v5;
-else {
+let savedV7, savedV6, savedV5;
+try { savedV7 = JSON.parse(localStorage.getItem('c12-prototype-v7')); savedV6 = JSON.parse(localStorage.getItem('c12-prototype-v6')); savedV5 = JSON.parse(localStorage.getItem('c12-prototype-v5')) } catch { }
+if (savedV7?.version === 7) state = savedV7;
+else if (savedV6?.version === 6 || savedV5?.version === 5) {
+  state = M.upgradeV6(savedV6 || savedV5);
+  localStorage.setItem('c12-prototype-v7', JSON.stringify(state));
+} else {
   localStorage.setItem('c12-backup-v4', JSON.stringify(state));
   state = M.migrate(state);
   seedTaskDemo();
-  localStorage.setItem('c12-prototype-v5', JSON.stringify(state));
+  localStorage.setItem('c12-prototype-v7', JSON.stringify(state));
 }
 
 session = sessionStorage.getItem('c12-v5-session') !== null ? sessionStorage.getItem('c12-v5-session') : session;
 
 const persist = () => {
   try {
-    localStorage.setItem('c12-prototype-v5', JSON.stringify(state));
+    localStorage.setItem('c12-prototype-v7', JSON.stringify(state));
     syncChannel?.postMessage({ at: Date.now() });
   } catch {
     throw Error('Bộ nhớ trình duyệt đã đầy. Hãy giảm tệp; phiếu chưa được lưu.');
@@ -52,12 +55,12 @@ const persist = () => {
 window.C12SaveV5 = persist;
 
 let syncChannel;
-try { syncChannel = new BroadcastChannel('c12-v5') } catch { }
+try { syncChannel = new BroadcastChannel('c12-v7') } catch { }
 
 function incoming() {
   let next;
-  try { next = JSON.parse(localStorage.getItem('c12-prototype-v5')) } catch { }
-  if (next?.version === 5) {
+  try { next = JSON.parse(localStorage.getItem('c12-prototype-v7')) } catch { }
+  if (next?.version === 7) {
     state = next;
     if ($('#notifyAll')) {
       render();
@@ -67,7 +70,7 @@ function incoming() {
   }
 }
 syncChannel && (syncChannel.onmessage = incoming);
-window.addEventListener('storage', e => { if (e.key === 'c12-prototype-v5') incoming() });
+window.addEventListener('storage', e => { if (e.key === 'c12-prototype-v7') incoming() });
 
 const groupName = id => state.taskGroups.find(g => g.id === id)?.name || 'Chưa phân nhóm';
 const userName = id => state.users.find(u => u.id === id)?.name || 'Người dùng';
@@ -105,8 +108,9 @@ function seedTaskDemo() {
     }
   }
 
-  let existing = { id: M.id(), no: 'CV-DEMO-01', date: '2026-11-10', summary: 'Đăng ký tài nguyên hạ tầng đám mây', note: 'Mục dùng chung' };
-  state.officials.push(existing);
+  let existing = { id: M.id(), no: 'CV-DEMO-01', date: '2026-11-10', summary: 'Đăng ký tài nguyên hạ tầng đám mây', documentType: 'Công văn', type: 'Công văn', note: 'Mục dùng chung', files: [] };
+  state.documents.push(existing);
+  state.officials = state.documents;
 
   let a = state.users.find(x => x.role === 'user' && x.status === 'approved') || u,
     b = state.users.find(x => x.id !== a.id && x.role === 'user' && x.status === 'approved') || a;
@@ -126,9 +130,12 @@ function seedTaskDemo() {
       start: start.toISOString(),
       due: due.toISOString(),
       status: i === 2 ? 'done' : 'processing',
+      documentType: i === 2 ? '' : 'Công văn',
+      documentNumber: i === 2 ? '' : existing.no,
+      documentSummary: i === 2 ? '' : existing.summary,
       officialIds: i === 2 ? [] : [existing.id],
       documentIds: [],
-      resources: i === 2 ? [] : [{ id: M.id(), system: 'Hệ thống quản lý văn bản và điều hành', name: 'Máy chủ ứng dụng', values: { vCPU: i ? 32 : 16, 'RAM (GB)': i ? 64 : 32 }, files: [] }],
+      resources: [],
       resourceColumns: ['vCPU', 'RAM (GB)'],
       customFields: [],
       attachments: [],
@@ -155,7 +162,7 @@ render = function () {
     let link = $('[data-page=resources]');
     link?.insertAdjacentHTML('beforebegin', nav('tasks', 'Quản lý công việc', '', true));
     let catalog = $('[data-page=catalog]');
-    if (catalog) catalog.innerHTML = `<span>Danh mục Công văn / Văn bản</span>`;
+    if (catalog) catalog.innerHTML = `<span>Danh mục văn bản</span>`;
   }
 
   // Ensure personal theme applied
@@ -231,7 +238,7 @@ function homeWorkspace() {
     unreadCount = state.notifications.filter(n => n.recipientId === session && !n.read).length,
     lateCount = ts.filter(t => M.bucket(t) === 'late').length;
 
-  return `
+  return head('Trang chính') + `<section class="surface home-overview-surface">` + `
   <!-- Welcome Banner Google Cloud Console -->
   <div class="welcome-banner">
     <div class="welcome-main">
@@ -252,7 +259,7 @@ function homeWorkspace() {
         <button type="button" class="quick-chip primary" data-action="new-task">${icon('plus')} Tạo công việc mới</button>
         <button type="button" class="quick-chip" data-page="resources">${icon('folder')} Tra cứu tài nguyên</button>
         <button type="button" class="quick-chip" data-page="org">${icon('tree')} Sơ đồ tổ</button>
-        <button type="button" class="quick-chip" data-page="catalog">${icon('file')} Danh mục công văn</button>
+        <button type="button" class="quick-chip" data-page="catalog">${icon('file')} Danh mục văn bản</button>
         <button type="button" class="quick-chip" data-page="stats">${icon('chart')} Báo cáo tiến độ</button>
       </div>
     </div>
@@ -275,16 +282,17 @@ function homeWorkspace() {
 
   <!-- Thẻ Task Summaries Compact -->
   ${summaryCards(ts)}
+  </section>
 
   <!-- Khu vực Quick access: Lưới thẻ thoáng đãng (gap 20-24px) -->
-  <div class="section-title">
+  <section class="surface home-quick-surface"><div class="section-title">
     <h2>Truy cập nhanh</h2>
   </div>
   <div class="quick-grid">
     ${[
       ['tasks', 'folder', 'Quản lý công việc', 'Phân công nhiệm vụ, cập nhật tiến độ và theo dõi trạng thái chung.'],
       ['resources', 'folder', 'Dữ liệu tài nguyên', 'Đối chiếu thông số kỹ thuật vCPU, RAM, Disk theo từng công văn.'],
-      ['catalog', 'file', 'Danh mục công văn / văn bản', 'Tra cứu thông tin ban hành, trích yếu và tệp đính kèm.'],
+      ['catalog', 'file', 'Danh mục văn bản', 'Tra cứu thông tin ban hành, trích yếu và tệp đính kèm.'],
       ['org', 'tree', 'Cây sơ đồ tổ', 'Cơ cấu lãnh đạo phòng, chỉ huy tổ và các nhóm chuyên môn nghiệp vụ.'],
       ['knowledge', 'book', 'Kiến thức tổ', 'Kho tài liệu chuyên môn, căn cứ pháp lý và hướng dẫn kỹ thuật.'],
       ['stats', 'chart', 'Thống kê tiến độ', 'Báo cáo tổng hợp số liệu công việc hoàn thành và quá hạn theo nhóm.']
@@ -296,20 +304,20 @@ function homeWorkspace() {
       </div>
       ${icon('arrow')}
     </button>`).join('')}
-  </div>
+  </div></section>
 
-  <div class="section-title">
-    <h2>Công văn gần đây</h2>
+  <section class="surface home-recent-surface"><div class="section-title">
+    <h2>Văn bản gần đây</h2>
 
   </div>
-  <div class="surface">${docTable(state.docs)}</div>
+  ${docTable(state.docs)}</section>
   `;
 }
 
 // =========================================================
 // YÊU CẦU 2: THẺ TASK SUMMARIES COMPACT VỚI ICON TRẠNG THÁI RIÊNG
 // =========================================================
-function summaryCards(ts) {
+function summaryCards(ts, includeTotal = true) {
   let doneCount = ts.filter(t => M.bucket(t) === 'done').length,
     procCount = ts.filter(t => M.bucket(t) === 'processing').length,
     lateCount = ts.filter(t => M.bucket(t) === 'late').length,
@@ -337,13 +345,13 @@ function summaryCards(ts) {
         <span>Chậm muộn</span>
       </div>
     </button>
-    <button type="button" class="summary-card total" data-bucket="">
+    ${includeTotal ? `<button type="button" class="summary-card total" data-bucket="">
       <div class="summary-icon-wrap">${icon('folder')}</div>
       <div class="summary-content">
         <strong>${totalCount}</strong>
         <span>Tổng công việc</span>
       </div>
-    </button>
+    </button>` : ''}
   </div>`;
 }
 
@@ -389,16 +397,13 @@ function taskMatchesFilters(t) {
     let match = activeTaskFilter.groups.some(gid => groupsOfTask.includes(gid) || t.managementGroupId === gid);
     if (!match) return false;
   }
-  // 2. Công văn: logic OR nội bộ
-  if (activeTaskFilter.officials.length > 0) {
-    let match = activeTaskFilter.officials.some(oid => t.officialIds.includes(oid));
-    if (!match) return false;
-  }
-  // 3. Văn bản: logic OR nội bộ
+  // Primary and related documents use the same catalog.
   if (activeTaskFilter.documents.length > 0) {
-    let match = activeTaskFilter.documents.some(did => t.documentIds.includes(did));
+    let ids = [t.documentId, ...(t.documentIds || []), ...(t.officialIds || [])].filter(Boolean);
+    let match = activeTaskFilter.documents.some(did => ids.includes(did));
     if (!match) return false;
   }
+  if (activeTaskFilter.types.length > 0 && !activeTaskFilter.types.includes(t.type)) return false;
   // 4. Trạng thái bucket
   if (activeTaskFilter.bucket && M.bucket(t) !== activeTaskFilter.bucket) {
     return false;
@@ -407,37 +412,42 @@ function taskMatchesFilters(t) {
 }
 
 let taskViewMode = 'board';
-let kanbanTab = 'all';
 let statsActiveGroup = '';
 let calSelectedDate = '2026-11-18';
 let calMonth = 10, calYear = 2026;
 
 function tasksView() {
   let all = visibleTasks(),
-    filtered = all.filter(taskMatchesFilters).filter(t => [t.title, t.code, fmt(t.start), fmt(t.due), t.start, t.due].join(' ').toLocaleLowerCase('vi').includes(taskSearch.toLocaleLowerCase('vi')));
+    bucketFilter = activeTaskFilter.bucket;
+  activeTaskFilter.bucket = '';
+  let base = all.filter(taskMatchesFilters).filter(t => [t.title, t.code, fmt(t.start), fmt(t.due), t.start, t.due].join(' ').toLocaleLowerCase('vi').includes(taskSearch.toLocaleLowerCase('vi')));
+  activeTaskFilter.bucket = bucketFilter;
+  let counts = { processing: 0, done: 0, late: 0 };
+  base.forEach(t => counts[M.bucket(t)]++);
+  let filtered = bucketFilter ? base.filter(t => M.bucket(t) === bucketFilter) : base;
 
   let filtersHtml = `<div class="filters task-filters" style="gap:12px;display:flex;align-items:center;flex-wrap:wrap">
     ${renderMultiSelect('Nhóm quản lý', 'groups', state.taskGroups.filter(g => !g.archived).map(g => [g.id, g.name]), activeTaskFilter.groups)}
-    ${renderMultiSelect('Công văn', 'officials', state.officials.filter(d => !d.archived).map(d => [d.id, d.no]), activeTaskFilter.officials)}
-    ${renderMultiSelect('Văn bản', 'documents', state.documents.filter(d => !d.archived).map(d => [d.id, d.no]), activeTaskFilter.documents)}
-    ${(activeTaskFilter.groups.length || activeTaskFilter.officials.length || activeTaskFilter.documents.length || activeTaskFilter.bucket) ?
+    ${renderMultiSelect('Văn bản', 'documents', state.documents.filter(d => !d.archived).map(d => [d.id, `${d.documentType || d.type} · ${d.no || 'Chưa có số'}`]), activeTaskFilter.documents)}
+    ${renderMultiSelect('Loại công việc', 'types', [['document', 'Xử lý văn bản'], ['daily', 'Task thường']], activeTaskFilter.types)}
+    ${(activeTaskFilter.groups.length || activeTaskFilter.documents.length || activeTaskFilter.types.length || activeTaskFilter.bucket) ?
       `<button class="btn text" id="clearTaskFilters">${icon('close')} Xóa bộ lọc (${filtered.length}/${all.length})</button>` : ''}
   </div>`;
 
-  let ongoingList = filtered.filter(t => t.status === 'processing' || (!t.status && M.bucket(t) !== 'done' && M.bucket(t) !== 'late')),
-    doneList = filtered.filter(t => t.status === 'done' || M.bucket(t) === 'done'),
-    upcomingList = filtered.filter(t => t.status === 'init' || new Date(t.start) > Date.now()),
-    lateList = filtered.filter(t => t.status === 'paused' || M.bucket(t) === 'late');
+  let lists = { processing: base.filter(t => M.bucket(t) === 'processing'), done: base.filter(t => M.bucket(t) === 'done'), late: base.filter(t => M.bucket(t) === 'late') };
+  let tabs = [['all', '', 'Tổng công việc', base.length], ['processing', 'processing', 'Đang xử lý', counts.processing], ['done', 'done', 'Đã hoàn thành', counts.done], ['late', 'late', 'Chậm muộn', counts.late]];
+  let donePct = base.length ? counts.done / base.length * 100 : 0,
+    processingPct = base.length ? counts.processing / base.length * 100 : 0;
+  let chart = `<div class="task-status-chart" aria-label="Tổng hợp trạng thái công việc">
+    <div class="task-status-pie" style="--done-pct:${donePct}%;--processing-pct:${processingPct}%" role="img" aria-label="${counts.processing} đang xử lý, ${counts.done} đã hoàn thành, ${counts.late} chậm muộn"></div>
+    <div class="task-status-legend"><strong>Trạng thái trong phạm vi lọc</strong><span><i class="processing"></i>Đang xử lý <b>${counts.processing}</b></span><span><i class="done"></i>Đã hoàn thành <b>${counts.done}</b></span><span><i class="late"></i>Chậm muộn <b>${counts.late}</b></span></div>
+  </div>`;
 
-  return head('Quản lý công việc', '', btn('Tạo công việc mới', 'new-task', 'plus', 'primary')) +
-    summaryCards(all) +
-    `<div class="kanban-header-bar">
+  return head('Quản lý công việc', '', btn('Tạo công việc mới', 'new-task', 'plus', 'primary'), '', 'task-page-heading') +
+    `<section class="surface task-controls-surface">
+    <div class="kanban-header-bar">
       <div class="kanban-tabs">
-        <button type="button" class="kanban-tab-btn ${kanbanTab === 'all' ? 'active' : ''}" data-kanban-tab="all">All Task (${filtered.length})</button>
-        <button type="button" class="kanban-tab-btn ${kanbanTab === 'ongoing' ? 'active' : ''}" data-kanban-tab="ongoing">On Going (${ongoingList.length})</button>
-        <button type="button" class="kanban-tab-btn ${kanbanTab === 'done' ? 'active' : ''}" data-kanban-tab="done">Completed (${doneList.length})</button>
-        <button type="button" class="kanban-tab-btn ${kanbanTab === 'upcoming' ? 'active' : ''}" data-kanban-tab="upcoming">Upcoming (${upcomingList.length})</button>
-        <button type="button" class="kanban-tab-btn ${kanbanTab === 'paused' ? 'active' : ''}" data-kanban-tab="paused">Paused (${lateList.length})</button>
+        ${tabs.map(([id, bucket, title, count]) => `<button type="button" class="kanban-tab-btn ${bucketFilter === bucket ? 'active' : ''}" data-kanban-tab="${id}">${title} (${count})</button>`).join('')}
       </div>
       <div class="view-toggle-btns">
         <button type="button" class="view-toggle-btn ${taskViewMode === 'board' ? 'active' : ''}" data-task-view-mode="board">
@@ -447,7 +457,7 @@ function tasksView() {
           ${icon('file')} Danh sách Table
         </button>
       </div>
-    </div>
+    </div>${chart}
     <div class="controls-container">
       <label class="task-search">
         ${icon('search')}
@@ -455,51 +465,38 @@ function tasksView() {
       </label>
       ${filtersHtml}
     </div>` +
+    `</section>` +
     (taskViewMode === 'board' ?
-      renderKanbanBoard(filtered, { ongoingList, doneList, upcomingList, lateList }) :
+      renderKanbanBoard(filtered, { processing: lists.processing.filter(t => !bucketFilter || bucketFilter === 'processing'), done: lists.done.filter(t => !bucketFilter || bucketFilter === 'done'), late: lists.late.filter(t => !bucketFilter || bucketFilter === 'late') }) :
       renderTableTasks(filtered)
     );
 }
 
-function renderKanbanBoard(allFiltered, { ongoingList, doneList, upcomingList, lateList }) {
-  let showCol = colKey => kanbanTab === 'all' || kanbanTab === colKey;
-
+function renderKanbanBoard(allFiltered, { processing, done, late }) {
   return `<div class="kanban-board">
-    ${showCol('ongoing') ? `
     <div class="kanban-column">
       <div class="kanban-col-head">
-        <div class="kanban-col-title"><span class="col-dot blue"></span> On Going</div>
-        <span class="kanban-col-count">${ongoingList.length}</span>
+        <div class="kanban-col-title"><span class="col-dot blue"></span> Đang xử lý</div>
+        <span class="kanban-col-count">${processing.length}</span>
       </div>
-      ${ongoingList.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
-    </div>` : ''}
+      ${processing.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
+    </div>
 
-    ${showCol('done') ? `
     <div class="kanban-column">
       <div class="kanban-col-head">
-        <div class="kanban-col-title"><span class="col-dot green"></span> Completed</div>
-        <span class="kanban-col-count">${doneList.length}</span>
+        <div class="kanban-col-title"><span class="col-dot green"></span> Đã hoàn thành</div>
+        <span class="kanban-col-count">${done.length}</span>
       </div>
-      ${doneList.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
-    </div>` : ''}
+      ${done.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
+    </div>
 
-    ${showCol('upcoming') ? `
     <div class="kanban-column">
       <div class="kanban-col-head">
-        <div class="kanban-col-title"><span class="col-dot yellow"></span> Upcoming</div>
-        <span class="kanban-col-count">${upcomingList.length}</span>
+        <div class="kanban-col-title"><span class="col-dot red"></span> Chậm muộn</div>
+        <span class="kanban-col-count">${late.length}</span>
       </div>
-      ${upcomingList.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
-    </div>` : ''}
-
-    ${showCol('paused') ? `
-    <div class="kanban-column">
-      <div class="kanban-col-head">
-        <div class="kanban-col-title"><span class="col-dot red"></span> Paused</div>
-        <span class="kanban-col-count">${lateList.length}</span>
-      </div>
-      ${lateList.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
-    </div>` : ''}
+      ${late.map(renderKanbanCard).join('') || '<p class="small muted" style="text-align:center;padding:20px">Không có task nào</p>'}
+    </div>
   </div>`;
 }
 
@@ -573,7 +570,7 @@ function statsWorkspace() {
   let filteredActivities = calSelectedDate ? activities.filter(a => a.date === calSelectedDate) : activities;
 
   return head('Thống kê công việc') +
-    summaryCards(ts) +
+    `<section class="surface stats-summary-surface"><div class="section-title"><h2>Tổng quan công việc</h2></div>${summaryCards(ts, false)}</section>` +
     `<div class="stats-grid-layout">
       <!-- CỘT TRÁI: THEO NHÓM QUẢN LÝ (ACCORDION) -->
       <section class="surface panel-pad">
@@ -682,7 +679,7 @@ function bindWorkspace() {
 
   // Kanban tabs
   $$('[data-kanban-tab]').forEach(btn => btn.onclick = () => {
-    kanbanTab = btn.dataset.kanbanTab;
+    activeTaskFilter.bucket = btn.dataset.kanbanTab === 'all' ? '' : btn.dataset.kanbanTab;
     render();
   });
 
@@ -758,8 +755,8 @@ function bindWorkspace() {
       e.stopPropagation();
       let key = btn.dataset.multiAll;
       if (key === 'groups') activeTaskFilter.groups = state.taskGroups.filter(g => !g.archived).map(g => g.id);
-      if (key === 'officials') activeTaskFilter.officials = state.officials.filter(d => !d.archived).map(d => d.id);
       if (key === 'documents') activeTaskFilter.documents = state.documents.filter(d => !d.archived).map(d => d.id);
+      if (key === 'types') activeTaskFilter.types = ['document', 'daily'];
       render();
     };
   });
@@ -788,7 +785,7 @@ function bindWorkspace() {
   });
 
   $('#clearTaskFilters')?.addEventListener('click', () => {
-    activeTaskFilter = { groups: [], officials: [], documents: [], bucket: '' };
+    activeTaskFilter = { groups: [], documents: [], types: [], bucket: '' };
     openDropdownKey = '';
     render();
   });

@@ -158,17 +158,80 @@ document.documentElement.classList.toggle('dark', localStorage.getItem('c12-dark
 function applyContrastEngine() {
   let isDark = document.documentElement.classList.contains('dark');
   let root = document.documentElement;
-  if (isDark) {
-    root.style.setProperty('--text-contrast-primary', '#f8fafc');
-    root.style.setProperty('--text-contrast-secondary', '#cbd5e1');
-    root.style.setProperty('--table-row-hover', '#1e293b');
-    root.style.setProperty('--table-cell-hover', '#2d3d54');
-  } else {
-    root.style.setProperty('--text-contrast-primary', '#0f172a');
-    root.style.setProperty('--text-contrast-secondary', '#475569');
-    root.style.setProperty('--table-row-hover', '#f1f5f9');
-    root.style.setProperty('--table-cell-hover', '#dbeafe');
-  }
+  let text = getTextColorState(isDark);
+  root.style.setProperty('--text-primary', text.color);
+  root.style.setProperty('--text-secondary', text.color);
+  root.style.setProperty('--text-muted', text.color);
+  root.style.setProperty('--text-icon', text.color);
+  // Keep older inline styles and component CSS wired to the canonical tokens.
+  root.style.setProperty('--text-contrast-primary', 'var(--text-primary)');
+  root.style.setProperty('--text-contrast-secondary', 'var(--text-secondary)');
+  root.style.setProperty('--muted', 'var(--text-muted)');
+  root.style.setProperty('--table-row-hover', isDark ? '#1e293b' : '#f1f5f9');
+  root.style.setProperty('--table-cell-hover', isDark ? '#2d3d54' : '#dbeafe');
 }
 
-const nav = (p, t, i, child = false) => `<button class="nav-link ${child ? 'child' : ''} ${page === p ? 'active' : ''}" data-page="${p}" ${page === p ? 'aria-current="page"' : ''}>${child ? '' : icon(i)}<span>${t}</span></button>`;
+const TEXT_PALETTE_KEY = 'c12-text-palette';
+const TEXT_PALETTES = {
+  auto: { label: 'Tự động theo theme', light: '#0f172a', dark: '#f8fafc' },
+  ink: { label: 'Tối đậm', light: '#111827', dark: '#f9fafb' },
+  navy: { label: 'Xanh than', light: '#17324d', dark: '#dbeafe' },
+  bright: { label: 'Trắng sáng', light: '#1f2937', dark: '#ffffff' },
+  violet: { label: 'Tím xanh', light: '#43308e', dark: '#e6ddff' }
+};
+
+function getTextPalettePreference() {
+  let value = localStorage.getItem(TEXT_PALETTE_KEY) || 'auto';
+  if (TEXT_PALETTES[value]) return value;
+  if (/^custom:#[\da-f]{6}$/i.test(value)) return value.toLowerCase();
+  return 'auto';
+}
+
+function setTextPalettePreference(value) {
+  if (!TEXT_PALETTES[value] && !/^custom:#[\da-f]{6}$/i.test(value)) value = 'auto';
+  if (value === 'auto') localStorage.removeItem(TEXT_PALETTE_KEY);
+  else localStorage.setItem(TEXT_PALETTE_KEY, value.toLowerCase());
+}
+
+function colorLuminance(hex) {
+  let value = hex.replace('#', ''), rgb = [0, 2, 4].map(i => parseInt(value.slice(i, i + 2), 16) / 255);
+  let linear = rgb.map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function contrastRatio(a, b) {
+  let values = [colorLuminance(a), colorLuminance(b)].sort((x, y) => y - x);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
+
+function hexRgb(hex) {
+  let value = hex.slice(1);
+  return [0, 2, 4].map(i => parseInt(value.slice(i, i + 2), 16));
+}
+
+function getTextColorState(isDark = document.documentElement.classList.contains('dark')) {
+  let preference = getTextPalettePreference(), background = isDark ? '#0f172a' : '#f8fafc';
+  if (TEXT_PALETTES[preference]) {
+    let color = TEXT_PALETTES[preference][isDark ? 'dark' : 'light'];
+    return { preference, color, adjusted: false, ratio: contrastRatio(color, background) };
+  }
+
+  let requested = preference.slice('custom:'.length), ratio = contrastRatio(requested, background);
+  if (ratio >= 4.5) return { preference, color: requested, adjusted: false, ratio };
+
+  // Preserve the chosen hue, moving it toward the mode's safest endpoint.
+  let source = hexRgb(requested), target = hexRgb(isDark ? '#ffffff' : '#0b1220'), color = target;
+  for (let step = 1; step <= 100; step++) {
+    let amount = step / 100;
+    color = source.map((channel, i) => Math.round(channel + (target[i] - channel) * amount));
+    let candidate = '#' + color.map(c => c.toString(16).padStart(2, '0')).join('');
+    ratio = contrastRatio(candidate, background);
+    if (ratio >= 4.5) return { preference, color: candidate, adjusted: true, ratio };
+  }
+  return { preference, color: isDark ? '#ffffff' : '#0b1220', adjusted: true, ratio: contrastRatio(isDark ? '#ffffff' : '#0b1220', background) };
+}
+
+const nav = (p, t, i, child = false) => {
+  let current = page === p;
+  return `<button class="nav-link ${child ? 'child' : ''} ${current ? 'active' : ''}" data-page="${p}" aria-current="${current ? 'page' : 'false'}">${child ? '' : icon(i)}<span>${t}</span></button>`;
+};

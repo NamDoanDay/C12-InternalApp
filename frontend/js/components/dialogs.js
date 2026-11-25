@@ -60,6 +60,7 @@ function closeOverlay() {
   if (typeof taskDraftFiles !== 'undefined') taskDraftFiles = {};
   if (typeof taskDraftDocuments !== 'undefined') taskDraftDocuments = {};
   $('#overlay').innerHTML = '';
+  setModalScrollLock(false);
   drawerState = null;
   returnFocus?.focus?.();
 }
@@ -67,9 +68,25 @@ function closeOverlay() {
 function done(message) {
   save();
   $('#overlay').innerHTML = '';
+  setModalScrollLock(false);
   render();
   if (message) toast(message);
 }
+
+let lockedPageScrollY = 0;
+function setModalScrollLock(open) {
+  let root = document.documentElement, body = document.body;
+  if (!body) return;
+  let wasLocked = root.classList.contains('modal-open');
+  if (open && !wasLocked) lockedPageScrollY = window.scrollY || 0;
+  root.classList.toggle('modal-open', open);
+  body.classList.toggle('modal-open', open);
+  if (!open && wasLocked) window.scrollTo(0, lockedPageScrollY);
+}
+
+const overlayNode = $('#overlay');
+if (overlayNode) new MutationObserver(() => setModalScrollLock(overlayNode.childElementCount > 0))
+  .observe(overlayNode, { childList: true });
 
 // =========================================================
 // YÊU CẦU 8: QUY CHUẨN MODAL & DRAWER THÀNH RIGHT SIDEBAR DRAWER
@@ -94,6 +111,7 @@ function modal(title, body, onSave, wide = false, saveText = 'Lưu thay đổi')
       </form>
     </section>
   </div>`;
+  setModalScrollLock(true);
 
   let scrim = $('#modalScrim');
   if (scrim) scrim.onclick = e => { if (e.target === scrim) closeOverlay() };
@@ -124,6 +142,7 @@ function drawer(title, subtitle, body, large = false) {
       </div>
     </section>
   </div>`;
+  setModalScrollLock(true);
 
   let scrim = $('#drawerScrim');
   if (scrim) scrim.onclick = e => { if (e.target === scrim) closeOverlay() };

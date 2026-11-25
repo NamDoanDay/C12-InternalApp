@@ -1475,7 +1475,7 @@
   left: 12px;
   width: 18px;
   height: 18px;
-  color: #9ca3af;
+  color: var(--text-icon);
   pointer-events: none;
 }
 

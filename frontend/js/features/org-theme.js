@@ -187,18 +187,7 @@ function applyPersonalTheme(){
     document.body.classList.remove('has-workspace-background');
   }
 
-  // Auto Contrast Check
-  if(isDark){
-    root.style.setProperty('--text-contrast-primary','#f8fafc');
-    root.style.setProperty('--text-contrast-secondary','#cbd5e1');
-    root.style.setProperty('--table-row-hover','rgba(30,41,59,0.85)');
-    root.style.setProperty('--table-cell-hover','rgba(45,61,84,0.9)');
-  }else{
-    root.style.setProperty('--text-contrast-primary','#0f172a');
-    root.style.setProperty('--text-contrast-secondary','#334155');
-    root.style.setProperty('--table-row-hover','rgba(241,245,249,0.75)');
-    root.style.setProperty('--table-cell-hover','rgba(219,234,254,0.85)');
-  }
+  applyContrastEngine();
 }
 
 // =========================================================
@@ -206,7 +195,24 @@ function applyPersonalTheme(){
 // =========================================================
 function themesDialog(){
   let s=state.themeByUser[session]||{};
+  let textPreference=getTextPalettePreference(), textState=getTextColorState();
   modal('Chủ đề không gian làm việc',`
+    <section class="text-palette-panel" aria-labelledby="textPaletteHeading">
+      <div class="text-palette-heading">
+        <div><h3 id="textPaletteHeading">Màu chữ</h3><p>Áp dụng đồng bộ cho nội dung, nhãn, icon và dữ liệu.</p></div>
+        <span class="text-contrast-score">${textState.ratio ? `${textState.ratio.toFixed(1)}:1` : 'AA'}</span>
+      </div>
+      <div class="text-palette-presets" role="group" aria-label="Preset màu chữ">
+        ${Object.entries(TEXT_PALETTES).map(([id,p])=>`<button type="button" class="text-palette-option ${textPreference===id?'selected':''}" data-text-preset="${id}" aria-pressed="${textPreference===id}"><span class="text-palette-dot" style="--sample-text:${p[document.documentElement.classList.contains('dark')?'dark':'light']}">Aa</span><span>${p.label}</span></button>`).join('')}
+      </div>
+      <div class="text-custom-row">
+        <label for="textColorPicker">Màu tùy chỉnh</label>
+        <input id="textColorPicker" type="color" value="${textPreference.startsWith('custom:')?textPreference.slice(7):textState.color}" aria-label="Chọn màu chữ tùy chỉnh">
+        <span id="textColorStatus" role="status" aria-live="polite">${textState.adjusted?`Màu đã được tự điều chỉnh để đạt tương phản ${textState.ratio.toFixed(1)}:1.`:'Màu chữ được duy trì ở mức tương phản cao.'}</span>
+        <button type="button" class="btn text-reset" id="resetTextColor">Khôi phục mặc định</button>
+      </div>
+    </section>
+
     <h3 style="color:var(--text-contrast-primary)">Màu chủ đạo (Primary Accent)</h3>
     <div class="palette-grid">
       ${COLOR_PRESETS.map(c=>`<button type="button" class="theme-swatch ${s.color===c?'selected':''}" data-color="${c}" style="--swatch:${c}" aria-label="Màu ${c}"></button>`).join('')}
@@ -249,6 +255,36 @@ function themesDialog(){
     state.themeByUser[session]=s;
     applyPersonalTheme();
     $$('[data-color]').forEach(x=>x.classList.toggle('selected',x===b));
+  });
+
+  const syncTextColorControls=()=>{
+    applyContrastEngine();
+    let preference=getTextPalettePreference(), current=getTextColorState();
+    $$('[data-text-preset]').forEach(b=>{
+      let selected=b.dataset.textPreset===preference;
+      b.classList.toggle('selected',selected);
+      b.setAttribute('aria-pressed',String(selected));
+    });
+    let status=$('#textColorStatus');
+    if(status)status.textContent=current.adjusted
+      ? `Màu chưa đủ tương phản; đã tự điều chỉnh thành ${current.color} (${current.ratio.toFixed(1)}:1).`
+      : `Độ tương phản hiện tại ${current.ratio?current.ratio.toFixed(1)+':1':'đạt chuẩn AA'}; màu chữ sẽ tự đổi sắc theo LIGHT/DARK.`;
+  };
+
+  $$('[data-text-preset]').forEach(b=>b.onclick=()=>{
+    setTextPalettePreference(b.dataset.textPreset);
+    syncTextColorControls();
+  });
+
+  $('#textColorPicker')?.addEventListener('input',e=>{
+    setTextPalettePreference(`custom:${e.target.value}`);
+    syncTextColorControls();
+  });
+
+  $('#resetTextColor')?.addEventListener('click',()=>{
+    setTextPalettePreference('auto');
+    if($('#textColorPicker'))$('#textColorPicker').value=getTextColorState().color;
+    syncTextColorControls();
   });
 
   $$('[data-background]').forEach(b=>b.onclick=()=>{

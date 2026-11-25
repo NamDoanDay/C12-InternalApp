@@ -1,27 +1,314 @@
-(function(root,factory){const api=factory();if(typeof module==='object')module.exports=api;else root.C12Model=api})(typeof globalThis!=='undefined'?globalThis:this,function(){
-'use strict';
-const clone=x=>JSON.parse(JSON.stringify(x)),id=()=>globalThis.crypto?.randomUUID?.()||'id-'+Date.now()+'-'+Math.random().toString(36).slice(2),now=()=>new Date().toISOString();
-const GROUPS=[['HT','Hạ tầng'],['HTM','Mạng / Hạ tầng mạng'],['DN','Điện nước'],['MC','Máy chủ'],['HPCAI','HPC-AI đề án'],['QLVB','Quản lý văn bản']];
-function bucket(t,time=Date.now()){if(t.status==='done')return 'done';if(time>new Date(t.due).getTime())return 'late';if(t.status==='init')return 'init';return 'processing'}
-function overdueDays(t,time=Date.now()){return bucket(t,time)==='late'?Math.ceil((time-new Date(t.due).getTime())/86400000):0}
-const personGroup=(s,userId)=>s.people.find(p=>p.id===s.users.find(u=>u.id===userId)?.personId)?.groupId||'';
-function participatingGroups(s,t){return [...new Set([t.managementGroupId,...t.assigneeIds.map(u=>personGroup(s,u))].filter(Boolean))]}
-function canView(s,u,t){return !!u&&(u.role==='admin'||t.creatorId===u.id||t.assigneeIds.includes(u.id)||participatingGroups(s,t).includes(personGroup(s,u.id)))}
-function canEdit(s,u,t){return !!u&&(u.role==='admin'||t.creatorId===u.id||t.assigneeIds.includes(u.id))}
-function canEditDue(s,u,t){return !!u&&(u.role==='admin'||t.creatorId===u.id)}
-function canEditCell(s,u,t){return !!u&&(u.role==='admin'||t.assigneeIds.includes(u.id))}
-function nextCode(s,type,groupId){let prefix=type==='daily'?'DAILY':s.taskGroups.find(g=>g.id===groupId)?.code;if(!prefix)throw Error('Chọn nhóm quản lý task.');s.counters[prefix]=(s.counters[prefix]||0)+1;return 'Task-'+prefix+'-'+String(s.counters[prefix]).padStart(2,'0')}
-function revision(t,actorId,action,changes=[],time=now()){t.updatedAt=time;t.revisions||=[];let data=clone(t);delete data.revisions;t.revisions.push({id:id(),at:time,actorId,action,changes:clone(changes),data});return t}
-function notify(s,t,actorId,ids,event='created'){let at=now(),eventId=id();for(let recipientId of new Set(ids)){s.notifications.push({id:id(),eventId,recipientId,taskId:t.id,actorId,event,at,read:false,title:event==='assigned'?'Bạn được giao công việc': 'Công việc mới được tạo',body:t.code+' · '+t.title})}}
-function validateTask(s,u,t,checkAssignment=true){if(!t.title?.trim())throw Error('Nhập tiêu đề công việc.');if(!t.start||!t.due||!Number.isFinite(Date.parse(t.start))||!Number.isFinite(Date.parse(t.due)))throw Error('Ngày bắt đầu và hạn hoàn thành là bắt buộc.');if(Date.parse(t.due)<Date.parse(t.start))throw Error('Hạn hoàn thành không được trước ngày bắt đầu.');if(!t.assigneeIds?.length)throw Error('Chọn ít nhất một người nhận.');if(checkAssignment&&u.role!=='admin'&&(t.assigneeIds.length!==1||t.assigneeIds[0]!==u.id))throw Error('User chỉ được tự giao công việc.');if(t.type==='document'){if(!t.unit?.trim()||!t.agency?.trim()||!t.managementGroupId)throw Error('Nhập đơn vị, cơ quan và nhóm quản lý.');if(!t.officialIds?.length)throw Error('Task theo công văn cần ít nhất một công văn.');for(let cid of t.officialIds){let d=s.officials.find(x=>x.id===cid);if(!d?.no||!d.date||!d.summary?.trim())throw Error('Công văn cần đủ số, ngày phát hành và trích yếu.')}}}
-function saveTask(s,u,input){let old=s.tasks.find(t=>t.id===input.id),t=clone(input);if(old){if(!canEdit(s,u,old))throw Error('Bạn không có quyền sửa task.');let full=u.role==='admin'||old.creatorId===u.id;if(!full){for(let k of ['title','description','start','due','managementGroupId','assigneeIds','type','unit','agency'])if(JSON.stringify(t[k])!==JSON.stringify(old[k]))throw Error('Bạn không được sửa thông tin phân công hoặc lịch của task này.')}if(t.due!==old.due&&!canEditDue(s,u,old))throw Error('Chỉ admin hoặc người tạo được sửa hạn.');if(u.role!=='admin'&&old.creatorId===u.id&&JSON.stringify(t.assigneeIds)!==JSON.stringify(old.assigneeIds)&&t.assigneeIds.some(x=>x!==u.id))throw Error('User chỉ được tự giao.');validateTask(s,u,t,false);stampCells(s,t,old);t.revisions=old.revisions;t.id=old.id;t.code=old.code;t.creatorId=old.creatorId;t.createdAt=old.createdAt;if(t.type!==old.type||t.managementGroupId!==old.managementGroupId){t.aliases=[...(old.aliases||[]),old.code];t.code=nextCode(s,t.type,t.managementGroupId)}revision(t,u.id,'Cập nhật công việc',Object.keys(t).filter(k=>!['revisions','updatedAt'].includes(k)&&JSON.stringify(old[k])!==JSON.stringify(t[k])).map(k=>({field:k,old:old[k],new:t[k]})));s.tasks[s.tasks.indexOf(old)]=t;let added=t.assigneeIds.filter(x=>!old.assigneeIds.includes(x));if(added.length)notify(s,t,u.id,added,'assigned')}else{validateTask(s,u,t);stampCells(s,t);t.id=id();t.code=nextCode(s,t.type,t.managementGroupId);t.creatorId=u.id;t.createdAt=now();t.aliases=[];t.comments=[];revision(t,u.id,'Tạo công việc');s.tasks.push(t);notify(s,t,u.id,[...s.users.filter(x=>x.role==='admin').map(x=>x.id),...t.assigneeIds,u.id])}return t}
-function movePerson(s,u,pid,gid){if(u.role!=='admin')throw Error('Chỉ admin được chuyển nhóm.');let p=s.people.find(x=>x.id===pid),g=s.taskGroups.find(x=>x.id===gid);if(!p||!g)throw Error('Không tìm thấy nhân sự hoặc nhóm.');let old=p.groupId;if(old===gid)return;p.groupId=gid;let time=now();let audit={id:id(),actorId:u.id,personId:pid,oldGroupId:old,newGroupId:gid,at:time,taskChanges:[]};for(let t of s.tasks.filter(x=>x.assigneeIds.some(uid=>s.users.find(y=>y.id===uid)?.personId===pid))){let before=t.code;if(t.type==='document'&&t.assigneeIds.length===1){t.managementGroupId=gid;t.aliases.push(t.code);t.code=nextCode(s,t.type,gid)}audit.taskChanges.push({taskId:t.id,oldCode:before,newCode:t.code});revision(t,u.id,'Chuyển nhóm thành viên',[{field:'group',old,new:gid},{field:'code',old:before,new:t.code}],time)}s.orgAudit.push(audit);return audit}
-function stampCells(s,t,old){let time=now();for(let item of t.resources||[]){let prior=old?.resources?.find(x=>x.id===item.id);item.cellTimes=clone(prior?.cellTimes||item.cellTimes||{});item.cellSeqs=clone(prior?.cellSeqs||item.cellSeqs||{});for(let docId of t.officialIds||[])for(let [field,value]of Object.entries({...item.values,...item.docValues?.[docId]})){let k=docId+'|'+field,prev=prior?({...prior.values,...prior.docValues?.[docId]})[field]:undefined;if(!prior||JSON.stringify(value)!==JSON.stringify(prev)||!item.cellTimes[k]){item.cellTimes[k]=time;item.cellSeqs[k]=s.saveSeq=(s.saveSeq||0)+1}}}}
-function projectCells(s,u){let map=new Map;for(let t of s.tasks.filter(t=>!t.archived&&canView(s,u,t)&&t.type==='document'))for(let item of t.resources||[]){if(!item.system?.trim())continue;let key=[t.unit,t.agency,item.system].map(x=>x.trim().toLocaleLowerCase('vi')).join('|');let r=map.get(key);if(!r){r={key,unit:t.unit,agency:t.agency,system:item.system,tasks:[],officialIds:[],documentIds:[],cells:{}};map.set(key,r)}if(!r.tasks.includes(t.id))r.tasks.push(t.id);r.officialIds=[...new Set([...r.officialIds,...t.officialIds])];r.documentIds=[...new Set([...r.documentIds,...t.documentIds])];for(let docId of t.officialIds)for(let [field,value]of Object.entries({...item.values,...item.docValues?.[docId]})){let cellKey=docId+'|'+field,prev=r.cells[cellKey],time=item.cellTimes?.[cellKey]||t.createdAt||t.updatedAt,seq=item.cellSeqs?.[cellKey]||0;if(!prev||time>prev.at||(time===prev.at&&seq>prev.seq))r.cells[cellKey]={value,taskId:t.id,itemId:item.id,docId,field,at:time,seq}}}return [...map.values()].sort((a,b)=>a.unit.localeCompare(b.unit,'vi')||a.agency.localeCompare(b.agency,'vi')||a.system.localeCompare(b.system,'vi'))}
-function editCell(s,u,row,docId,field,value){let cell=row.cells[docId+'|'+field];if(!cell)throw Error('Ô chưa có task nguồn; bổ sung trong phiếu task.');let t=s.tasks.find(x=>x.id===cell.taskId);if(!canEditCell(s,u,t))throw Error('Bạn chỉ sửa ô của task đang giao cho mình.');let item=t.resources.find(x=>x.id===cell.itemId),old=cell.value;item.docValues||={};item.docValues[docId]||={};item.docValues[docId][field]=value;item.cellTimes||={};item.cellSeqs||={};let k=docId+'|'+field;item.cellTimes[k]=now();item.cellSeqs[k]=s.saveSeq=(s.saveSeq||0)+1;revision(t,u.id,'Sửa ô tài nguyên',[{field:item.system+' / '+docId+' / '+field,old,new:value}]);return t}
-function migrate(old){let s=clone(old||{});s.version=5;s.legacyRows=clone(s.rows||[]);s.rows=[];s.officials=clone(s.docs||[]);s.documents=[];s.taskGroups=GROUPS.map(([code,name])=>({id:'g-'+code,code,name,archived:false}));s.tasks=[];s.notifications=[];s.orgAudit=[];s.counters={};s.themeByUser={};s.people||=[];s.users||=[];return s}
-return {clone,id,now,GROUPS,bucket,overdueDays,personGroup,participatingGroups,canView,canEdit,canEditDue,canEditCell,nextCode,revision,notify,validateTask,saveTask,movePerson,projectCells,editCell,migrate};
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object') module.exports = api;
+  else root.C12Model = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const clone = value => JSON.parse(JSON.stringify(value));
+  const id = () => globalThis.crypto?.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const now = () => new Date().toISOString();
+  const GROUPS = [['HT', 'Hạ tầng'], ['HTM', 'Mạng / Hạ tầng mạng'], ['DN', 'Điện nước'], ['MC', 'Máy chủ'], ['HPCAI', 'HPC-AI đề án'], ['QLVB', 'Quản lý văn bản']];
+  const DOCUMENT_TYPES = ['Công văn', 'Thông tư', 'Nghị định', 'Quyết định', 'Luật', 'Nghị quyết', 'Báo cáo', 'Các loại văn bản khác'];
+  const norm = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
+
+  function bucket(task, time = Date.now()) {
+    if (task.status === 'done') return 'done';
+    if (Number.isFinite(Date.parse(task.due)) && time > Date.parse(task.due)) return 'late';
+    return 'processing';
+  }
+  function overdueDays(task, time = Date.now()) {
+    return bucket(task, time) === 'late' ? Math.max(1, Math.ceil((time - Date.parse(task.due)) / 86400000)) : 0;
+  }
+  const personGroup = (state, userId) => state.people.find(p => p.id === state.users.find(u => u.id === userId)?.personId)?.groupId || '';
+  function participatingGroups(state, task) {
+    return [...new Set([task.managementGroupId, ...(task.assigneeIds || []).map(userId => personGroup(state, userId))].filter(Boolean))];
+  }
+  function canView(state, user, task) {
+    return !!user && (user.role === 'admin' || task.creatorId === user.id || task.assigneeIds?.includes(user.id) || participatingGroups(state, task).includes(personGroup(state, user.id)));
+  }
+  function canEdit(state, user, task) { return !!user && (user.role === 'admin' || task.creatorId === user.id || task.assigneeIds?.includes(user.id)); }
+  function canEditDue(state, user, task) { return !!user && (user.role === 'admin' || task.creatorId === user.id); }
+  function canEditCell(state, user, task) { return !!user && (user.role === 'admin' || task.assigneeIds?.includes(user.id)); }
+  function nextCode(state, type, groupId) {
+    const prefix = type === 'daily' ? 'DAILY' : state.taskGroups.find(group => group.id === groupId)?.code;
+    if (!prefix) throw Error('Chọn nhóm quản lý task.');
+    state.counters[prefix] = (state.counters[prefix] || 0) + 1;
+    return `Task-${prefix}-${String(state.counters[prefix]).padStart(2, '0')}`;
+  }
+  function revision(task, actorId, action, changes = [], time = now()) {
+    task.updatedAt = time;
+    task.revisions ||= [];
+    const data = clone(task);
+    delete data.revisions;
+    task.revisions.push({ id: id(), at: time, actorId, action, changes: clone(changes), data });
+    return task;
+  }
+  function notify(state, task, actorId, ids, event = 'created') {
+    const at = now(), eventId = id();
+    for (const recipientId of new Set(ids)) state.notifications.push({ id: id(), eventId, recipientId, taskId: task.id, actorId, event, at, read: false, title: event === 'assigned' ? 'Bạn được giao công việc' : 'Công việc mới được tạo', body: `${task.code} · ${task.title}` });
+  }
+
+  function catalogDocumentForTask(state, task) {
+    if (task.type !== 'document') return;
+    const type = task.documentType;
+    if (!DOCUMENT_TYPES.includes(type)) throw Error('Chọn loại văn bản hợp lệ cho task xử lý văn bản.');
+    const number = String(task.documentNumber || '').trim();
+    let found = state.documents.find(doc => !doc.archived && doc.id === task.documentId);
+    if (found && (norm(found.documentType || found.type) !== norm(type) || norm(found.no) !== norm(number))) found = null;
+    if (!found && number) found = state.documents.find(doc => !doc.archived && norm(doc.documentType || doc.type) === norm(type) && norm(doc.no) === norm(number));
+    if (!found) {
+      found = { id: id(), documentType: type, type, no: number, date: '', summary: String(task.documentSummary || '').trim(), agency: '', note: '', files: [], createdAt: now() };
+      state.documents.push(found);
+    }
+    state.officials = state.documents;
+    state.docs = state.documents;
+    task.documentId = found.id;
+  }
+
+  function validateTask(state, user, task, checkAssignment = true) {
+    if (!task.title?.trim()) throw Error('Nhập tiêu đề công việc.');
+    if (!task.start || !task.due || !Number.isFinite(Date.parse(task.start)) || !Number.isFinite(Date.parse(task.due))) throw Error('Ngày bắt đầu và hạn hoàn thành là bắt buộc.');
+    if (Date.parse(task.due) < Date.parse(task.start)) throw Error('Hạn hoàn thành không được trước ngày bắt đầu.');
+    if (!task.assigneeIds?.length) throw Error('Chọn ít nhất một người nhận.');
+    if (checkAssignment && user.role !== 'admin' && (task.assigneeIds.length !== 1 || task.assigneeIds[0] !== user.id)) throw Error('User chỉ được tự giao công việc.');
+    if (task.type === 'document' && !DOCUMENT_TYPES.includes(task.documentType)) throw Error('Chọn loại văn bản cho task xử lý văn bản.');
+  }
+
+  function saveTask(state, user, input) {
+    const old = state.tasks.find(task => task.id === input.id);
+    const task = clone(input);
+    task.assigneeIds ||= [];
+    task.customFields ||= [];
+    task.attachments ||= [];
+    task.customTable ||= { name: 'Bảng dữ liệu tùy chỉnh', columns: ['STT', 'Nội dung'], rows: [] };
+    if (old) {
+      if (!canEdit(state, user, old)) throw Error('Bạn không có quyền sửa task.');
+      const full = user.role === 'admin' || old.creatorId === user.id;
+      if (!full) for (const key of ['title', 'description', 'start', 'due', 'managementGroupId', 'assigneeIds', 'type', 'documentType', 'documentNumber', 'documentSummary']) {
+        if (JSON.stringify(task[key]) !== JSON.stringify(old[key])) throw Error('Bạn không được sửa thông tin phân công hoặc lịch của task này.');
+      }
+      if (task.due !== old.due && !canEditDue(state, user, old)) throw Error('Chỉ admin hoặc người tạo được sửa hạn.');
+      if (user.role !== 'admin' && old.creatorId === user.id && JSON.stringify(task.assigneeIds) !== JSON.stringify(old.assigneeIds) && task.assigneeIds.some(value => value !== user.id)) throw Error('User chỉ được tự giao.');
+      validateTask(state, user, task, false);
+      task.revisions = old.revisions || [];
+      task.id = old.id;
+      task.code = old.code;
+      task.creatorId = old.creatorId;
+      task.createdAt = old.createdAt;
+      task.aliases = old.aliases || [];
+      if (task.type === 'document') catalogDocumentForTask(state, task);
+      if (task.type !== old.type || task.managementGroupId !== old.managementGroupId) {
+        task.aliases = [...task.aliases, old.code];
+        task.code = nextCode(state, task.type, task.managementGroupId);
+      }
+      const changes = Object.keys(task).filter(key => !['revisions', 'updatedAt'].includes(key) && JSON.stringify(old[key]) !== JSON.stringify(task[key])).map(field => ({ field, old: old[field], new: task[field] }));
+      revision(task, user.id, 'Cập nhật công việc', changes);
+      state.tasks[state.tasks.indexOf(old)] = task;
+      const added = task.assigneeIds.filter(value => !old.assigneeIds.includes(value));
+      if (added.length) notify(state, task, user.id, added, 'assigned');
+    } else {
+      validateTask(state, user, task);
+      if (!task.managementGroupId && user.role !== 'admin') task.managementGroupId = personGroup(state, user.id);
+      if (task.type === 'document') catalogDocumentForTask(state, task);
+      task.id = id();
+      task.code = nextCode(state, task.type, task.managementGroupId);
+      task.creatorId = user.id;
+      task.createdAt = now();
+      task.aliases = [];
+      task.comments ||= [];
+      revision(task, user.id, 'Tạo công việc');
+      state.tasks.push(task);
+      notify(state, task, user.id, [...state.users.filter(item => item.role === 'admin').map(item => item.id), ...task.assigneeIds, user.id]);
+    }
+    return task;
+  }
+
+  function movePerson(state, user, personId, groupId) {
+    if (user.role !== 'admin') throw Error('Chỉ admin được chuyển nhóm.');
+    const person = state.people.find(item => item.id === personId), group = state.taskGroups.find(item => item.id === groupId);
+    if (!person || !group) throw Error('Không tìm thấy nhân sự hoặc nhóm.');
+    const old = person.groupId;
+    if (old === groupId) return;
+    person.groupId = groupId;
+    const time = now(), audit = { id: id(), actorId: user.id, personId, oldGroupId: old, newGroupId: groupId, at: time, taskChanges: [] };
+    for (const task of state.tasks.filter(item => item.assigneeIds.some(uid => state.users.find(account => account.id === uid)?.personId === personId))) {
+      const before = task.code;
+      if (task.type === 'document' && task.assigneeIds.length === 1) {
+        task.managementGroupId = groupId;
+        task.aliases = [...(task.aliases || []), task.code];
+        task.code = nextCode(state, task.type, groupId);
+      }
+      audit.taskChanges.push({ taskId: task.id, oldCode: before, newCode: task.code });
+      revision(task, user.id, 'Chuyển nhóm thành viên', [{ field: 'Nhóm', old, new: groupId }, { field: 'Mã task', old: before, new: task.code }], time);
+    }
+    state.orgAudit.push(audit);
+    return audit;
+  }
+
+  // Legacy APIs remain available to old revision data; new resources no longer use task projections.
+  function stampCells(state, task, old) {
+    const time = now();
+    for (const item of task.resources || []) {
+      const prior = old?.resources?.find(value => value.id === item.id);
+      item.cellTimes = clone(prior?.cellTimes || item.cellTimes || {});
+      item.cellSeqs = clone(prior?.cellSeqs || item.cellSeqs || {});
+      for (const docId of task.officialIds || []) for (const [field, value] of Object.entries({ ...item.values, ...item.docValues?.[docId] })) {
+        const key = `${docId}|${field}`, previous = prior ? ({ ...prior.values, ...prior.docValues?.[docId] })[field] : undefined;
+        if (!prior || JSON.stringify(value) !== JSON.stringify(previous) || !item.cellTimes[key]) {
+          item.cellTimes[key] = time;
+          item.cellSeqs[key] = state.saveSeq = (state.saveSeq || 0) + 1;
+        }
+      }
+    }
+  }
+  function projectCells(state, user) {
+    const map = new Map();
+    for (const task of state.tasks.filter(item => !item.archived && canView(state, user, item) && item.type === 'document')) for (const item of task.resources || []) {
+      if (!item.system?.trim()) continue;
+      const key = [task.unit, task.agency, item.system].map(value => value.trim().toLocaleLowerCase('vi')).join('|');
+      let row = map.get(key);
+      if (!row) { row = { key, unit: task.unit, agency: task.agency, system: item.system, tasks: [], officialIds: [], documentIds: [], cells: {} }; map.set(key, row); }
+      if (!row.tasks.includes(task.id)) row.tasks.push(task.id);
+      row.officialIds = [...new Set([...row.officialIds, ...(task.officialIds || [])])];
+      row.documentIds = [...new Set([...row.documentIds, ...(task.documentIds || [])])];
+      for (const docId of task.officialIds || []) for (const [field, value] of Object.entries({ ...item.values, ...item.docValues?.[docId] })) {
+        const cellKey = `${docId}|${field}`, previous = row.cells[cellKey], time = item.cellTimes?.[cellKey] || task.createdAt || task.updatedAt, seq = item.cellSeqs?.[cellKey] || 0;
+        if (!previous || time > previous.at || (time === previous.at && seq > previous.seq)) row.cells[cellKey] = { value, taskId: task.id, itemId: item.id, docId, field, at: time, seq };
+      }
+    }
+    return [...map.values()].sort((a, b) => a.unit.localeCompare(b.unit, 'vi') || a.agency.localeCompare(b.agency, 'vi') || a.system.localeCompare(b.system, 'vi'));
+  }
+  function editCell(state, user, row, docId, field, value) {
+    const cell = row.cells[`${docId}|${field}`];
+    if (!cell) throw Error('Ô chưa có dữ liệu nguồn.');
+    const task = state.tasks.find(item => item.id === cell.taskId);
+    if (!canEditCell(state, user, task)) throw Error('Bạn chỉ sửa ô của task đang giao cho mình.');
+    const item = task.resources.find(resource => resource.id === cell.itemId), old = cell.value;
+    item.docValues ||= {}; item.docValues[docId] ||= {}; item.docValues[docId][field] = value;
+    revision(task, user.id, 'Sửa ô tài nguyên', [{ field: `${item.system} / ${docId} / ${field}`, old, new: value }]);
+    return task;
+  }
+
+  function blankResourceRows(rows) {
+    const byKey = new Map();
+    for (const source of rows || []) {
+      const key = [source.unit, source.agency, source.system].map(norm).join('|');
+      let record = byKey.get(key);
+      if (!record) {
+        record = { id: id(), unit: source.unit || '', agency: source.agency || '', system: source.system || '', level: source.level || '', registeredDocumentIds: [], exchangeDocumentIds: [], hardwareColumns: ['STT', 'Tên tài nguyên', 'Văn bản nguồn'], hardwareRows: [], customFields: [], revisions: [], createdBy: '', editors: [], createdAt: now(), updatedAt: now() };
+        byKey.set(key, record);
+      }
+      for (const snapshot of source.snapshots || []) {
+        const doc = snapshot.docId || null;
+        if (doc && !record.registeredDocumentIds.includes(doc)) record.registeredDocumentIds.push(doc);
+        const values = { STT: String(record.hardwareRows.length + 1), 'Tên tài nguyên': source.system || '', 'Văn bản nguồn': snapshot.doc || '' };
+        for (const [field, value] of Object.entries(snapshot.values || {})) {
+          const column = `${snapshot.doc || 'Thông tin'} · ${field}`;
+          if (!record.hardwareColumns.includes(column)) record.hardwareColumns.push(column);
+          values[column] = value;
+        }
+        record.hardwareRows.push(values);
+      }
+    }
+    return [...byKey.values()];
+  }
+
+  function migrate(old) {
+    const state = clone(old || {});
+    state.version = 7;
+    state.legacyRows = clone(state.rows || []);
+    state.rows = [];
+    state.taskGroups = GROUPS.map(([code, name]) => ({ id: `g-${code}`, code, name, archived: false }));
+    state.tasks = [];
+    state.notifications = [];
+    state.orgAudit = [];
+    state.counters = {};
+    state.themeByUser = {};
+    state.people ||= [];
+    state.users ||= [];
+    state.files ||= {};
+    const documents = (state.docs || []).map(doc => ({ ...doc, documentType: doc.documentType || 'Công văn', type: doc.documentType || 'Công văn' }));
+    for (const row of state.legacyRows) for (const snapshot of row.snapshots || []) if (snapshot.doc && !documents.some(doc => norm(doc.no) === norm(snapshot.doc) && doc.documentType === 'Công văn')) {
+      documents.push({ id: id(), no: snapshot.doc, date: snapshot.documentDate || '', summary: '', documentType: 'Công văn', type: 'Công văn', files: [] });
+    }
+    state.documents = documents;
+    state.officials = documents;
+    state.docs = documents;
+    state.resourceColumns = ['STT', 'Tên tài nguyên', 'Văn bản nguồn'];
+    const linkLegacy = rows => rows.map(row => ({ ...row, snapshots: (row.snapshots || []).map(snapshot => ({ ...snapshot, docId: documents.find(doc => norm(doc.no) === norm(snapshot.doc))?.id })) }));
+    state.resourceRecords = blankResourceRows(linkLegacy(state.legacyRows));
+    state.tableColumns ||= [];
+    state.saveSeq ||= 0;
+    return state;
+  }
+
+  function upgradeV6(old) {
+    const state = clone(old || {});
+    const sourceDocs = state.documentCatalog || [...(state.officials || []), ...(state.documents || [])];
+    const documents = [], seenIds = new Set();
+    for (const doc of sourceDocs) {
+      if (!doc || seenIds.has(doc.id)) continue;
+      seenIds.add(doc.id);
+      const documentType = DOCUMENT_TYPES.includes(doc.documentType || doc.type) ? (doc.documentType || doc.type) : (state.officials?.some(item => item.id === doc.id) ? 'Công văn' : 'Các loại văn bản khác');
+      documents.push({ ...doc, documentType, type: documentType, files: doc.files || [] });
+    }
+    const oldOfficials = new Set((state.officials || []).map(doc => doc.id));
+    for (const task of state.tasks || []) {
+      task.assigneeIds ||= [];
+      task.documentIds = [...new Set([...(task.documentIds || []), ...(task.officialIds || [])])];
+      const primary = [...(task.officialIds || []), ...(task.documentIds || [])].map(id => documents.find(doc => doc.id === id)).find(Boolean);
+      task.documentType ||= primary?.documentType || (task.type === 'document' ? 'Công văn' : '');
+      task.documentNumber ??= primary?.no || '';
+      task.documentSummary ??= primary?.summary || '';
+      if (primary) task.documentId ||= primary.id;
+      if (task.type === 'document' && oldOfficials.size && !primary) task.documentType ||= 'Công văn';
+      task.resources ||= [];
+      task.customFields ||= [];
+      task.attachments ||= [];
+      task.customTable ||= { name: 'Bảng dữ liệu tùy chỉnh', columns: ['STT', 'Nội dung'], rows: [] };
+    }
+    state.documents = documents;
+    state.officials = documents;
+    state.docs = documents;
+    state.files ||= {};
+    state.people ||= [];
+    state.users ||= [];
+    state.notifications ||= [];
+    state.orgAudit ||= [];
+    state.counters ||= {};
+    state.taskGroups ||= GROUPS.map(([code, name]) => ({ id: `g-${code}`, code, name, archived: false }));
+    state.resourceColumns ||= ['STT', 'Tên tài nguyên', 'Văn bản nguồn'];
+    state.resourceRecords ||= blankResourceRows((state.legacyRows || []).map(row => ({ ...row, snapshots: (row.snapshots || []).map(snapshot => ({ ...snapshot, docId: documents.find(doc => norm(doc.no) === norm(snapshot.doc))?.id })) })));
+
+    // Detach legacy hardware rows from tasks and preserve them as independent resource records.
+    const recordsByKey = new Map(state.resourceRecords.map(record => [[record.unit, record.agency, record.system].map(norm).join('|'), record]));
+    for (const task of state.tasks || []) for (const item of task.resources || []) {
+      if (!item.system?.trim()) continue;
+      const key = [task.unit, task.agency, item.system].map(norm).join('|');
+      let record = recordsByKey.get(key);
+      if (!record) {
+        record = { id: id(), unit: task.unit || '', agency: task.agency || '', system: item.system, level: task.level || '', registeredDocumentIds: [], exchangeDocumentIds: [], hardwareColumns: ['STT', 'Tên tài nguyên', 'Văn bản nguồn'], hardwareRows: [], customFields: [], revisions: [], createdBy: task.creatorId || '', editors: task.assigneeIds || [], createdAt: task.createdAt || now(), updatedAt: task.updatedAt || task.createdAt || now() };
+        recordsByKey.set(key, record);
+        state.resourceRecords.push(record);
+      }
+      record.registeredDocumentIds = [...new Set([...record.registeredDocumentIds, ...(task.officialIds || [])])];
+      record.exchangeDocumentIds = [...new Set([...record.exchangeDocumentIds, ...(task.documentIds || [])])];
+      record.createdBy ||= task.creatorId || '';
+      record.editors = [...new Set([...record.editors, ...(task.assigneeIds || [])])];
+      const values = { STT: String(record.hardwareRows.length + 1), 'Tên tài nguyên': item.name || item.system, 'Văn bản nguồn': task.documentNumber || '' };
+      for (const [field, value] of Object.entries(item.values || {})) {
+        const column = `${task.documentNumber || 'Thông tin'} · ${field}`;
+        if (!record.hardwareColumns.includes(column)) record.hardwareColumns.push(column);
+        values[column] = value;
+      }
+      if (!record.hardwareRows.some(row => row['Tên tài nguyên'] === values['Tên tài nguyên'] && JSON.stringify(row) === JSON.stringify(values))) record.hardwareRows.push(values);
+    }
+    for (const task of state.tasks || []) { task.resources = []; task.resourceColumns = []; }
+
+    state.version = 7;
+    return state;
+  }
+
+  return { clone, id, now, GROUPS, DOCUMENT_TYPES, bucket, overdueDays, personGroup, participatingGroups, canView, canEdit, canEditDue, canEditCell, nextCode, revision, notify, catalogDocumentForTask, validateTask, saveTask, movePerson, stampCells, projectCells, editCell, migrate, upgradeV6 };
 });
-
-
-
