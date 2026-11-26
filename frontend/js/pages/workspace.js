@@ -136,7 +136,7 @@ function seedTaskDemo() {
       officialIds: i === 2 ? [] : [existing.id],
       documentIds: [],
       resources: [],
-      resourceColumns: ['vCPU', 'RAM (GB)'],
+      resourceColumns: [],
       customFields: [],
       attachments: [],
       customTable: { name: 'Bảng theo dõi trực nhật', columns: ['STT', 'Hạng mục công việc', 'Người phụ trách', 'Kết quả kiểm tra'], rows: [{ STT: '1', 'Hạng mục công việc': 'Kiểm tra phòng máy chủ', 'Người phụ trách': 'Nguyễn Văn An', 'Kết quả kiểm tra': 'Hoạt động bình thường' }] }

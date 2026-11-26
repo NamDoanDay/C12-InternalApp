@@ -11,35 +11,222 @@ const resourceDisplayRowsV7 = (record, docIds) => {
 };
 const canEditResourceV7 = record => admin() || record.createdBy === session || (record.editors || []).includes(session);
 const cleanExcelV7 = value => String(value ?? '').trim().replace(/^—$/, '');
+const isResourceDirectColumnV7 = column => !['STT','Tên tài nguyên','Văn bản nguồn'].includes(column);
+const resourceDocNumberV7 = id => state.documents.find(doc=>doc.id===id)?.no || '';
+const defaultResourceDocColumnsV7 = id => {
+  const no = resourceDocNumberV7(id);
+  if (no === '952' && typeof LOCAL_DEMAND_COLUMNS_952 !== 'undefined') return LOCAL_DEMAND_COLUMNS_952;
+  if (no === '4651' && typeof LOCAL_DEMAND_COLUMNS_4651 !== 'undefined') return LOCAL_DEMAND_COLUMNS_4651;
+  return state.resourceAppendixSchemas?.[id] || state.schemas?.[no] || schemas?.[no] || [];
+};
+const resourceDocColumnsV7 = (id, records=state.resourceRecords||[]) => [...new Set([...defaultResourceDocColumnsV7(id),...records.flatMap(r=>r.documentAppendices?.[id]?.columns||[])])];
+
+function migrateResourceColumnsV7() {
+  state.resourceRecords ||= [];
+  state.resourceAppendixSchemas ||= {};
+  state.resourcePrivateColumns ||= [];
+
+  let doc952 = state.documents.find(d => normV7(d.no) === '952');
+  if (!doc952) {
+    doc952 = { id: uid(), no: '952', date: '2025-03-15', summary: 'Đăng ký nhu cầu tài nguyên hạ tầng điện toán đám mây', documentType: 'Công văn', type: 'Công văn', agency: 'Cục C12', files: [] };
+    state.documents.push(doc952);
+  }
+  let doc4651 = state.documents.find(d => normV7(d.no) === '4651');
+  if (!doc4651) {
+    doc4651 = { id: uid(), no: '4651', date: '2025-09-20', summary: 'Rà soát, bổ sung nhu cầu tài nguyên và phương án bảo đảm an toàn thông tin', documentType: 'Công văn', type: 'Công văn', agency: 'Cục C12', files: [] };
+    state.documents.push(doc4651);
+  }
+
+  delete state.schemas?.['4267'];
+  state.schemas ||= {};
+  if (typeof LOCAL_DEMAND_COLUMNS_952 !== 'undefined') state.schemas['952'] = [...LOCAL_DEMAND_COLUMNS_952];
+  if (typeof LOCAL_DEMAND_COLUMNS_4651 !== 'undefined') state.schemas['4651'] = [...LOCAL_DEMAND_COLUMNS_4651];
+
+  state.resourcePrivateColumns = (state.resourcePrivateColumns || []).filter(c =>
+    !c.includes('CV-DEMO-01') &&
+    !c.includes('4267') &&
+    !c.includes('Ô nguồn') &&
+    !c.includes('Ghi chú trích xuất') &&
+    isResourceDirectColumnV7(c)
+  );
+
+  // Seed full dataset from LOCAL_DEMAND_DATA if resourceRecords has <= 5 mock items
+  if (typeof LOCAL_DEMAND_DATA !== 'undefined' && LOCAL_DEMAND_DATA.length && (!state.resourceRecords || state.resourceRecords.length <= 5)) {
+    const byKey = new Map();
+    (state.resourceRecords || []).forEach(r => byKey.set([r.unit, r.agency, r.system].map(normV7).join('|'), r));
+    state.resourceRecords = LOCAL_DEMAND_DATA.map((item, idx) => {
+      const key = [item.unit, item.agency, item.system].map(normV7).join('|');
+      const existing = byKey.get(key);
+      const regDocs = [];
+      if (item.has952) regDocs.push(doc952.id);
+      if (item.has4651) regDocs.push(doc4651.id);
+      const appendices = {};
+      if (item.has952) {
+        appendices[doc952.id] = {
+          columns: [...LOCAL_DEMAND_COLUMNS_952],
+          rows: [{ ...item.data952, ...(existing?.documentAppendices?.[doc952.id]?.rows?.[0] || {}) }],
+          privateRows: []
+        };
+      }
+      if (item.has4651) {
+        appendices[doc4651.id] = {
+          columns: [...LOCAL_DEMAND_COLUMNS_4651],
+          rows: [{ ...item.data4651, ...(existing?.documentAppendices?.[doc4651.id]?.rows?.[0] || {}) }],
+          privateRows: []
+        };
+      }
+      return {
+        id: existing?.id || uid(),
+        stt: item.stt,
+        order: idx + 1,
+        unit: item.unit,
+        agency: item.agency,
+        system: item.system,
+        level: 'Địa phương',
+        registeredDocumentIds: regDocs,
+        exchangeDocumentIds: [],
+        hardwareColumns: ['STT', 'Tên tài nguyên', 'Văn bản nguồn'],
+        hardwareRows: [{ STT: '1', 'Tên tài nguyên': item.system }],
+        sharedHardwareRowCount: 1,
+        documentAppendices: appendices,
+        customFields: existing?.customFields || [],
+        revisions: existing?.revisions || [],
+        createdBy: existing?.createdBy || session,
+        editors: existing?.editors || [],
+        createdAt: existing?.createdAt || now(),
+        updatedAt: existing?.updatedAt || now()
+      };
+    });
+  }
+
+  // Sanitize any remaining records
+  for (const r of state.resourceRecords) {
+    if (r.documentAppendices) {
+      for (const did of Object.keys(r.documentAppendices)) {
+        const doc = state.documents.find(d => d.id === did);
+        if (!doc || doc.no === '4267' || doc.no === 'CV-DEMO-01') delete r.documentAppendices[did];
+      }
+    }
+    if (r.hardwareColumns) {
+      r.hardwareColumns = r.hardwareColumns.filter(c => !c.includes('4267') && !c.includes('CV-DEMO-01') && !c.includes('Ô nguồn') && !c.includes('Ghi chú trích xuất'));
+    }
+    r.registeredDocumentIds = (r.registeredDocumentIds || []).filter(did => {
+      const doc = state.documents.find(d => d.id === did);
+      return doc && doc.no !== '4267' && doc.no !== 'CV-DEMO-01';
+    });
+  }
+}
 
 // The prior task-linked projection is replaced by records owned by the resource workspace.
 resourcesWorkspace = function () {
   state.resourceRecords ||= [];
-  const docs = state.documents.filter(doc => !doc.archived);
+  migrateResourceColumnsV7();
+  const docs = state.documents.filter(doc => !doc.archived && (doc.no === '952' || doc.no === '4651'));
+  const doc952 = state.documents.find(d => normV7(d.no) === '952');
+  const doc4651 = state.documents.find(d => normV7(d.no) === '4651');
+
   let records = state.resourceRecords.filter(record => {
     if (resourceFilters.self && record.createdBy !== session && !(record.editors || []).includes(session)) return false;
-    if (resourceFilters.documents?.length && !resourceFilters.documents.some(id => [...(record.registeredDocumentIds || []), ...(record.exchangeDocumentIds || [])].includes(id))) return false;
-    return !resourceSearchV7 || `${record.unit} ${record.agency} ${record.system}`.toLocaleLowerCase('vi').includes(resourceSearchV7.toLocaleLowerCase('vi'));
-  }).sort((a,b)=>a.unit.localeCompare(b.unit,'vi')||a.agency.localeCompare(b.agency,'vi')||a.system.localeCompare(b.system,'vi'));
-  const docIds = [...new Set(records.flatMap(r => r.registeredDocumentIds || []))];
-  const docCols = Object.fromEntries(docIds.map(id => [id, [...new Set(records.flatMap(r => r.documentAppendices?.[id]?.columns || []))]]));
-  const columns = [...new Set(records.flatMap(r => r.hardwareColumns || []))].filter(c => c !== 'STT');
-  const flatRows = records.flatMap((record, ri) => resourceDisplayRowsV7(record,docIds).map(entry=>({record,ri,...entry,row:entry.kind==='private'?record.documentAppendices?.[entry.docId]?.privateRows?.[entry.i]||{}:resourceRowsV7(record)[entry.i]||{}})));
-  const rowspan = (at, predicate = () => true) => {
-    const first = flatRows[at]; if (at && flatRows[at-1].kind==='shared' && first.kind==='shared' && predicate(flatRows[at - 1].record, first.record)) return 0;
-    let n = 1; while (at + n < flatRows.length && flatRows[at+n].kind==='shared' && first.kind==='shared' && predicate(first.record, flatRows[at + n].record)) n++; return n;
+    if (resourceFilters.documents?.length && !resourceFilters.documents.some(id => (record.registeredDocumentIds || []).includes(id))) return false;
+    if (!resourceSearchV7) return true;
+    const q = resourceSearchV7.toLocaleLowerCase('vi');
+    return `${record.unit} ${record.agency} ${record.system}`.toLocaleLowerCase('vi').includes(q);
+  }).sort((a,b) => (a.order || 9999) - (b.order || 9999) || a.unit.localeCompare(b.unit,'vi') || a.agency.localeCompare(b.agency,'vi') || a.system.localeCompare(b.system,'vi'));
+
+  const show952 = !resourceFilters.documents?.length || (doc952 && resourceFilters.documents.includes(doc952.id));
+  const show4651 = !resourceFilters.documents?.length || (doc4651 && resourceFilters.documents.includes(doc4651.id));
+
+  const cols952 = show952 && doc952 ? resourceDocColumnsV7(doc952.id, records) : [];
+  const cols4651 = show4651 && doc4651 ? resourceDocColumnsV7(doc4651.id, records) : [];
+
+  const flatRows = records.flatMap((record, ri) => {
+    const sharedCount = Math.max(record.sharedHardwareRowCount || 1, 1);
+    return Array.from({ length: sharedCount }, (_, i) => ({ record, ri, i, kind: 'shared', unit: record.unit, agency: record.agency, system: record.system, stt: record.stt }));
+  });
+
+  const getUnitSpan = at => {
+    const cur = flatRows[at];
+    if (at > 0 && normV7(flatRows[at - 1].unit) === normV7(cur.unit)) return 0;
+    let span = 1;
+    while (at + span < flatRows.length && normV7(flatRows[at + span].unit) === normV7(cur.unit)) span++;
+    return span;
   };
+
+  const getAgencySpan = at => {
+    const cur = flatRows[at];
+    if (at > 0 && normV7(flatRows[at - 1].unit) === normV7(cur.unit) && normV7(flatRows[at - 1].agency) === normV7(cur.agency)) return 0;
+    let span = 1;
+    while (at + span < flatRows.length && normV7(flatRows[at + span].unit) === normV7(cur.unit) && normV7(flatRows[at + span].agency) === normV7(cur.agency)) span++;
+    return span;
+  };
+
+  const getSystemSpan = at => {
+    const cur = flatRows[at];
+    if (at > 0 && flatRows[at - 1].record.id === cur.record.id) return 0;
+    let span = 1;
+    while (at + span < flatRows.length && flatRows[at + span].record.id === cur.record.id) span++;
+    return span;
+  };
+
+  const formatShortHeader = col => {
+    if (col.startsWith('Hệ thống có trong danh mục')) return 'Danh mục (278/214/1132)';
+    return col;
+  };
+
   return head('Quản lý tài nguyên', '', btn('Tạo tài nguyên', 'new-resource', 'plus', 'primary')) +
     `<section class="surface resource-v7-panel" id="resourcePanel">
-      <div class="toolbar"><strong>Dữ liệu tài nguyên</strong><span class="badge-count">${records.length} hệ thống</span><span class="grow"></span><button class="btn" id="exportResourceExcelV7" ${records.length ? '' : 'disabled'}>${icon('download')} Xuất Excel</button>${ib('expand', 'fullscreen', 'Phóng to hoặc thu nhỏ bảng')}</div>
+      <div class="toolbar"><strong>Dữ liệu tài nguyên tổng hợp</strong><span class="badge-count">${records.length} hệ thống</span><span class="grow"></span><button class="btn" id="exportResourceExcelV7" ${records.length ? '' : 'disabled'}>${icon('download')} Xuất Excel</button>${ib('expand', 'fullscreen', 'Phóng to hoặc thu nhỏ bảng')}</div>
       <div class="resource-v7-filters">
-        <label class="task-search">${icon('search')}<input id="resourceSearchV7" value="${esc(resourceSearchV7)}" placeholder="Tìm đơn vị, cơ quan quản lý hoặc hệ thống..."></label>
-        <label class="field"><span>Văn bản</span><select id="resourceDocumentFilterV7"><option value="">Tất cả</option>${docs.map(d => `<option value="${d.id}" ${resourceFilters.documents?.includes(d.id) ? 'selected' : ''}>${esc(d.documentType)} · ${esc(d.no || 'Chưa có số')}</option>`).join('')}</select></label>
-        <label class="checkbox-field"><input id="resourceSelfV7" type="checkbox" ${resourceFilters.self ? 'checked' : ''}> Tài nguyên của tôi</label>
+        <label class="task-search">${icon('search')}<input id="resourceSearchV7" value="${esc(resourceSearchV7)}" placeholder="Tìm tên đơn vị, cơ quan quản lý, hệ thống..."></label>
+        <label class="field"><span>Công văn</span><select id="resourceDocumentFilterV7"><option value="">Tất cả</option>${docs.map(d => `<option value="${d.id}" ${resourceFilters.documents?.includes(d.id) ? 'selected' : ''}>Công văn ${esc(d.no || d.documentType)} · ${esc(d.summary || '')}</option>`).join('')}</select></label>
+        <label class="checkbox-field"><input id="resourceSelfV7" type="checkbox" ${resourceFilters.self ? 'checked' : ''}> Được giao cho tôi</label>
         ${resourceSearchV7 || resourceFilters.documents?.length || resourceFilters.self ? '<button class="btn text" id="clearResourceV7">Xóa bộ lọc</button>' : ''}
       </div>
-      <div class="table-scroll"><table class="data-table resource-v7-table"><thead><tr><th rowspan="2">STT</th><th rowspan="2">Tên đơn vị</th><th rowspan="2">Cơ quan quản lý</th><th rowspan="2">Hệ thống</th><th rowspan="2">Công văn đăng ký</th><th rowspan="2">Văn bản trao đổi</th>${docIds.map(id => { const d=state.documents.find(x=>x.id===id); return `<th colspan="${Math.max(1,docCols[id].length)}">${esc(d?.no || d?.documentType || 'Văn bản')}</th>` }).join('')}${columns.length ? `<th colspan="${columns.length}">Phụ lục riêng</th>` : ''}<th rowspan="2"></th></tr><tr>${docIds.map(id => (docCols[id].length ? docCols[id] : ['—']).map(c=>`<th>${esc(c)}</th>`).join('')).join('')}${columns.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
-        ${flatRows.map(({record,i,row,kind,docId}, at) => { const docsCell=(ids,cls='')=>(ids||[]).map(id=>{let d=state.documents.find(x=>x.id===id);return d?`<span class="chip ${cls}">${esc(d.no||d.documentType)}</span>`:''}).join('')||'—'; const unitSpan=kind==='shared'?rowspan(at,(a,b)=>normV7(a.unit)===normV7(b.unit)):1; const agencySpan=kind==='shared'?rowspan(at,(a,b)=>normV7(a.unit)===normV7(b.unit)&&normV7(a.agency)===normV7(b.agency)):1; const systemSpan=kind==='shared'?rowspan(at,(a,b)=>a.id===b.id):0; return `<tr data-resource-v7="${record.id}" tabindex="0"><td>${at+1}</td>${unitSpan?`<td rowspan="${unitSpan}">${esc(row.unit||record.unit)}</td>`:''}${agencySpan?`<td rowspan="${agencySpan}">${esc(row.agency||record.agency)}</td>`:''}${systemSpan?`<td rowspan="${systemSpan}"><strong>${esc(record.system)}</strong></td>`:`<td><strong>${esc(row.system||'')}</strong></td>`}${kind==='private'?`<td>${docsCell([docId],'active')}</td><td>—</td>`:systemSpan?`<td rowspan="${systemSpan}">${docsCell(record.registeredDocumentIds,'active')}</td><td rowspan="${systemSpan}">${docsCell(record.exchangeDocumentIds)}</td>`:''}${docIds.flatMap(id=>{const app=record.documentAppendices?.[id]||{};const cols=docCols[id].length?docCols[id]:['—'];const vals=kind==='private'?(docId===id?app.privateRows?.[i]||{}:{}):app.rows?.[i]||{};return cols.map(c=>`<td>${esc(vals[c]??'—')}</td>`) }).join('')}${columns.map(c=>`<td>${esc(kind==='shared'?row[c]??'—':'—')}</td>`).join('')}<td><button class="icon-btn-sm" type="button" data-resource-v7-detail="${record.id}" aria-label="Xem chi tiết">${icon('eye')}</button></td></tr>` }).join('')}
+      <div class="table-scroll"><table class="data-table resource-v7-table"><thead><tr><th rowspan="2" class="col-stt">STT</th><th rowspan="2" class="col-unit">Tên đơn vị</th><th rowspan="2" class="col-agency">Cơ quan quản lý</th><th rowspan="2" class="col-system">Hệ thống</th><th rowspan="2" class="col-docs">Công văn đăng ký</th>${show952 && cols952.length ? `<th colspan="${cols952.length}" class="th-doc-group th-doc-952">Công văn 952</th>` : ''}${show4651 && cols4651.length ? `<th colspan="${cols4651.length}" class="th-doc-group th-doc-4651">Công văn 4651</th>` : ''}<th rowspan="2" class="col-action">Thao tác</th></tr><tr>${show952 ? cols952.map(c=>`<th class="th-sub th-sub-952" title="${esc(c)}">${esc(formatShortHeader(c))}</th>`).join('') : ''}${show4651 ? cols4651.map(c=>`<th class="th-sub th-sub-4651" title="${esc(c)}">${esc(formatShortHeader(c))}</th>`).join('') : ''}</tr></thead><tbody>
+        ${flatRows.map((entry, at) => {
+          const { record, ri, i, unit, agency, system, stt } = entry;
+          const unitSpan = getUnitSpan(at);
+          const agencySpan = getAgencySpan(at);
+          const systemSpan = getSystemSpan(at);
+          const docsBadge = (record.registeredDocumentIds || []).map(id => {
+            const d = state.documents.find(x => x.id === id);
+            return d ? `<span class="chip active">${esc(d.no || d.documentType)}</span>` : '';
+          }).join('') || '—';
+
+          let rowHtml = `<tr data-resource-v7="${record.id}" tabindex="0">`;
+          if (unitSpan > 0) {
+            rowHtml += `<td class="col-stt" rowspan="${unitSpan}">${esc(stt || (ri + 1))}</td>`;
+            rowHtml += `<td class="col-unit" rowspan="${unitSpan}"><strong>${esc(unit)}</strong></td>`;
+          }
+          if (agencySpan > 0) {
+            rowHtml += `<td class="col-agency" rowspan="${agencySpan}">${esc(agency)}</td>`;
+          }
+          if (systemSpan > 0) {
+            rowHtml += `<td class="col-system" rowspan="${systemSpan}"><strong>${esc(system)}</strong></td>`;
+            rowHtml += `<td class="col-docs" rowspan="${systemSpan}">${docsBadge}</td>`;
+          }
+          if (show952) {
+            const app952 = record.documentAppendices?.[doc952?.id];
+            const vals952 = app952?.rows?.[i] || {};
+            rowHtml += cols952.map(c => {
+              const val = vals952[c] ?? '';
+              return `<td class="resource-edit-cell cell-952" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc952?.id || ''}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${esc(val || '—')}</td>`;
+            }).join('');
+          }
+          if (show4651) {
+            const app4651 = record.documentAppendices?.[doc4651?.id];
+            const vals4651 = app4651?.rows?.[i] || {};
+            rowHtml += cols4651.map(c => {
+              const val = vals4651[c] ?? '';
+              return `<td class="resource-edit-cell cell-4651" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc4651?.id || ''}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${esc(val || '—')}</td>`;
+            }).join('');
+          }
+          if (systemSpan > 0) {
+            rowHtml += `<td class="col-action" rowspan="${systemSpan}"><button class="icon-btn-sm" type="button" data-resource-v7-detail="${record.id}" aria-label="Xem chi tiết">${icon('eye')}</button></td>`;
+          }
+          rowHtml += `</tr>`;
+          return rowHtml;
+        }).join('')}
       </tbody></table>${records.length ? '' : '<div class="empty">Chưa có tài nguyên phù hợp. Tạo tài nguyên để bắt đầu.</div>'}</div>
     </section>`;
 };
@@ -59,28 +246,154 @@ function catalogTableV7() {
   return `<div class="table-scroll"><table class="data-table"><thead><tr><th>STT</th><th>Loại văn bản</th><th>Số</th><th>Ngày phát hành</th><th>Trích yếu</th><th></th></tr></thead><tbody>${list.map((d, i) => `<tr data-catalog-v7-row="${d.id}" tabindex="0"><td>${i + 1}</td><td>${esc(d.documentType || d.type)}</td><td><strong>${esc(d.no || '—')}</strong></td><td>${day(d.date)}</td><td>${esc(d.summary || '—')}</td><td><button type="button" class="icon-btn-sm" data-catalog-v7-detail="${d.id}" aria-label="Xem chi tiết">${icon('eye')}</button></td></tr>`).join('')}</tbody></table>${list.length ? '' : '<div class="empty">Chưa có văn bản trong loại này.</div>'}</div>`;
 }
 
-function exportResourceExcelV7(records, docIds, docCols, privateCols) {
+function exportResourceExcelV7(records) {
   if (!records.length) return toast('Không có dữ liệu để xuất.');
   if (!window.XLSX?.utils?.aoa_to_sheet) return toast('Thư viện xuất Excel chưa tải được. Vui lòng tải lại trang rồi thử lại.');
-  const fixed=['STT','Tên đơn vị','Cơ quan quản lý','Hệ thống','Công văn đăng ký','Văn bản trao đổi'];
-  const groups=docIds.map(id=>({id,label:state.documents.find(d=>d.id===id)?.no||state.documents.find(d=>d.id===id)?.documentType||'Văn bản',cols:docCols[id].length?docCols[id]:['—']}));
-  const head1=[...fixed,...groups.flatMap(g=>g.cols.map((_,i)=>i===0?g.label:'')),...privateCols.map((_,i)=>i===0?'Phụ lục riêng':'' )];
-  const head2=[...fixed.map(()=>''),...groups.flatMap(g=>g.cols),...privateCols];
-  const data=[head1,head2], merges=[];
-  const flat=records.flatMap(record=>resourceDisplayRowsV7(record,docIds).map(entry=>({record,...entry})));
-  flat.forEach(({record,i,kind,docId},idx)=>{
-    const nums=(ids)=>(ids||[]).map(id=>state.documents.find(d=>d.id===id)?.no||state.documents.find(d=>d.id===id)?.documentType||'').filter(Boolean).join(', ');
-    const identity=kind==='private'?record.documentAppendices?.[docId]?.privateRows?.[i]||{}:record;
-    data.push([idx+1,identity.unit||record.unit,identity.agency||record.agency,kind==='private'?identity.system||'':record.system,nums(kind==='private'?[docId]:record.registeredDocumentIds),kind==='private'?'':nums(record.exchangeDocumentIds),...groups.flatMap(g=>g.cols.map(c=>kind==='private'?(g.id===docId?record.documentAppendices?.[g.id]?.privateRows?.[i]?.[c]||'':''):record.documentAppendices?.[g.id]?.rows?.[i]?.[c]||'')),...privateCols.map(c=>kind==='shared'?resourceRowsV7(record)[i]?.[c]||'':'')].map(cleanExcelV7));
+  const doc952 = state.documents.find(d => (d.no || '').includes('952'));
+  const doc4651 = state.documents.find(d => (d.no || '').includes('4651'));
+  const cols952 = (typeof LOCAL_DEMAND_COLUMNS_952 !== 'undefined' ? LOCAL_DEMAND_COLUMNS_952 : [
+    'vCPU', 'RAM (GB)', 'Disk / Block (TB)', 'Disk / File Storage (TB)', 'Disk / Object (TB)',
+    'License', 'Giải pháp ATTT', 'Kênh truyền'
+  ]);
+  const cols4651 = (typeof LOCAL_DEMAND_COLUMNS_4651 !== 'undefined' ? LOCAL_DEMAND_COLUMNS_4651 : [
+    'vCPU', 'RAM (GB)', 'GPU (GB)', 'Disk / Block SSD (TB)', 'Disk / Block HDD (TB)',
+    'Disk / File Storage SSD (TB)', 'Disk / File Storage HDD (TB)', 'Disk / Object (TB)',
+    'Sizing 3 vùng', 'Sizing / DMZ', 'Sizing / DB', 'Sizing / APP',
+    'License thương mại', 'Kênh truyền', 'Giải pháp ATTT', 'Kế hoạch',
+    'Đặc thù', 'Hệ thống có trong danh mục theo QĐ 1690/QĐ-BCA-A05 ngày 15/3/2023 của Bộ Công an', 'Ghi chú'
+  ]);
+  const fixed = ['STT', 'Tên đơn vị', 'Cơ quan quản lý', 'Hệ thống', 'Công văn đăng ký'];
+  const head1 = [...fixed, ...cols952.map((_, i) => i === 0 ? 'Công văn 952' : ''), ...cols4651.map((_, i) => i === 0 ? 'Công văn 4651' : '')];
+  const head2 = [...fixed.map(() => ''), ...cols952, ...cols4651];
+  const data = [head1, head2];
+  const merges = [];
+
+  fixed.forEach((_, c) => merges.push({ s: { r: 0, c }, e: { r: 1, c } }));
+  if (cols952.length > 1) {
+    merges.push({ s: { r: 0, c: fixed.length }, e: { r: 0, c: fixed.length + cols952.length - 1 } });
+  }
+  if (cols4651.length > 1) {
+    const c4651 = fixed.length + cols952.length;
+    merges.push({ s: { r: 0, c: c4651 }, e: { r: 0, c: c4651 + cols4651.length - 1 } });
+  }
+
+  records.forEach((record, idx) => {
+    const app952 = record.documentAppendices?.[doc952?.id];
+    const vals952 = app952?.rows?.[0] || {};
+    const app4651 = record.documentAppendices?.[doc4651?.id];
+    const vals4651 = app4651?.rows?.[0] || {};
+    const docsStr = (record.registeredDocumentIds || [])
+      .map(id => state.documents.find(d => d.id === id)?.no || '')
+      .filter(Boolean).join(', ') || '952, 4651';
+
+    data.push([
+      idx + 1,
+      record.unit || '',
+      record.agency || '',
+      record.system || '',
+      docsStr,
+      ...cols952.map(c => vals952[c] ?? ''),
+      ...cols4651.map(c => vals4651[c] ?? '')
+    ].map(cleanExcelV7));
   });
-  const firstData=2;
-  for(let i=0;i<flat.length;){let j=i+1;while(j<flat.length&&flat[j].kind==='shared'&&flat[i].kind==='shared'&&flat[j].record.id===flat[i].record.id)j++;if(j-i>1){[4,5].forEach(col=>merges.push({s:{r:firstData+i,c:col},e:{r:firstData+j-1,c:col}}))}i=j}
-  for(let start=0;start<flat.length;){let end=start+1;while(end<flat.length&&flat[end].kind==='shared'&&flat[start].kind==='shared'&&normV7(flat[end].record.unit)===normV7(flat[start].record.unit))end++;if(end-start>1)merges.push({s:{r:firstData+start,c:1},e:{r:firstData+end-1,c:1}});let a=start;while(a<end){let b=a+1;while(b<end&&normV7(flat[b].record.agency)===normV7(flat[a].record.agency))b++;if(b-a>1)merges.push({s:{r:firstData+a,c:2},e:{r:firstData+b-1,c:2}});let c=a;while(c<b){let d=c+1;while(d<b&&flat[d].kind==='shared'&&flat[c].kind==='shared'&&flat[d].record.id===flat[c].record.id)d++;if(d-c>1)merges.push({s:{r:firstData+c,c:3},e:{r:firstData+d-1,c:3}});c=d}a=b}start=end}
-  let c=fixed.length;groups.forEach(g=>{if(g.cols.length>1)merges.push({s:{r:0,c},e:{r:0,c:c+g.cols.length-1}});c+=g.cols.length});if(privateCols.length>1)merges.push({s:{r:0,c},e:{r:0,c:c+privateCols.length-1}});
-  const ws=window.XLSX.utils.aoa_to_sheet(data);ws['!merges']=merges;ws['!cols']=Array.from({length:head2.length},(_,col)=>({wch:Math.min(48,Math.max(12,...data.map(row=>String(row[col]||'').length+2)))}));
-  fixed.forEach((_,col)=>merges.push({s:{r:0,c:col},e:{r:1,c:col}}));ws['!merges']=merges;
-  for(let col=0;col<head2.length;col++)for(let row=0;row<2;row++){const cell=ws[window.XLSX.utils.encode_cell({r:row,c:col})];if(cell)cell.s={font:{bold:true},alignment:{vertical:'center',wrapText:true}}}
-  try{const wb=window.XLSX.utils.book_new();window.XLSX.utils.book_append_sheet(wb,ws,'Du lieu tai nguyen');const now=new Date(),date=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;window.XLSX.writeFile(wb,`Du_lieu_tai_nguyen_${date}.xlsx`);toast(`Đã xuất ${flat.length} dòng tài nguyên.`)}catch(error){toast('Không thể tạo tệp Excel. Vui lòng thử tải lại trang.')}
+
+  const firstData = 2;
+  for (let start = 0; start < records.length;) {
+    let end = start + 1;
+    while (end < records.length && normV7(records[end].unit) === normV7(records[start].unit)) {
+      end++;
+    }
+    if (end - start > 1) {
+      merges.push({ s: { r: firstData + start, c: 0 }, e: { r: firstData + end - 1, c: 0 } });
+      merges.push({ s: { r: firstData + start, c: 1 }, e: { r: firstData + end - 1, c: 1 } });
+    }
+    let a = start;
+    while (a < end) {
+      let b = a + 1;
+      while (b < end && normV7(records[b].agency) === normV7(records[a].agency)) {
+        b++;
+      }
+      if (b - a > 1) {
+        merges.push({ s: { r: firstData + a, c: 2 }, e: { r: firstData + b - 1, c: 2 } });
+      }
+      a = b;
+    }
+    start = end;
+  }
+
+  const ws = window.XLSX.utils.aoa_to_sheet(data);
+  ws['!merges'] = merges;
+  ws['!cols'] = Array.from({ length: head2.length }, (_, col) => ({
+    wch: Math.min(48, Math.max(12, ...data.map(row => String(row[col] || '').length + 2)))
+  }));
+  for (let col = 0; col < head2.length; col++) {
+    for (let row = 0; row < 2; row++) {
+      const cell = ws[window.XLSX.utils.encode_cell({ r: row, c: col })];
+      if (cell) cell.s = { font: { bold: true }, alignment: { vertical: 'center', wrapText: true } };
+    }
+  }
+  try {
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, 'Nhu cầu Địa phương');
+    const now = new Date(), date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    window.XLSX.writeFile(wb, `Nhu_cau_Dia_phuong_${date}.xlsx`);
+    toast(`Đã xuất ${records.length} hệ thống tài nguyên.`);
+  } catch (error) {
+    toast('Không thể tạo tệp Excel. Vui lòng thử tải lại trang.');
+  }
+}
+
+function resourceTableActionV7(kind) {
+  const editable=state.resourceRecords.filter(canEditResourceV7);
+  const documents=[...new Set(state.resourceRecords.flatMap(r=>r.registeredDocumentIds||[]))].map(id=>state.documents.find(d=>d.id===id)).filter(Boolean);
+  const resourceOptions=editable.map(r=>`<option value="${esc(r.id)}">${esc(`${r.unit} / ${r.agency} / ${r.system}`)}</option>`).join('');
+  const documentOptions=documents.map(d=>`<option value="${esc(d.id)}">${esc(`${d.no||d.documentType} · ${d.documentType}`)}</option>`).join('');
+  if(kind==='common-column') return modal('Thêm cột chung',`<label class="field"><span>Nhóm văn bản <b class="required">*</b></span><select name="docId" required>${documentOptions}</select></label>${field('Tên cột *','name','','text',true)}`,data=>{
+    const name=data.name.trim(),docId=data.docId;if(!name||!docId)throw Error('Chọn văn bản và nhập tên cột.');
+    state.resourceAppendixSchemas||={};const schema=state.resourceAppendixSchemas[docId]||=resourceDocColumnsV7(docId);if(schema.includes(name))throw Error('Cột này đã tồn tại trong nhóm văn bản.');schema.push(name);
+    state.resourceRecords.filter(r=>(r.registeredDocumentIds||[]).includes(docId)).forEach(r=>{const app=r.documentAppendices?.[docId];if(app){app.columns||=[];if(!app.columns.includes(name))app.columns.push(name);(app.rows||[]).forEach(row=>row[name]??='');(app.privateRows||[]).forEach(row=>row[name]??='')}});
+    done('Đã thêm cột vào nhóm văn bản.');
+  },false,'Thêm cột');
+  if(kind==='private-column') return modal('Thêm cột riêng',`${field('Tên cột *','name','','text',true)}<p class="small muted">Cột hiển thị sau Công văn đăng ký và Văn bản trao đổi; mỗi dòng có giá trị riêng.</p>`,data=>{
+    const name=data.name.trim();if(!name)throw Error('Nhập tên cột.');if(!isResourceDirectColumnV7(name))throw Error('Tên cột này đã có trong thông tin hệ thống.');state.resourcePrivateColumns||=[];if(state.resourcePrivateColumns.includes(name))throw Error('Tên cột đã tồn tại.');
+    state.resourcePrivateColumns.push(name);state.resourceRecords.forEach(r=>{r.hardwareColumns||=['STT'];if(!r.hardwareColumns.includes(name))r.hardwareColumns.push(name);(r.hardwareRows||[]).forEach(row=>row[name]??='');Object.values(r.documentAppendices||{}).forEach(app=>(app.privateRows||[]).forEach(row=>row[name]??=''))});done('Đã thêm cột riêng.');
+  },false,'Thêm cột');
+  if(kind==='common-row') {
+    const units=[...new Set(editable.map(r=>r.unit))],selectedUnit=units[0]||'';
+    if(!units.length)return toast('Chưa có tài nguyên để thêm hàng chung.');
+    const agencies=[...new Set(editable.filter(r=>r.unit===selectedUnit).map(r=>r.agency))],selectedAgency=agencies[0]||'';
+    const systems=[...new Set(editable.filter(r=>r.unit===selectedUnit&&r.agency===selectedAgency).map(r=>r.system))];
+    modal('Thêm hàng chung',`<label class="field"><span>Tên đơn vị <b class="required">*</b></span><select name="unit" id="resourceCommonUnitV7" required>${units.map(v=>`<option>${esc(v)}</option>`).join('')}</select></label><label class="field"><span>Cơ quan quản lý <b class="required">*</b></span><select name="agency" id="resourceCommonAgencyV7" required>${agencies.map(v=>`<option>${esc(v)}</option>`).join('')}</select></label><label class="field"><span>Hệ thống <b class="required">*</b></span><select name="system" id="resourceCommonSystemV7" required>${systems.map(v=>`<option>${esc(v)}</option>`).join('')}</select></label><p class="small muted">Thêm một dòng trống vào hệ thống đã chọn và căn hàng giữa các nhóm văn bản đang đăng ký.</p>`,data=>{
+    const source=editable.find(r=>r.unit===data.unit&&r.agency===data.agency&&r.system===data.system);if(!source)throw Error('Chọn đơn vị, cơ quan quản lý và hệ thống hiện có.');const draft=V7.clone(source);draft.documentAppendices||={};const count=Math.max(draft.sharedHardwareRowCount||0,draft.hardwareRows?.length||0,...Object.values(draft.documentAppendices).map(app=>app.rows?.length||0))+1;draft.sharedHardwareRowCount=count;
+    const row={};(draft.hardwareColumns||[]).forEach((c,i)=>row[c]=i===0?String(count):'');draft.hardwareRows||=[];while(draft.hardwareRows.length<count-1)draft.hardwareRows.push({});draft.hardwareRows.push(row);
+    (draft.registeredDocumentIds||[]).forEach(id=>{const app=draft.documentAppendices[id]||={columns:[],rows:[],privateRows:[]};app.rows||=[];while(app.rows.length<count)app.rows.push({})});saveResourceV7(draft);
+    },false,'Thêm hàng');
+    const refreshSystems=()=>{const unit=$('#resourceCommonUnitV7')?.value||'',agency=$('#resourceCommonAgencyV7')?.value||'',systemSelect=$('#resourceCommonSystemV7');if(!systemSelect)return;const values=[...new Set(editable.filter(r=>r.unit===unit&&r.agency===agency).map(r=>r.system))];systemSelect.innerHTML=values.map(v=>`<option>${esc(v)}</option>`).join('')};
+    const refreshAgencies=()=>{const unit=$('#resourceCommonUnitV7')?.value||'',agencySelect=$('#resourceCommonAgencyV7');if(!agencySelect)return;const values=[...new Set(editable.filter(r=>r.unit===unit).map(r=>r.agency))];agencySelect.innerHTML=values.map(v=>`<option>${esc(v)}</option>`).join('');refreshSystems()};
+    $('#resourceCommonUnitV7')?.addEventListener('change',refreshAgencies);$('#resourceCommonAgencyV7')?.addEventListener('change',refreshSystems);return;
+  }
+  if(kind==='private-row') {
+    if(!documents.length)return toast('Chưa có văn bản đăng ký cho tài nguyên.');
+    modal('Thêm hàng riêng',`<label class="field"><span>Tài nguyên cha <b class="required">*</b></span><select name="resourceId" id="resourcePrivateParentV7" required>${resourceOptions}</select></label><label class="field"><span>Nhóm văn bản <b class="required">*</b></span><select name="docId" id="resourcePrivateDocV7" required>${documentOptions}</select></label>${field('Tên đơn vị *','unit','','text',true)}${field('Cơ quan quản lý *','agency','','text',true)}${field('Hệ thống *','system','','text',true)}<p class="small muted">Dòng này chỉ xuất hiện trong nhóm văn bản đã chọn, không gộp vào các dòng chung.</p>`,data=>{
+    const draft=V7.clone(state.resourceRecords.find(r=>r.id===data.resourceId));if(!draft)throw Error('Chọn tài nguyên có thể chỉnh sửa.');if(!(draft.registeredDocumentIds||[]).includes(data.docId))throw Error('Văn bản này chưa được đăng ký cho tài nguyên đã chọn.');
+    const app=draft.documentAppendices[data.docId]||={columns:[],rows:[],privateRows:[]};app.privateRows||=[];app.privateRows.push({unit:data.unit.trim(),agency:data.agency.trim(),system:data.system.trim()});saveResourceV7(draft);
+    },true,'Thêm hàng riêng');
+    $('#resourcePrivateParentV7')?.addEventListener('change',e=>{const parent=state.resourceRecords.find(r=>r.id===e.target.value);const select=$('#resourcePrivateDocV7');if(!select)return;const ids=parent?.registeredDocumentIds||[];select.innerHTML=ids.map(id=>state.documents.find(d=>d.id===id)).filter(Boolean).map(d=>`<option value="${esc(d.id)}">${esc(`${d.no||d.documentType} · ${d.documentType}`)}</option>`).join('')});
+    $('#resourcePrivateParentV7')?.dispatchEvent(new Event('change'));
+    return;
+  }
+}
+
+function resourceCellEditV7(recordId, rowIndex, kind, docId, column) {
+  if(column==='—')return;
+  const current=state.resourceRecords.find(r=>r.id===recordId);if(!current)return;
+  if(!canEditResourceV7(current))return toast('Bạn chỉ được sửa tài nguyên do mình quản lý.');
+  const draft=V7.clone(current),app=docId?(draft.documentAppendices[docId]||={columns:[],rows:[],privateRows:[]}):null;
+  if(app){app.rows||=[];app.privateRows||=[]}else draft.hardwareRows||=[];
+  const rows=docId?(kind==='private'?app.privateRows:app.rows):draft.hardwareRows;
+  rows[rowIndex]||={};
+  const initial=rows[rowIndex][column]??'';
+  modal(`Sửa ${column}`,`${field('Giá trị','value',initial)}`,data=>{rows[rowIndex][column]=data.value;saveResourceV7(draft)},false,'Lưu giá trị');
 }
 
 function catalogFormV7(id = '') {
@@ -126,7 +439,8 @@ function catalogDetailV7(id) {
 function resourceFormV7(id = '') {
   const current = state.resourceRecords.find(r => r.id === id);
   if (current && !canEditResourceV7(current)) return toast('Bạn chỉ được sửa tài nguyên do mình quản lý.');
-  resourceDraftV7 = V7.clone(current || { id: '', unit: '', agency: '', system: '', level: 'Địa phương', registeredDocumentIds: [], exchangeDocumentIds: [], attachments: [], hardwareColumns: ['STT', 'Tên tài nguyên'], hardwareRows: [{ STT: '1', 'Tên tài nguyên': '' }], sharedHardwareRowCount: 1, documentAppendices: {}, customFields: [], revisions: [], createdBy: '', editors: [], createdAt: '', updatedAt: '' });
+  const directColumns=(state.resourcePrivateColumns||[]).filter(isResourceDirectColumnV7);
+  resourceDraftV7 = V7.clone(current || { id: '', unit: '', agency: '', system: '', level: 'Địa phương', registeredDocumentIds: [], exchangeDocumentIds: [], attachments: [], hardwareColumns: ['STT',...directColumns], hardwareRows: [{ STT: '1',...Object.fromEntries(directColumns.map(c=>[c,'' ])) }], sharedHardwareRowCount: 1, documentAppendices: {}, customFields: [], revisions: [], createdBy: '', editors: [], createdAt: '', updatedAt: '' });
   resourceDraftV7.sharedHardwareRowCount ||= Math.max(resourceDraftV7.hardwareRows?.length || 1, 1);
   resourceDraftV7.documentAppendices ||= {};
   (resourceDraftV7.registeredDocumentIds || []).forEach(docId => resourceDraftV7.documentAppendices[docId] ||= {columns:[],rows:Array.from({length:resourceDraftV7.sharedHardwareRowCount},()=>({})),privateRows:[]});
@@ -140,8 +454,7 @@ function drawResourceFormV7() {
     <section class="surface"><h3>Công văn đăng ký</h3>${docs.map(d => `<label class="resource-doc-choice"><input type="checkbox" data-resource-doc="registeredDocumentIds" value="${d.id}" ${(r.registeredDocumentIds || []).includes(d.id) ? 'checked' : ''}> ${esc(d.documentType)} · ${esc(d.no || 'Chưa có số')}</label>`).join('') || '<p class="muted">Chưa có văn bản trong danh mục.</p>'}</section>
     <section class="surface"><h3>Văn bản trao đổi</h3>${docs.map(d => `<label class="resource-doc-choice"><input type="checkbox" data-resource-doc="exchangeDocumentIds" value="${d.id}" ${(r.exchangeDocumentIds || []).includes(d.id) ? 'checked' : ''}> ${esc(d.documentType)} · ${esc(d.no || 'Chưa có số')}</label>`).join('') || '<p class="muted">Chưa có văn bản trong danh mục.</p>'}</section>
     <section class="surface"><div class="toolbar"><h3>Tệp đính kèm tài nguyên</h3><span class="grow"></span><label class="btn">${icon('upload')} Tải tệp lên<input id="resourceFilesV7" type="file" multiple hidden></label></div>${fileLinks(r.attachments || []) || '<p class="muted">Chưa có tệp đính kèm.</p>'}</section>
-    <section class="surface"><div class="toolbar"><h3>Phụ lục theo văn bản</h3><span class="grow"></span><select id="resourceAppendixDocV7" aria-label="Chọn văn bản">${(r.registeredDocumentIds||[]).map(id=>{const d=docs.find(x=>x.id===id);return d?`<option value="${id}">${esc(d.no||d.documentType)}</option>`:''}).join('')}</select><button class="btn" type="button" id="resourceCommonColV7">+ Cột cho văn bản</button><button class="btn" type="button" id="resourceCommonRowV7">+ Dòng chung</button><button class="btn" type="button" id="resourcePrivateRowV7">+ Dòng riêng</button></div><p class="small muted">Cột thuộc văn bản đang chọn và áp dụng cho các dòng của văn bản đó. Dòng chung chia sẻ hệ thống giữa các văn bản; dòng riêng chỉ thuộc văn bản đang chọn.</p>${(r.registeredDocumentIds||[]).map(id=>{const d=docs.find(x=>x.id===id);const app=r.documentAppendices[id]||{columns:[],rows:[],privateRows:[]};const cols=app.columns;const rows=Array.from({length:r.sharedHardwareRowCount},(_,i)=>({kind:'shared',i,data:app.rows?.[i]||{}})).concat((app.privateRows||[]).map((data,i)=>({kind:'private',i,data})));return `<div class="resource-doc-appendix"><h4>${esc(d?.documentType||'Văn bản')} ${esc(d?.no||'')}</h4><div class="table-scroll"><table class="dynamic-data-table"><thead><tr><th>Phạm vi dòng / Thông tin hệ thống riêng</th>${cols.map(c=>`<th>${esc(c)} · Văn bản</th>`).join('')}</tr></thead><tbody>${rows.map(({kind,i,data})=>`<tr><td>${kind==='shared'?'Chung':`<div class="resource-private-identity"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="unit" value="${esc(data.unit||r.unit)}" placeholder="Tên đơn vị"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="agency" value="${esc(data.agency||r.agency)}" placeholder="Cơ quan quản lý"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="system" value="${esc(data.system||'')}" placeholder="Hệ thống"></div>`}</td>${cols.map(c=>`<td><input data-appendix-doc-v7="${id}" data-appendix-kind-v7="${kind}" data-appendix-row-v7="${i}" data-appendix-col-v7="${esc(c)}" value="${esc(data[c]??'')}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`}).join('')||'<p class="muted">Chọn ít nhất một công văn đăng ký để khai báo phụ lục theo văn bản.</p>'}</section>
-    <section class="surface"><div class="toolbar"><h3>Phụ lục riêng (dữ liệu cũ)</h3><span class="grow"></span><button class="btn" type="button" id="resourceAddColV7">+ Thêm cột</button><button class="btn" type="button" id="resourceAddRowV7">+ Thêm dòng</button></div><div class="table-scroll"><table class="dynamic-data-table"><thead><tr>${r.hardwareColumns.map((c,i) => `<th>${i ? `<input data-resource-col-v7="${i}" value="${esc(c)}">` : esc(c)}</th>`).join('')}<th></th></tr></thead><tbody>${r.hardwareRows.map((row,ri) => `<tr>${r.hardwareColumns.map((c,ci) => `<td><input data-resource-cell-v7="${ri}" data-col-v7="${ci}" value="${esc(row[c] ?? '')}"></td>`).join('')}<td><button type="button" class="icon-btn-sm" data-resource-row-del-v7="${ri}">×</button></td></tr>`).join('')}</tbody></table></div></section>
+    <section class="surface"><div class="toolbar"><h3>Thông tin theo nhóm văn bản</h3><span class="small muted">Cột con chỉ hiển thị trong nhóm số văn bản tương ứng</span></div><p class="small muted">Dùng các nút Thêm cột / Thêm hàng tại bảng Dữ liệu tài nguyên để mở rộng cấu trúc dùng chung.</p>${(r.registeredDocumentIds||[]).map(id=>{const d=docs.find(x=>x.id===id);const app=r.documentAppendices[id]||{columns:[],rows:[],privateRows:[]};const cols=resourceDocColumnsV7(id);const rows=Array.from({length:r.sharedHardwareRowCount},(_,i)=>({kind:'shared',i,data:app.rows?.[i]||{}})).concat((app.privateRows||[]).map((data,i)=>({kind:'private',i,data})));return `<div class="resource-doc-appendix"><h4>${esc(d?.no||d?.documentType||'Văn bản')}</h4><div class="table-scroll"><table class="dynamic-data-table"><thead><tr><th>Phạm vi dòng / Thông tin hệ thống riêng</th>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(({kind,i,data})=>`<tr><td>${kind==='shared'?'Chung':`<div class="resource-private-identity"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="unit" value="${esc(data.unit||r.unit)}" placeholder="Tên đơn vị"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="agency" value="${esc(data.agency||r.agency)}" placeholder="Cơ quan quản lý"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="system" value="${esc(data.system||'')}" placeholder="Hệ thống"></div>`}</td>${cols.map(c=>`<td><input data-appendix-doc-v7="${id}" data-appendix-kind-v7="${kind}" data-appendix-row-v7="${i}" data-appendix-col-v7="${esc(c)}" value="${esc(data[c]??'')}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`}).join('')||'<p class="muted">Chọn ít nhất một văn bản đăng ký để khai báo thông tin theo nhóm.</p>'}</section>
     <section class="surface"><div class="toolbar"><h3>Trường tùy chỉnh</h3><span class="grow"></span><button class="btn" type="button" id="resourceAddFieldV7">+ Thêm trường</button></div>${r.customFields.map((f,i) => `<div class="custom-row"><input data-resource-custom-name-v7="${i}" placeholder="Tên trường" value="${esc(f.name)}"><input data-resource-custom-value-v7="${i}" placeholder="Giá trị" value="${esc(f.value)}"><button type="button" data-resource-custom-del-v7="${i}">×</button></div>`).join('')}</section>
     <p class="error" id="resourceErrorV7" role="alert"></p><div class="modal-foot"><button type="button" class="btn" id="resourceCancelV7">Hủy</button><button type="submit" class="btn primary">Lưu tài nguyên</button></div></form>`, true);
   const form = $('#resourceFormV7');
@@ -162,12 +475,6 @@ function drawResourceFormV7() {
   form.onsubmit = e => { e.preventDefault(); capture(); try { saveResourceV7(r) } catch(err) { $('#resourceErrorV7').textContent=err.message } };
   $('#resourceCancelV7').onclick = closeOverlay;
   $('#resourceFilesV7')?.addEventListener('change',async e=>{try{r.attachments.push(...await storeFiles(e.target.files));drawResourceFormV7()}catch(err){$('#resourceErrorV7').textContent=err.message}});
-  $('#resourceAddColV7').onclick = () => { capture(); const name=prompt('Tên cột mới:'); if(name?.trim() && !r.hardwareColumns.includes(name.trim())){r.hardwareColumns.push(name.trim());r.hardwareRows.forEach(row=>row[name.trim()]='');drawResourceFormV7()} };
-  $('#resourceCommonColV7').onclick=()=>{capture();const id=$('#resourceAppendixDocV7')?.value;if(!id)return toast('Chọn văn bản trước.');const app=r.documentAppendices[id]||={columns:[],rows:Array.from({length:r.sharedHardwareRowCount},()=>({})),privateRows:[]};const name=prompt('Tên cột cho văn bản đang chọn:');if(name?.trim()&&!app.columns.includes(name.trim())&&!r.hardwareColumns.includes(name.trim())){app.columns.push(name.trim());drawResourceFormV7()}};
-  $('#resourceCommonRowV7').onclick=()=>{capture();r.sharedHardwareRowCount++;(r.registeredDocumentIds||[]).forEach(id=>{const app=r.documentAppendices[id]||={columns:[],rows:[],privateRows:[]};app.rows||=[];app.rows.push({})});drawResourceFormV7()};
-  $('#resourcePrivateRowV7').onclick=()=>{capture();const id=$('#resourceAppendixDocV7')?.value;if(!id)return toast('Chọn văn bản trước.');const app=r.documentAppendices[id]||={columns:[],rows:Array.from({length:r.sharedHardwareRowCount},()=>({})),privateRows:[]};app.privateRows||=[];app.privateRows.push({unit:r.unit,agency:r.agency,system:''});drawResourceFormV7()};
-  $('#resourceAddRowV7').onclick = () => { capture(); const row={};r.hardwareColumns.forEach((c,i)=>row[c]=i===0?String(r.hardwareRows.length+1):'');r.hardwareRows.push(row);drawResourceFormV7() };
-  $$('[data-resource-row-del-v7]').forEach(b=>b.onclick=()=>{capture();r.hardwareRows.splice(+b.dataset.resourceRowDelV7,1);drawResourceFormV7()});
   $('#resourceAddFieldV7').onclick = () => {capture();r.customFields.push({name:'',value:''});drawResourceFormV7()};
   $$('[data-resource-custom-del-v7]').forEach(b=>b.onclick=()=>{capture();r.customFields.splice(+b.dataset.resourceCustomDelV7,1);drawResourceFormV7()});
 }
@@ -204,9 +511,9 @@ function resourceDetailV7(id, revisionId = '') {
   const history=[...(r.revisions||[])].sort((a,b)=>b.at.localeCompare(a.at));
   const selected=history.find(item=>item.id===revisionId)||history[0];
   const snap=selected?.data||r;
-  const docAppendices=(snap.registeredDocumentIds||[]).map(docId=>{const d=state.documents.find(x=>x.id===docId);const app=snap.documentAppendices?.[docId];if(!d||!app)return '';const cols=app.columns||[];const rows=[...(app.rows||[]).map((row,i)=>({scope:`Dòng chung ${i+1}`,row})),...(app.privateRows||[]).map((row,i)=>({scope:`Dòng riêng ${i+1} · ${row.unit||''} / ${row.agency||''} / ${row.system||''}`,row}))];return `<h3>Phụ lục · ${esc(d.no||d.documentType)}</h3><div class="table-scroll"><table class="data-table"><thead><tr><th>Phạm vi / hệ thống</th>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(({scope,row})=>`<tr><td>${esc(scope)}</td>${cols.map(c=>`<td>${esc(row[c]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}).join('');
+  const docAppendices=(snap.registeredDocumentIds||[]).map(docId=>{const d=state.documents.find(x=>x.id===docId);const app=snap.documentAppendices?.[docId];if(!d||!app)return '';const cols=resourceDocColumnsV7(docId,[snap]);const rows=[...(app.rows||[]).map((row,i)=>({scope:`Dòng chung ${i+1}`,row})),...(app.privateRows||[]).map((row,i)=>({scope:`Dòng riêng ${i+1} · ${row.unit||''} / ${row.agency||''} / ${row.system||''}`,row}))];return `<h3>${esc(d.no||d.documentType)}</h3><div class="table-scroll"><table class="data-table"><thead><tr><th>Phạm vi / hệ thống</th>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(({scope,row})=>`<tr><td>${esc(scope)}</td>${cols.map(c=>`<td>${esc(row[c]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`}).join('');
   const values=[['Tên đơn vị',snap.unit],['Cơ quan quản lý',snap.agency],['Hệ thống',snap.system],['Cấp quản lý',snap.level],['Công văn đăng ký',(snap.registeredDocumentIds||[]).map(id=>state.documents.find(d=>d.id===id)?.no||'').filter(Boolean).join(', ')||'—'],['Văn bản trao đổi',(snap.exchangeDocumentIds||[]).map(id=>state.documents.find(d=>d.id===id)?.no||'').filter(Boolean).join(', ')||'—']];
-  drawer(`${r.unit} / ${r.agency}`, 'Thông tin tài nguyên', `<div class="resource-v7-detail"><aside class="resource-v7-timeline"><h3>Lịch sử cập nhật</h3>${history.map(h=>`<button class="timeline-btn ${selected?.id===h.id?'selected':''}" data-resource-history-v7="${h.id}"><strong>${esc(h.action)}</strong><small>${fmt(h.at)} · ${esc(userName(h.actorId))}</small></button>`).join('')||'<p class="muted">Chưa có lịch sử.</p>'}</aside><section class="resource-v7-snapshot"><h2>${esc(snap.system)}</h2><dl class="task-meta">${values.map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v||'—')}</dd></div>`).join('')}</dl>${docAppendices}<h3>Phụ lục riêng</h3><div class="table-scroll"><table class="data-table"><thead><tr>${(snap.hardwareColumns||[]).map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${(snap.hardwareRows||[]).map(row=>`<tr>${snap.hardwareColumns.map(c=>`<td>${esc(row[c]||'—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div><h3>Tệp đính kèm</h3>${fileLinks(snap.attachments||[])}<h3>Thông tin bổ sung</h3>${(snap.customFields||[]).map(f=>`<div class="detail-pair"><span>${esc(f.name||'Trường')}</span><strong>${esc(f.value||'—')}</strong></div>`).join('')||'<p class="muted">Chưa có trường bổ sung.</p>'}<p class="small muted">${selected?`${esc(selected.action)} bởi ${esc(userName(selected.actorId))} · ${fmt(selected.at)}`:''}</p><div class="detail-actions">${canEditResourceV7(r)?'<button class="btn primary" id="editResourceV7">Chỉnh sửa</button><button class="btn danger" id="deleteResourceV7">Xóa tài nguyên</button>':''}</div></section></div>`,true);
+  drawer(`${r.unit} / ${r.agency}`, 'Thông tin tài nguyên', `<div class="resource-v7-detail"><aside class="resource-v7-timeline"><h3>Lịch sử cập nhật</h3>${history.map(h=>`<button class="timeline-btn ${selected?.id===h.id?'selected':''}" data-resource-history-v7="${h.id}"><strong>${esc(h.action)}</strong><small>${fmt(h.at)} · ${esc(userName(h.actorId))}</small></button>`).join('')||'<p class="muted">Chưa có lịch sử.</p>'}</aside><section class="resource-v7-snapshot"><h2>${esc(snap.system)}</h2><dl class="task-meta">${values.map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v||'—')}</dd></div>`).join('')}</dl>${docAppendices}<h3>Tệp đính kèm</h3>${fileLinks(snap.attachments||[])}<h3>Thông tin bổ sung</h3>${(snap.customFields||[]).map(f=>`<div class="detail-pair"><span>${esc(f.name||'Trường')}</span><strong>${esc(f.value||'—')}</strong></div>`).join('')||'<p class="muted">Chưa có trường bổ sung.</p>'}<p class="small muted">${selected?`${esc(selected.action)} bởi ${esc(userName(selected.actorId))} · ${fmt(selected.at)}`:''}</p><div class="detail-actions">${canEditResourceV7(r)?'<button class="btn primary" id="editResourceV7">Chỉnh sửa</button><button class="btn danger" id="deleteResourceV7">Xóa tài nguyên</button>':''}</div></section></div>`,true);
   $('#overlay .drawer')?.classList.add('resource-v7-drawer');
   $$('[data-resource-history-v7]').forEach(b=>b.onclick=()=>resourceDetailV7(id,b.dataset.resourceHistoryV7));
   $('#editResourceV7')?.addEventListener('click',()=>resourceFormV7(id));
@@ -222,13 +529,28 @@ function bindV7() {
   $('#resourceSearchV7')?.addEventListener('input',e=>{resourceSearchV7=e.target.value;render()});
   $('#resourceDocumentFilterV7')?.addEventListener('change',e=>{resourceFilters.documents=e.target.value?[e.target.value]:[];render()});
   $('#resourceSelfV7')?.addEventListener('change',e=>{resourceFilters.self=e.target.checked;render()});
-  $('#exportResourceExcelV7')?.addEventListener('click',()=>{const recs=state.resourceRecords.filter(record=>{if(resourceFilters.self&&record.createdBy!==session&&!(record.editors||[]).includes(session))return false;if(resourceFilters.documents?.length&&!resourceFilters.documents.some(id=>[...(record.registeredDocumentIds||[]),...(record.exchangeDocumentIds||[])].includes(id)))return false;return !resourceSearchV7||`${record.unit} ${record.agency} ${record.system}`.toLocaleLowerCase('vi').includes(resourceSearchV7.toLocaleLowerCase('vi'))}).sort((a,b)=>a.unit.localeCompare(b.unit,'vi')||a.agency.localeCompare(b.agency,'vi')||a.system.localeCompare(b.system,'vi'));const ids=[...new Set(recs.flatMap(r=>r.registeredDocumentIds||[]))];const dc=Object.fromEntries(ids.map(id=>[id,[...new Set(recs.flatMap(r=>r.documentAppendices?.[id]?.columns||[]))]]));const pc=[...new Set(recs.flatMap(r=>(r.hardwareColumns||[]).filter(c=>c!=='STT')))];exportResourceExcelV7(recs,ids,dc,pc)});
+  $('#resourceAddCommonColV7')?.addEventListener('click',()=>resourceTableActionV7('common-column'));
+  $('#resourceAddPrivateColV7')?.addEventListener('click',()=>resourceTableActionV7('private-column'));
+  $('#resourceAddCommonRowV7')?.addEventListener('click',()=>resourceTableActionV7('common-row'));
+  $('#resourceAddPrivateRowV7')?.addEventListener('click',()=>resourceTableActionV7('private-row'));
+  $('#exportResourceExcelV7')?.addEventListener('click', () => {
+    const recs = state.resourceRecords.filter(record => {
+      if (resourceFilters.self && record.createdBy !== session && !(record.editors || []).includes(session)) return false;
+      if (resourceFilters.documents?.length && !resourceFilters.documents.some(id => [...(record.registeredDocumentIds || []), ...(record.exchangeDocumentIds || [])].includes(id))) return false;
+      return !resourceSearchV7 || `${record.unit} ${record.agency} ${record.system}`.toLocaleLowerCase('vi').includes(resourceSearchV7.toLocaleLowerCase('vi'));
+    }).sort((a, b) => a.unit.localeCompare(b.unit, 'vi') || a.agency.localeCompare(b.agency, 'vi') || a.system.localeCompare(b.system, 'vi'));
+    exportResourceExcelV7(recs);
+  });
   $('#clearResourceV7')?.addEventListener('click',()=>{resourceSearchV7='';resourceFilters={documents:[],groups:[],levels:[],month:'',self:false};render()});
   $$('[data-resource-v7]').forEach(row=>{
     row.onclick=e=>{if(!e.target.closest('button'))resourceDetailV7(row.dataset.resourceV7)};
     row.onkeydown=e=>{if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button')){e.preventDefault();resourceDetailV7(row.dataset.resourceV7)}};
   });
   $$('[data-resource-v7-detail]').forEach(btn=>btn.onclick=e=>{e.stopPropagation();resourceDetailV7(btn.dataset.resourceV7Detail)});
+  $$('[data-resource-cell-edit-v7]').forEach(cell=>{
+    const edit=e=>{e.stopPropagation();resourceCellEditV7(cell.dataset.resourceCellEditV7,+cell.dataset.resourceRowEditV7,cell.dataset.resourceKindEditV7,cell.dataset.resourceDocEditV7||'',cell.dataset.resourceColumnEditV7)};
+    cell.onclick=edit;cell.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();edit(e)}};
+  });
 }
 
 function bindCatalogV7() {
