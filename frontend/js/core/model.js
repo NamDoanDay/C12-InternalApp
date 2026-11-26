@@ -9,7 +9,7 @@
   const id = () => globalThis.crypto?.randomUUID?.() || `id-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const now = () => new Date().toISOString();
   const GROUPS = [['HT', 'Hạ tầng'], ['HTM', 'Mạng / Hạ tầng mạng'], ['DN', 'Điện nước'], ['MC', 'Máy chủ'], ['HPCAI', 'HPC-AI đề án'], ['QLVB', 'Quản lý văn bản']];
-  const DOCUMENT_TYPES = ['Công văn', 'Thông tư', 'Nghị định', 'Quyết định', 'Luật', 'Nghị quyết', 'Báo cáo', 'Các loại văn bản khác'];
+  const DOCUMENT_TYPES = ['Công văn', 'Thông tư', 'Nghị định', 'Quyết định', 'Luật', 'Nghị quyết', 'Báo cáo', 'Văn bản cấp tài nguyên', 'Các loại văn bản khác'];
   const norm = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
 
   function bucket(task, time = Date.now()) {
@@ -72,6 +72,7 @@
     if (Date.parse(task.due) < Date.parse(task.start)) throw Error('Hạn hoàn thành không được trước ngày bắt đầu.');
     if (!task.assigneeIds?.length) throw Error('Chọn ít nhất một người nhận.');
     if (checkAssignment && user.role !== 'admin' && (task.assigneeIds.length !== 1 || task.assigneeIds[0] !== user.id)) throw Error('User chỉ được tự giao công việc.');
+    if (task.type !== 'daily' && !task.managementGroupId) throw Error('Chọn nhóm quản lý task.');
     if (task.type === 'document' && !DOCUMENT_TYPES.includes(task.documentType)) throw Error('Chọn loại văn bản cho task xử lý văn bản.');
   }
 
@@ -134,7 +135,7 @@
     const time = now(), audit = { id: id(), actorId: user.id, personId, oldGroupId: old, newGroupId: groupId, at: time, taskChanges: [] };
     for (const task of state.tasks.filter(item => item.assigneeIds.some(uid => state.users.find(account => account.id === uid)?.personId === personId))) {
       const before = task.code;
-      if (task.type === 'document' && task.assigneeIds.length === 1) {
+      if (task.type !== 'daily' && task.assigneeIds.length === 1) {
         task.managementGroupId = groupId;
         task.aliases = [...(task.aliases || []), task.code];
         task.code = nextCode(state, task.type, groupId);

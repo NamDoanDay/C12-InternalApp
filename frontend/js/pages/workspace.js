@@ -399,7 +399,7 @@ function taskMatchesFilters(t) {
   }
   // Primary and related documents use the same catalog.
   if (activeTaskFilter.documents.length > 0) {
-    let ids = [t.documentId, ...(t.documentIds || []), ...(t.officialIds || [])].filter(Boolean);
+    let ids = [t.documentId, ...(t.documentIds || []), ...(t.officialIds || []), ...(t.resourceData?.registeredDocumentIds || []), ...(t.resourceData?.assetDocumentIds || t.resourceData?.exchangeDocumentIds || [])].filter(Boolean);
     let match = activeTaskFilter.documents.some(did => ids.includes(did));
     if (!match) return false;
   }
@@ -429,7 +429,7 @@ function tasksView() {
   let filtersHtml = `<div class="filters task-filters" style="gap:12px;display:flex;align-items:center;flex-wrap:wrap">
     ${renderMultiSelect('Nhóm quản lý', 'groups', state.taskGroups.filter(g => !g.archived).map(g => [g.id, g.name]), activeTaskFilter.groups)}
     ${renderMultiSelect('Văn bản', 'documents', state.documents.filter(d => !d.archived).map(d => [d.id, `${d.documentType || d.type} · ${d.no || 'Chưa có số'}`]), activeTaskFilter.documents)}
-    ${renderMultiSelect('Loại công việc', 'types', [['document', 'Xử lý văn bản'], ['daily', 'Task thường']], activeTaskFilter.types)}
+    ${renderMultiSelect('Loại công việc', 'types', [['document', 'Xử lý văn bản'], ['resource', 'Quản lý tài nguyên'], ['daily', 'Task thường']], activeTaskFilter.types)}
     ${(activeTaskFilter.groups.length || activeTaskFilter.documents.length || activeTaskFilter.types.length || activeTaskFilter.bucket) ?
       `<button class="btn text" id="clearTaskFilters">${icon('close')} Xóa bộ lọc (${filtered.length}/${all.length})</button>` : ''}
   </div>`;
@@ -764,7 +764,7 @@ function bindWorkspace() {
       let key = btn.dataset.multiAll;
       if (key === 'groups') activeTaskFilter.groups = state.taskGroups.filter(g => !g.archived).map(g => g.id);
       if (key === 'documents') activeTaskFilter.documents = state.documents.filter(d => !d.archived).map(d => d.id);
-      if (key === 'types') activeTaskFilter.types = ['document', 'daily'];
+      if (key === 'types') activeTaskFilter.types = ['document', 'resource', 'daily'];
       render();
     };
   });

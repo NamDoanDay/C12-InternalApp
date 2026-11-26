@@ -3,6 +3,14 @@ const legacyUpgradeHeader = upgradeHeader;
 upgradeHeader = function () { if (state.version < 7) legacyUpgradeHeader() };
 
 function taskDetailContent(t, current, readonly = false, docContext = '') {
+  const resourceData = t.type === 'resource' ? t.resourceData : null;
+  const resourceDocValues = (ids = []) => ids.map(id => state.documents.find(doc => doc.id === id)).filter(Boolean).map(doc => `${doc.documentType || doc.type} ${doc.no || ''}`.trim()).join(', ') || '—';
+  const resourceAppendices = resourceData ? (resourceData.registeredDocumentIds || []).map(id => {
+    const doc = state.documents.find(item => item.id === id), appendix = resourceData.documentAppendices?.[id];
+    if (!doc || !appendix) return '';
+    const columns = typeof resourceDocColumnsV7 === 'function' ? resourceDocColumnsV7(id, [resourceData]) : appendix.columns || [];
+    return `<section class="surface"><h3>${esc(doc.documentType || doc.type)} ${esc(doc.no || '')}</h3><div class="table-scroll"><table class="data-table"><thead><tr>${columns.map(column => `<th>${esc(column)}</th>`).join('')}</tr></thead><tbody>${(appendix.rows || []).map(row => `<tr>${columns.map(column => `<td>${esc(row[column] || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
+  }).join('') : '';
   return `<div class="task-detail-title">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
       <span class="chip active">${esc(t.code)}</span>
@@ -14,6 +22,7 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
 
   <dl class="task-meta">
     ${[
+      ['Loại công việc', t.type === 'resource' ? 'Quản lý tài nguyên' : t.type === 'document' ? 'Xử lý văn bản' : 'Task thường'],
       ['Trạng thái công việc', WF[t.status]],
       ['Nhóm quản lý', groupName(t.managementGroupId)],
       ['Người được giao', t.assigneeIds.map(userName).join(', ')],
@@ -25,6 +34,8 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
 
   ${Date.now() < Date.parse(t.start) ? '<p class="notice">Chưa đến ngày bắt đầu công việc.</p>' : ''}
   ${readonly ? '<p class="notice">Bản lịch sử chỉ đọc. Chọn bản hiện tại để cập nhật dữ liệu.</p>' : ''}
+
+  ${resourceData ? `<section class="surface task-resource-summary"><h3>Thông tin tài nguyên liên kết</h3><dl class="task-meta">${[['Tên đơn vị', resourceData.unit], ['Cơ quan quản lý', resourceData.agency], ['Hệ thống', resourceData.system], ['Công văn đăng ký', resourceDocValues(resourceData.registeredDocumentIds)], ['Văn bản cấp tài nguyên', resourceDocValues(resourceData.assetDocumentIds || resourceData.exchangeDocumentIds)]].map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value || '—')}</dd></div>`).join('')}</dl>${resourceAppendices}</section>` : ''}
 
   <!-- Custom Table cho Task thường nếu có -->
   ${t.customTable ? `
@@ -41,9 +52,9 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
 
   ${t.type === 'document' ? `<section class="surface task-document-summary"><h3>Văn bản xử lý</h3><dl class="task-meta">${[['Loại văn bản',t.documentType],['Số văn bản',t.documentNumber||'—'],['Trích yếu',t.documentSummary||'—']].map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v||'—')}</dd></div>`).join('')}</dl></section>` : ''}
 
-  <!-- Tệp đính kèm khác -->
+  <!-- Tệp đính kèm -->
   ${t.attachments?.length ? `
-    <div class="section-title"><h3>Tệp đính kèm khác</h3></div>
+    <div class="section-title"><h3>${t.type === 'resource' ? 'Tệp đính kèm tài nguyên' : 'Tệp đính kèm khác'}</h3></div>
     <div>${fileLinks(t.attachments)}</div>
   `: ''}
 

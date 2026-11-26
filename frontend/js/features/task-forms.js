@@ -43,6 +43,7 @@ function taskForm(id, fromLegacy) {
   if (existing && !M.canEdit(state, me(), existing)) return toast('Bạn không có quyền sửa task.');
   taskDraftFiles = {}; taskDraftDocuments = {};
   formTask = M.clone(existing || emptyTask());
+  if (formTask.type === 'resource' && typeof prepareResourceTaskV7 === 'function') prepareResourceTaskV7(formTask);
   if (!formTask.customTable) {
     formTask.customTable = {
       name: 'Bảng dữ liệu công việc',
@@ -124,6 +125,7 @@ function renderTaskForm() {
               <textarea name="description" rows="3" ${lock} placeholder="Tóm tắt yêu cầu, nội dung chỉ đạo hoặc mục tiêu công việc...">${esc(t.description)}</textarea>
             </label>
 
+            ${t.type === 'resource' && typeof renderResourceTaskFieldsV7 === 'function' ? renderResourceTaskFieldsV7(t) : ''}
             ${t.type === 'document' ? `<section class="surface task-primary-document">
               <h3>Văn bản xử lý</h3>
               <div class="form-grid">
@@ -137,7 +139,7 @@ function renderTaskForm() {
             <!-- Tệp đính kèm độc lập với danh mục văn bản -->
             <div class="task-attachments-section" style="background:var(--app);padding:14px 18px;border-radius:10px;border:1px solid var(--border)">
               <div class="section-title" style="margin:0 0 10px;display:flex;align-items:center;justify-content:space-between">
-                <h3 style="margin:0">Tệp đính kèm</h3>
+                <h3 style="margin:0">${t.type === 'resource' ? 'Tệp đính kèm tài nguyên' : 'Tệp đính kèm'}</h3>
                 <label class="btn text" style="cursor:pointer">
                   <input type="file" id="taskAttachment" multiple hidden>
                   ${icon('upload')} Tải tệp lên
@@ -172,6 +174,7 @@ function renderTaskForm() {
               <span>Loại công việc</span>
               <select name="type" ${lock}>
                 <option value="document" ${t.type === 'document' ? 'selected' : ''}>Xử lý văn bản</option>
+                <option value="resource" ${t.type === 'resource' ? 'selected' : ''}>Quản lý tài nguyên</option>
                 <option value="daily" ${t.type === 'daily' ? 'selected' : ''}>Task thường</option>
               </select>
             </label>
@@ -184,7 +187,7 @@ function renderTaskForm() {
             </label>
 
             <label class="field">
-              <span>Nhóm quản lý ${t.type === 'document' ? '<span class="required">*</span>' : ''}</span>
+              <span>Nhóm quản lý ${t.type !== 'daily' ? '<span class="required">*</span>' : ''}</span>
               <select name="managementGroupId" ${admin() ? '' : 'disabled'}>
                 <option value="">Chọn nhóm quản lý</option>
                 ${state.taskGroups.filter(g => !g.archived).map(g => `<option value="${g.id}" ${g.id === t.managementGroupId ? 'selected' : ''}>${esc(g.name)} (${esc(g.code)})</option>`).join('')}
@@ -255,8 +258,10 @@ function renderTaskForm() {
   form.onsubmit = e => {
     e.preventDefault();
     capture();
+    const backup = M.clone(state);
     try {
-      M.saveTask(state, me(), formTask);
+      const savedTask = M.saveTask(state, me(), formTask);
+      if (savedTask.type === 'resource' || savedTask.resourceId) saveTaskResourceV7(savedTask);
       commitTaskAttachments();
       persist();
       formTask = null;
@@ -265,6 +270,7 @@ function renderTaskForm() {
       render();
       toast('Đã lưu công việc và gửi thông báo');
     } catch (err) {
+      state = backup;
       $('#taskError').textContent = err.message;
     }
   };
@@ -283,6 +289,7 @@ function renderTaskForm() {
       renderTaskForm();
     };
   }
+  $$('[data-task-resource-registered]').forEach(input => input.addEventListener('change', () => { capture(); renderTaskForm() }));
 
   // Custom Table events (Task thường)
   $('#customTableName')?.addEventListener('input', e => {
@@ -468,6 +475,7 @@ function captureTaskForm() {
   });
   $$('[data-custom-name]').forEach(e => formTask.customFields[+e.dataset.customName].name = e.value);
   $$('[data-custom-value]').forEach(e => formTask.customFields[+e.dataset.customValue].value = e.value);
+  if (typeof captureResourceTaskV7 === 'function') captureResourceTaskV7(formTask);
 }
 
 function assigneeChoices(t, groupIds = []) {

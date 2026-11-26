@@ -19,7 +19,10 @@ const resourceDisplayRowsV7 = (record, docIds) => {
   const sharedCount = Math.max(resourceRowsV7(record).length, record.sharedHardwareRowCount || 0, ...docIds.map(id => record.documentAppendices?.[id]?.rows?.length || 0), 1);
   return [...Array.from({ length: sharedCount }, (_, i) => ({ i, kind: 'shared' })), ...docIds.flatMap(id => (record.documentAppendices?.[id]?.privateRows || []).map((_, i) => ({ i, kind: 'private', docId: id })))];
 };
-const canEditResourceV7 = record => admin() || record.createdBy === session || (record.editors || []).includes(session);
+const linkedResourceTasksV7 = record => state.tasks.filter(task => (record.taskIds || []).includes(task.id) || task.resourceId === record.id);
+const canEditResourceV7 = record => admin() || record.createdBy === session || linkedResourceTasksV7(record).some(task => task.creatorId === session || (task.assigneeIds || []).includes(session));
+const resourceDocumentIdsV7 = record => record.assetDocumentIds || record.exchangeDocumentIds || [];
+const resourceTaskIdsV7 = record => [...new Set([...(record.taskIds || []), ...state.tasks.filter(task => task.resourceId === record.id).map(task => task.id)])];
 const cleanExcelV7 = value => String(value ?? '').trim().replace(/^—$/, '');
 const isResourceDirectColumnV7 = column => !['STT', 'Tên tài nguyên', 'Văn bản nguồn'].includes(column);
 const resourceDocNumberV7 = id => state.documents.find(doc => doc.id === id)?.no || '';
@@ -30,6 +33,133 @@ const defaultResourceDocColumnsV7 = id => {
   return state.resourceAppendixSchemas?.[id] || state.schemas?.[no] || schemas?.[no] || [];
 };
 const resourceDocColumnsV7 = (id, records = state.resourceRecords || []) => [...new Set([...defaultResourceDocColumnsV7(id), ...records.flatMap(r => r.documentAppendices?.[id]?.columns || [])])];
+
+function prepareResourceTaskV7(task) {
+  const resource = state.resourceRecords?.find(item => item.id === task.resourceId);
+  task.resourceData = resource ? V7.clone(resource) : task.resourceData || { unit: '', agency: '', system: '', level: 'Địa phương', registeredDocumentIds: [], assetDocumentIds: [], documentAppendices: {}, sharedHardwareRowCount: 1 };
+  task.resourceData.assetDocumentIds ||= task.resourceData.exchangeDocumentIds || [];
+  task.resourceData.documentAppendices ||= {};
+  task.attachments ||= [];
+  task.customFields ||= [];
+  if (resource) { task.attachments = V7.clone(resource.attachments || []); task.customFields = V7.clone(resource.customFields || []) }
+}
+
+function renderResourceTaskFieldsV7(task) {
+  prepareResourceTaskV7(task);
+  const r = task.resourceData;
+  const registrationDocs = state.documents.filter(doc => !doc.archived && (doc.documentType || doc.type) === 'Công văn');
+  const assetDocs = state.documents.filter(doc => !doc.archived && (doc.documentType || doc.type) === 'Văn bản cấp tài nguyên');
+  return `<section class="surface task-resource-fields-v7">
+    <h3>Thông tin hệ thống</h3><div class="form-grid">
+      ${field('Tên đơn vị *', 'resourceUnitV7', r.unit, 'text', true)}${field('Cơ quan quản lý *', 'resourceAgencyV7', r.agency, 'text', true)}${field('Hệ thống *', 'resourceSystemV7', r.system, 'text', true)}
+      <label class="field"><span>Cấp quản lý</span><select name="resourceLevelV7"><option ${r.level === 'Địa phương' ? 'selected' : ''}>Địa phương</option><option ${r.level === 'Bộ ngành' ? 'selected' : ''}>Bộ ngành</option></select></label>
+    </div>
+    <div class="task-resource-doc-grid"><div><div class="toolbar"><h3>Công văn đăng ký</h3></div>${registrationDocs.map(doc => `<label class="resource-doc-choice"><input type="checkbox" data-task-resource-registered="${doc.id}" ${(r.registeredDocumentIds || []).includes(doc.id) ? 'checked' : ''}> Công văn · ${esc(doc.no || 'Chưa có số')}</label>`).join('') || '<p class="muted">Chưa có công văn trong danh mục.</p>'}</div>
+      <div><div class="toolbar"><h3>Văn bản cấp tài nguyên</h3></div>${assetDocs.map(doc => `<label class="resource-doc-choice"><input type="checkbox" data-task-resource-asset="${doc.id}" ${(r.assetDocumentIds || []).includes(doc.id) ? 'checked' : ''}> ${esc(doc.no || doc.documentType)}</label>`).join('') || '<p class="muted">Chưa có văn bản cấp tài nguyên trong danh mục.</p>'}</div></div>
+    <div class="task-resource-appendices-v7"><h3>Thông tin theo nhóm văn bản</h3>${(r.registeredDocumentIds || []).map(docId => {
+      const doc = state.documents.find(item => item.id === docId); if (!doc) return '';
+      const appendix = r.documentAppendices[docId] ||= { columns: [], rows: [], privateRows: [] };
+      const columns = resourceDocColumnsV7(docId, [r]);
+      const rows = Array.from({ length: Math.max(1, r.sharedHardwareRowCount || 1) }, (_, rowIndex) => appendix.rows?.[rowIndex] || {});
+      return `<div class="resource-doc-appendix"><h4>${esc(doc.no || 'Công văn')}</h4><div class="table-scroll"><table class="dynamic-data-table"><thead><tr>${columns.map(col => `<th>${esc(col)}</th>`).join('')}</tr></thead><tbody>${rows.map((row, rowIndex) => `<tr>${columns.map(col => `<td><input data-task-resource-cell="${docId}" data-task-resource-row="${rowIndex}" data-task-resource-column="${esc(col)}" value="${esc(row[col] ?? '')}" aria-label="${esc(`${doc.no} ${col} dòng ${rowIndex + 1}`)}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+    }).join('') || '<p class="muted">Chọn công văn đăng ký để khai báo thông tin theo nhóm văn bản.</p>'}</div>
+  </section>`;
+}
+
+function captureResourceTaskV7(task) {
+  if (task?.type !== 'resource') return;
+  const form = $('#taskEditorForm'), r = task.resourceData; if (!form || !r) return;
+  for (const [fieldName, key] of [['resourceUnitV7', 'unit'], ['resourceAgencyV7', 'agency'], ['resourceSystemV7', 'system'], ['resourceLevelV7', 'level']]) if (form.elements[fieldName]) r[key] = form.elements[fieldName].value;
+  r.registeredDocumentIds = $$('[data-task-resource-registered]').filter(el => el.checked).map(el => el.dataset.taskResourceRegistered);
+  r.assetDocumentIds = $$('[data-task-resource-asset]').filter(el => el.checked).map(el => el.dataset.taskResourceAsset);
+  r.documentAppendices ||= {};
+  r.registeredDocumentIds.forEach(id => { r.documentAppendices[id] ||= { columns: [], rows: [], privateRows: [] }; r.documentAppendices[id].rows ||= [{}] });
+  $$('[data-task-resource-cell]').forEach(input => {
+    const appendix = r.documentAppendices[input.dataset.taskResourceCell]; if (!appendix) return;
+    const rowIndex = +input.dataset.taskResourceRow; appendix.rows[rowIndex] ||= {}; appendix.rows[rowIndex][input.dataset.taskResourceColumn] = input.value;
+  });
+}
+
+function validateResourceTaskV7(task) {
+  if (task.type !== 'resource') return;
+  const r = task.resourceData || {};
+  if (![r.unit, r.agency, r.system].every(value => String(value || '').trim())) throw Error('Nhập tên đơn vị, cơ quan quản lý và hệ thống cho tài nguyên.');
+  if (!(task.attachments || []).length && (r.attachments || []).length) task.attachments = r.attachments;
+  if (!(task.customFields || []).length && (r.customFields || []).length) task.customFields = r.customFields;
+}
+
+function saveTaskResourceV7(task) {
+  if (task.type !== 'resource' && task.resourceId) {
+    const linked = state.resourceRecords.find(record => record.id === task.resourceId);
+    const at = V7.now();
+    if (linked) {
+      linked.taskIds = resourceTaskIdsV7(linked).filter(id => id !== task.id);
+      linked.updatedAt = at;
+      linked.revisions ||= [];
+      linked.revisions.push({ id: V7.id(), at, actorId: session, action: 'Gỡ liên kết công việc', changes: [{ field: 'Công việc', old: task.code, new: '—' }], data: V7.clone(linked) });
+    }
+    M.revision(task, session, 'Gỡ liên kết tài nguyên', [{ field: 'Tài nguyên', old: task.resourceId, new: '—' }], at);
+    delete task.resourceId; delete task.resourceData;
+    return;
+  }
+  const previousId = task.resourceId || '', data = V7.clone(task.resourceData || {});
+  validateResourceTaskV7(task);
+  const key = [data.unit, data.agency, data.system].map(normV7).join('|');
+  const current = state.resourceRecords.find(record => record.id === previousId);
+  const target = current && [current.unit, current.agency, current.system].map(normV7).join('|') === key
+    ? current
+    : state.resourceRecords.find(record => [record.unit, record.agency, record.system].map(normV7).join('|') === key);
+  if (current && current !== target && !canEditResourceV7(current)) throw Error('Bạn không có quyền chuyển task khỏi tài nguyên hiện tại.');
+  if (target && !canEditResourceV7(target) && task.creatorId !== session && !(task.assigneeIds || []).includes(session)) throw Error('Bạn không có quyền liên kết task với tài nguyên này.');
+  const actor = session, at = V7.now(), oldTarget = target ? V7.clone(target) : null;
+  if (current && current !== target) {
+    current.taskIds = resourceTaskIdsV7(current).filter(id => id !== task.id);
+    current.revisions ||= [];
+    current.revisions.push({ id: V7.id(), at, actorId: actor, action: 'Gỡ liên kết công việc', changes: [{ field: 'Công việc', old: task.code, new: '—' }], data: V7.clone(current) });
+  }
+  const appendices = target ? V7.clone(target.documentAppendices || {}) : {};
+  for (const [docId, appendix] of Object.entries(data.documentAppendices || {})) {
+    const old = appendices[docId] || { columns: [], rows: [], privateRows: [] };
+    appendices[docId] = {
+      columns: [...new Set([...(old.columns || []), ...(appendix.columns || [])])],
+      rows: Array.from({ length: Math.max(old.rows?.length || 0, appendix.rows?.length || 0) }, (_, i) => ({ ...old.rows?.[i], ...appendix.rows?.[i] })),
+      privateRows: [...(old.privateRows || []), ...(appendix.privateRows || [])]
+    };
+  }
+  const attachments = V7.clone(!previousId && !task.attachments?.length ? (target?.attachments || []) : (task.attachments || []));
+  const customFields = V7.clone(!previousId && !task.customFields?.length ? (target?.customFields || []) : (task.customFields || []));
+  const resource = target || {
+    id: V7.id(), unit: data.unit.trim(), agency: data.agency.trim(), system: data.system.trim(), level: data.level || 'Địa phương',
+    registeredDocumentIds: [], assetDocumentIds: [], hardwareColumns: ['STT', 'Tên tài nguyên', 'Văn bản nguồn'], hardwareRows: [], sharedHardwareRowCount: Math.max(1, data.sharedHardwareRowCount || 1),
+    documentAppendices: {}, attachments: [], customFields: [], taskIds: [], revisions: [], createdBy: actor, editors: [], createdAt: at
+  };
+  resource.unit = data.unit.trim(); resource.agency = data.agency.trim(); resource.system = data.system.trim(); resource.level = data.level || resource.level;
+  resource.registeredDocumentIds = [...new Set([...(resource.registeredDocumentIds || []), ...(data.registeredDocumentIds || [])])];
+  resource.assetDocumentIds = [...new Set([...resourceDocumentIdsV7(resource), ...(data.assetDocumentIds || [])])];
+  resource.exchangeDocumentIds = resource.assetDocumentIds;
+  resource.documentAppendices = appendices;
+  resource.sharedHardwareRowCount = Math.max(resource.sharedHardwareRowCount || 1, data.sharedHardwareRowCount || 1);
+  resource.attachments = attachments; resource.customFields = customFields;
+  resource.taskIds = [...new Set([...resourceTaskIdsV7(resource), task.id])];
+  resource.editors = [...new Set([...(resource.editors || []), actor])]; resource.updatedAt = at;
+  resource.revisions ||= [];
+  const changes = Object.keys(resource).filter(field => field !== 'revisions' && JSON.stringify(oldTarget?.[field]) !== JSON.stringify(resource[field])).map(field => ({ field, old: oldTarget?.[field], new: resource[field] }));
+  resource.revisions.push({ id: V7.id(), at, actorId: actor, action: oldTarget ? 'Cập nhật tài nguyên từ công việc' : 'Tạo tài nguyên từ công việc', changes, data: V7.clone(resource) });
+  if (!target) state.resourceRecords.push(resource);
+  task.resourceId = resource.id;
+  task.resourceData = V7.clone(resource);
+  task.attachments = V7.clone(attachments);
+  task.customFields = V7.clone(customFields);
+  const lastTaskSnapshot = task.revisions?.at(-1)?.data || {};
+  if (lastTaskSnapshot.resourceId !== resource.id || JSON.stringify(lastTaskSnapshot.resourceData) !== JSON.stringify(task.resourceData) || JSON.stringify(lastTaskSnapshot.attachments || []) !== JSON.stringify(task.attachments) || JSON.stringify(lastTaskSnapshot.customFields || []) !== JSON.stringify(task.customFields)) M.revision(task, actor, 'Cập nhật liên kết và thông tin tài nguyên', [{ field: 'Tài nguyên', old: previousId || '—', new: resource.id }], at);
+  for (const linked of linkedResourceTasksV7(resource)) {
+    if (linked.id === task.id) continue;
+    const oldShared = JSON.stringify({ attachments: linked.attachments || [], customFields: linked.customFields || [], resourceData: linked.resourceData || {} });
+    linked.attachments = V7.clone(attachments); linked.customFields = V7.clone(customFields); linked.resourceData = V7.clone(resource);
+    const nextShared = { attachments: linked.attachments, customFields: linked.customFields, resourceData: linked.resourceData };
+    if (oldShared !== JSON.stringify(nextShared)) M.revision(linked, actor, 'Cập nhật thông tin dùng chung tài nguyên', [{ field: 'Thông tin tài nguyên / tệp / trường tùy chỉnh', old: JSON.parse(oldShared), new: nextShared }], at);
+  }
+}
 
 function migrateResourceColumnsV7() {
   if (typeof state !== 'undefined' && state) {
@@ -67,15 +197,17 @@ function migrateResourceColumnsV7() {
 
   // Seed full dataset from LOCAL_DEMAND_DATA if resourceRecords has <= 5 mock items
   if (typeof LOCAL_DEMAND_DATA !== 'undefined' && LOCAL_DEMAND_DATA.length && (!state.resourceRecords || state.resourceRecords.length <= 5)) {
+    const priorRecords = state.resourceRecords || [];
     const byKey = new Map();
-    (state.resourceRecords || []).forEach(r => byKey.set([r.unit, r.agency, r.system].map(normV7).join('|'), r));
+    priorRecords.forEach(r => byKey.set([r.unit, r.agency, r.system].map(normV7).join('|'), r));
+    const seedKeys = new Set(LOCAL_DEMAND_DATA.map(item => [item.unit, item.agency, item.system].map(normV7).join('|')));
     state.resourceRecords = LOCAL_DEMAND_DATA.map((item, idx) => {
       const key = [item.unit, item.agency, item.system].map(normV7).join('|');
       const existing = byKey.get(key);
       const regDocs = [];
       if (item.has952) regDocs.push(doc952.id);
       if (item.has4651) regDocs.push(doc4651.id);
-      const appendices = {};
+      const appendices = { ...(existing?.documentAppendices || {}) };
       if (item.has952) {
         appendices[doc952.id] = {
           columns: [...LOCAL_DEMAND_COLUMNS_952],
@@ -98,12 +230,15 @@ function migrateResourceColumnsV7() {
         agency: item.agency,
         system: item.system,
         level: 'Địa phương',
-        registeredDocumentIds: regDocs,
-        exchangeDocumentIds: [],
+        registeredDocumentIds: [...new Set([...(existing?.registeredDocumentIds || []), ...regDocs])],
+        assetDocumentIds: existing?.assetDocumentIds || existing?.exchangeDocumentIds || [],
+        exchangeDocumentIds: existing?.assetDocumentIds || existing?.exchangeDocumentIds || [],
         hardwareColumns: ['STT', 'Tên tài nguyên', 'Văn bản nguồn'],
         hardwareRows: [{ STT: '1', 'Tên tài nguyên': item.system }],
         sharedHardwareRowCount: 1,
         documentAppendices: appendices,
+        attachments: existing?.attachments || [],
+        taskIds: existing?.taskIds || [],
         customFields: existing?.customFields || [],
         revisions: existing?.revisions || [],
         createdBy: existing?.createdBy || session,
@@ -111,11 +246,13 @@ function migrateResourceColumnsV7() {
         createdAt: existing?.createdAt || V7.now?.() || new Date().toISOString(),
         updatedAt: existing?.updatedAt || V7.now?.() || new Date().toISOString()
       };
-    });
+    }).concat(priorRecords.filter(record => !seedKeys.has([record.unit, record.agency, record.system].map(normV7).join('|'))));
   }
 
   // Sanitize any remaining records
   for (const r of state.resourceRecords) {
+    r.assetDocumentIds ||= r.exchangeDocumentIds || [];
+    r.taskIds ||= [];
     if (r.documentAppendices) {
       for (const did of Object.keys(r.documentAppendices)) {
         const doc = state.documents.find(d => d.id === did);
@@ -136,23 +273,19 @@ function migrateResourceColumnsV7() {
 resourcesWorkspace = function () {
   state.resourceRecords ||= [];
   migrateResourceColumnsV7();
-  const docs = state.documents.filter(doc => !doc.archived && (doc.no === '952' || doc.no === '4651'));
-  const doc952 = state.documents.find(d => normV7(d.no) === '952');
-  const doc4651 = state.documents.find(d => normV7(d.no) === '4651');
+  const filterDocs = state.documents.filter(doc => !doc.archived && state.resourceRecords.some(record => [...(record.registeredDocumentIds || []), ...resourceDocumentIdsV7(record)].includes(doc.id)));
 
   let records = state.resourceRecords.filter(record => {
-    if (resourceFilters.self && record.createdBy !== session && !(record.editors || []).includes(session)) return false;
-    if (resourceFilters.documents?.length && !resourceFilters.documents.some(id => (record.registeredDocumentIds || []).includes(id))) return false;
+    if (resourceFilters.self && !linkedResourceTasksV7(record).some(task => (task.assigneeIds || []).includes(session))) return false;
+    if (resourceFilters.documents?.length && !resourceFilters.documents.some(id => [...(record.registeredDocumentIds || []), ...resourceDocumentIdsV7(record)].includes(id))) return false;
     if (!resourceSearchV7) return true;
     const q = resourceSearchV7.toLocaleLowerCase('vi');
     return `${record.unit} ${record.agency} ${record.system}`.toLocaleLowerCase('vi').includes(q);
   }).sort((a, b) => (a.order || 9999) - (b.order || 9999) || a.unit.localeCompare(b.unit, 'vi') || a.agency.localeCompare(b.agency, 'vi') || a.system.localeCompare(b.system, 'vi'));
 
-  const show952 = !resourceFilters.documents?.length || (doc952 && resourceFilters.documents.includes(doc952.id));
-  const show4651 = !resourceFilters.documents?.length || (doc4651 && resourceFilters.documents.includes(doc4651.id));
-
-  const cols952 = show952 && doc952 ? resourceDocColumnsV7(doc952.id, records) : [];
-  const cols4651 = show4651 && doc4651 ? resourceDocColumnsV7(doc4651.id, records) : [];
+  const registrationFilterActive = resourceFilters.documents?.some(id => records.some(record => (record.registeredDocumentIds || []).includes(id)));
+  const appendixDocs = [...new Set(records.flatMap(record => record.registeredDocumentIds || []))].map(id => state.documents.find(doc => doc.id === id)).filter(doc => doc && (!registrationFilterActive || resourceFilters.documents.includes(doc.id)));
+  const appendixGroups = appendixDocs.map(doc => ({ doc, columns: resourceDocColumnsV7(doc.id, records) }));
 
   const flatRows = records.flatMap((record, ri) => {
     const sharedCount = Math.max(record.sharedHardwareRowCount || 1, 1);
@@ -193,11 +326,11 @@ resourcesWorkspace = function () {
       <div class="toolbar"><strong>Dữ liệu tài nguyên tổng hợp</strong><span class="badge-count">${records.length} hệ thống</span><span class="grow"></span><button class="btn" id="exportResourceExcelV7" ${records.length ? '' : 'disabled'}>${icon('download')} Xuất Excel</button>${ib('expand', 'fullscreen', 'Phóng to hoặc thu nhỏ bảng')}</div>
       <div class="resource-v7-filters">
         <label class="task-search">${icon('search')}<input id="resourceSearchV7" value="${esc(resourceSearchV7)}" placeholder="Tìm tên đơn vị, cơ quan quản lý, hệ thống..."></label>
-        <label class="field resource-document-filter"><span>Công văn</span><select id="resourceDocumentFilterV7"><option value="">Tất cả</option>${docs.map(d => `<option value="${d.id}" ${resourceFilters.documents?.includes(d.id) ? 'selected' : ''}>Công văn ${esc(d.no || d.documentType)} · ${esc(d.summary || '')}</option>`).join('')}</select></label>
+        <label class="field resource-document-filter"><span>Văn bản</span><select id="resourceDocumentFilterV7"><option value="">Tất cả</option>${filterDocs.map(d => `<option value="${d.id}" ${resourceFilters.documents?.includes(d.id) ? 'selected' : ''}>${esc(d.documentType || d.type)} ${esc(d.no || '')} · ${esc(d.summary || '')}</option>`).join('')}</select></label>
         <label class="field resource-self-filter"><span>Phạm vi</span><select id="resourceSelfV7"><option value="all" ${resourceFilters.self ? '' : 'selected'}>Tất cả</option><option value="mine" ${resourceFilters.self ? 'selected' : ''}>Được giao cho tôi</option></select></label>
         ${resourceSearchV7 || resourceFilters.documents?.length || resourceFilters.self ? '<button class="btn text" id="clearResourceV7">Xóa bộ lọc</button>' : ''}
       </div>
-      <div class="table-scroll"><table class="data-table resource-v7-table"><thead><tr><th rowspan="2" class="col-stt">STT</th><th rowspan="2" class="col-unit">Tên đơn vị</th><th rowspan="2" class="col-agency">Cơ quan quản lý</th><th rowspan="2" class="col-system">Hệ thống</th><th rowspan="2" class="col-docs">Công văn đăng ký</th>${show952 && cols952.length ? `<th colspan="${cols952.length}" class="th-doc-group th-doc-952">Công văn 952</th>` : ''}${show4651 && cols4651.length ? `<th colspan="${cols4651.length}" class="th-doc-group th-doc-4651">Công văn 4651</th>` : ''}<th rowspan="2" class="col-action">Thao tác</th></tr><tr>${show952 ? cols952.map(c => `<th class="th-sub th-sub-952" title="${esc(c)}">${esc(formatShortHeader(c))}</th>`).join('') : ''}${show4651 ? cols4651.map(c => `<th class="th-sub th-sub-4651" title="${esc(c)}">${esc(formatShortHeader(c))}</th>`).join('') : ''}</tr></thead><tbody>
+      <div class="table-scroll"><table class="data-table resource-v7-table"><thead><tr><th rowspan="2" class="col-stt">STT</th><th rowspan="2" class="col-unit">Tên đơn vị</th><th rowspan="2" class="col-agency">Cơ quan quản lý</th><th rowspan="2" class="col-system">Hệ thống</th><th rowspan="2" class="col-docs">Công văn đăng ký</th><th rowspan="2" class="col-asset-docs">Văn bản cấp tài nguyên</th><th rowspan="2" class="col-task-links">Công việc (Task)</th>${appendixGroups.filter(group => group.columns.length).map(({ doc, columns }) => `<th colspan="${columns.length}" class="th-doc-group ${doc.no === '952' ? 'th-doc-952' : doc.no === '4651' ? 'th-doc-4651' : 'th-doc-other'}">${esc(doc.documentType || 'Văn bản')} ${esc(doc.no || '')}</th>`).join('')}<th rowspan="2" class="col-action">Thao tác</th></tr><tr>${appendixGroups.flatMap(({ doc, columns }) => columns.map(c => `<th class="th-sub ${doc.no === '952' ? 'th-sub-952' : doc.no === '4651' ? 'th-sub-4651' : 'th-sub-other'}" title="${esc(c)}">${esc(formatShortHeader(c))}</th>`)).join('')}</tr></thead><tbody>
         ${flatRows.map((entry, at) => {
       const { record, ri, i, unit, agency, system, stt } = entry;
       const unitSpan = getUnitSpan(at);
@@ -207,6 +340,8 @@ resourcesWorkspace = function () {
         const d = state.documents.find(x => x.id === id);
         return d ? `<span class="chip active">${esc(d.no || d.documentType)}</span>` : '';
       }).join('') || '—';
+      const assetDocuments = resourceDocumentIdsV7(record).map(resourceDocNumberV7).filter(Boolean).join(', ') || '—';
+      const taskCodes = resourceTaskIdsV7(record).map(id => state.tasks.find(task => task.id === id)?.code).filter(Boolean).join(', ') || '—';
 
       let rowHtml = `<tr data-resource-v7="${record.id}" tabindex="0">`;
       if (unitSpan > 0) {
@@ -218,24 +353,13 @@ resourcesWorkspace = function () {
       }
       if (systemSpan > 0) {
         rowHtml += `<td class="col-system" rowspan="${systemSpan}"><strong>${resourceCellV7(system)}</strong></td>`;
-        rowHtml += `<td class="col-docs" rowspan="${systemSpan}">${docsBadge}</td>`;
+        rowHtml += `<td class="col-docs" rowspan="${systemSpan}"><button type="button" class="link-button" data-resource-link-edit-v7="registered" data-resource-link-record-v7="${record.id}">${docsBadge}</button></td><td class="col-asset-docs" rowspan="${systemSpan}"><button type="button" class="link-button" data-resource-link-edit-v7="asset" data-resource-link-record-v7="${record.id}">${resourceCellV7(assetDocuments)}</button></td><td class="col-task-links" rowspan="${systemSpan}"><button type="button" class="link-button" data-resource-link-edit-v7="tasks" data-resource-link-record-v7="${record.id}">${resourceCellV7(taskCodes)}</button></td>`;
       }
-      if (show952) {
-        const app952 = record.documentAppendices?.[doc952?.id];
-        const vals952 = app952?.rows?.[i] || {};
-        rowHtml += cols952.map(c => {
-          const val = vals952[c] ?? '';
-          return `<td class="resource-edit-cell resource-doc-cell cell-952" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc952?.id || ''}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${resourceCellV7(val, c)}</td>`;
-        }).join('');
-      }
-      if (show4651) {
-        const app4651 = record.documentAppendices?.[doc4651?.id];
-        const vals4651 = app4651?.rows?.[i] || {};
-        rowHtml += cols4651.map(c => {
-          const val = vals4651[c] ?? '';
-          return `<td class="resource-edit-cell resource-doc-cell cell-4651" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc4651?.id || ''}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${resourceCellV7(val, c)}</td>`;
-        }).join('');
-      }
+      rowHtml += appendixGroups.map(({ doc, columns }) => {
+        if (!(record.registeredDocumentIds || []).includes(doc.id)) return columns.map(() => '<td class="resource-doc-cell">—</td>').join('');
+        const values = record.documentAppendices?.[doc.id]?.rows?.[i] || {};
+        return columns.map(c => { const val = values[c] ?? ''; const tone = doc.no === '952' ? 'cell-952' : doc.no === '4651' ? 'cell-4651' : 'cell-other'; return `<td class="resource-edit-cell resource-doc-cell ${tone}" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc.id}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${resourceCellV7(val, c)}</td>` }).join('');
+      }).join('');
       if (systemSpan > 0) {
         rowHtml += `<td class="col-action" rowspan="${systemSpan}"><button class="icon-btn-sm" type="button" data-resource-v7-detail="${record.id}" aria-label="Xem chi tiết">${icon('eye')}</button></td>`;
       }
@@ -271,42 +395,24 @@ function catalogTableV7() {
 function exportResourceExcelV7(records) {
   if (!records.length) return toast('Không có dữ liệu để xuất.');
   if (!window.XLSX?.utils?.aoa_to_sheet) return toast('Thư viện xuất Excel chưa tải được. Vui lòng tải lại trang rồi thử lại.');
-  const doc952 = state.documents.find(d => (d.no || '').includes('952'));
-  const doc4651 = state.documents.find(d => (d.no || '').includes('4651'));
-  const cols952 = (typeof LOCAL_DEMAND_COLUMNS_952 !== 'undefined' ? LOCAL_DEMAND_COLUMNS_952 : [
-    'vCPU', 'RAM (GB)', 'Disk / Block (TB)', 'Disk / File Storage (TB)', 'Disk / Object (TB)',
-    'License', 'Giải pháp ATTT', 'Kênh truyền'
-  ]);
-  const cols4651 = (typeof LOCAL_DEMAND_COLUMNS_4651 !== 'undefined' ? LOCAL_DEMAND_COLUMNS_4651 : [
-    'vCPU', 'RAM (GB)', 'GPU (GB)', 'Disk / Block SSD (TB)', 'Disk / Block HDD (TB)',
-    'Disk / File Storage SSD (TB)', 'Disk / File Storage HDD (TB)', 'Disk / Object (TB)',
-    'Sizing 3 vùng', 'Sizing / DMZ', 'Sizing / DB', 'Sizing / APP',
-    'License thương mại', 'Kênh truyền', 'Giải pháp ATTT', 'Kế hoạch',
-    'Đặc thù', 'Hệ thống có trong danh mục theo QĐ 1690/QĐ-BCA-A05 ngày 15/3/2023 của Bộ Công an', 'Ghi chú'
-  ]);
-  const fixed = ['STT', 'Tên đơn vị', 'Cơ quan quản lý', 'Hệ thống', 'Công văn đăng ký'];
-  const head1 = [...fixed, ...cols952.map((_, i) => i === 0 ? 'Công văn 952' : ''), ...cols4651.map((_, i) => i === 0 ? 'Công văn 4651' : '')];
-  const head2 = [...fixed.map(() => ''), ...cols952, ...cols4651];
+  const appendixDocs = [...new Set(records.flatMap(record => record.registeredDocumentIds || []))].map(id => state.documents.find(doc => doc.id === id)).filter(Boolean);
+  const groups = appendixDocs.map(doc => ({ doc, columns: resourceDocColumnsV7(doc.id, records) }));
+  const fixed = ['STT', 'Tên đơn vị', 'Cơ quan quản lý', 'Hệ thống', 'Công văn đăng ký', 'Văn bản cấp tài nguyên', 'Công việc (Task)'];
+  const head1 = [...fixed, ...groups.flatMap(({ doc, columns }) => columns.map((_, i) => i === 0 ? `${doc.documentType || 'Văn bản'} ${doc.no || ''}` : ''))];
+  const head2 = [...fixed.map(() => ''), ...groups.flatMap(group => group.columns)];
   const data = [head1, head2];
   const merges = [];
 
   fixed.forEach((_, c) => merges.push({ s: { r: 0, c }, e: { r: 1, c } }));
-  if (cols952.length > 1) {
-    merges.push({ s: { r: 0, c: fixed.length }, e: { r: 0, c: fixed.length + cols952.length - 1 } });
-  }
-  if (cols4651.length > 1) {
-    const c4651 = fixed.length + cols952.length;
-    merges.push({ s: { r: 0, c: c4651 }, e: { r: 0, c: c4651 + cols4651.length - 1 } });
-  }
+  let colOffset = fixed.length;
+  for (const group of groups) { if (group.columns.length > 1) merges.push({ s: { r: 0, c: colOffset }, e: { r: 0, c: colOffset + group.columns.length - 1 } }); colOffset += group.columns.length }
 
   records.forEach((record, idx) => {
-    const app952 = record.documentAppendices?.[doc952?.id];
-    const vals952 = app952?.rows?.[0] || {};
-    const app4651 = record.documentAppendices?.[doc4651?.id];
-    const vals4651 = app4651?.rows?.[0] || {};
     const docsStr = (record.registeredDocumentIds || [])
       .map(id => state.documents.find(d => d.id === id)?.no || '')
-      .filter(Boolean).join(', ') || '952, 4651';
+      .filter(Boolean).join(', ');
+    const assetDocsStr = resourceDocumentIdsV7(record).map(resourceDocNumberV7).filter(Boolean).join(', ');
+    const taskCodesStr = resourceTaskIdsV7(record).map(id => state.tasks.find(task => task.id === id)?.code).filter(Boolean).join(', ');
 
     data.push([
       idx + 1,
@@ -314,8 +420,9 @@ function exportResourceExcelV7(records) {
       record.agency || '',
       record.system || '',
       docsStr,
-      ...cols952.map(c => vals952[c] ?? ''),
-      ...cols4651.map(c => vals4651[c] ?? '')
+      assetDocsStr,
+      taskCodesStr,
+      ...groups.flatMap(({ doc, columns }) => columns.map(column => record.documentAppendices?.[doc.id]?.rows?.[0]?.[column] ?? ''))
     ].map(cleanExcelV7));
   });
 
@@ -409,13 +516,53 @@ function resourceTableActionV7(kind) {
 function resourceCellEditV7(recordId, rowIndex, kind, docId, column) {
   if (column === '—') return;
   const current = state.resourceRecords.find(r => r.id === recordId); if (!current) return;
-  if (!canEditResourceV7(current)) return toast('Bạn chỉ được sửa tài nguyên do mình quản lý.');
+  if (!canEditResourceV7(current)) return toast('Bạn không có quyền sửa tài nguyên này.');
   const draft = V7.clone(current), app = docId ? (draft.documentAppendices[docId] ||= { columns: [], rows: [], privateRows: [] }) : null;
   if (app) { app.rows ||= []; app.privateRows ||= [] } else draft.hardwareRows ||= [];
   const rows = docId ? (kind === 'private' ? app.privateRows : app.rows) : draft.hardwareRows;
   rows[rowIndex] ||= {};
   const initial = rows[rowIndex][column] ?? '';
   modal(`Sửa ${column}`, `${field('Giá trị', 'value', initial)}`, data => { rows[rowIndex][column] = data.value; saveResourceV7(draft) }, false, 'Lưu giá trị');
+}
+
+function resourceLinksEditV7(recordId, kind) {
+  const resource = state.resourceRecords.find(item => item.id === recordId); if (!resource || !canEditResourceV7(resource)) return toast('Bạn không có quyền sửa liên kết của tài nguyên này.');
+  if (kind === 'asset' || kind === 'registered') {
+    const type = kind === 'asset' ? 'Văn bản cấp tài nguyên' : 'Công văn', docs = state.documents.filter(doc => !doc.archived && (doc.documentType || doc.type) === type), currentIds = kind === 'asset' ? resourceDocumentIdsV7(resource) : resource.registeredDocumentIds || [];
+    modal(`${type} liên kết`, docs.map(doc => `<label class="resource-doc-choice"><input type="checkbox" name="documentIds" value="${esc(doc.id)}" ${currentIds.includes(doc.id) ? 'checked' : ''}> ${esc(doc.no || 'Chưa có số')} · ${esc(doc.summary || '')}</label>`).join('') || `<p class="muted">Chưa có ${type.toLocaleLowerCase('vi')} trong danh mục.</p>`, () => {
+      const current = state.resourceRecords.find(item => item.id === recordId); if (!current) throw Error('Không tìm thấy tài nguyên.');
+      const draft = V7.clone(current), selected = [...new Set([...$('#editForm').querySelectorAll('[name="documentIds"]')].filter(input => input.checked).map(input => input.value))];
+      if (kind === 'asset') { draft.assetDocumentIds = selected; draft.exchangeDocumentIds = selected } else draft.registeredDocumentIds = selected;
+      saveResourceV7(draft);
+    });
+    return;
+  }
+  const tasks = state.tasks.filter(task => task.type === 'resource');
+  const linked = resourceTaskIdsV7(resource);
+  modal('Công việc liên kết', tasks.map(task => `<label class="resource-doc-choice"><input type="checkbox" name="taskIds" value="${esc(task.id)}" ${linked.includes(task.id) ? 'checked' : ''}> <strong>${esc(task.code || 'Chưa có mã')}</strong> · ${esc(task.title)}</label>`).join('') || '<p class="muted">Chưa có task loại Quản lý tài nguyên.</p>', () => {
+    const backup = V7.clone(state);
+    try {
+    const current = state.resourceRecords.find(item => item.id === recordId); if (!current) throw Error('Không tìm thấy tài nguyên.');
+    const selected = [...$('#editForm').querySelectorAll('[name="taskIds"]')].filter(input => input.checked).map(input => input.value), next = new Set(selected), at = V7.now(), currentLinks = resourceTaskIdsV7(current);
+    for (const taskId of currentLinks.filter(id => !next.has(id))) { const task = state.tasks.find(item => item.id === taskId); if (task && !M.canEdit(state, me(), task)) throw Error(`Không có quyền bỏ liên kết ${task.code}.`); if (task) { delete task.resourceId; delete task.resourceData; M.revision(task, session, 'Gỡ liên kết tài nguyên', [{ field: 'Tài nguyên', old: current.id, new: '—' }], at) } }
+    for (const taskId of selected.filter(id => !currentLinks.includes(id))) {
+      const task = state.tasks.find(item => item.id === taskId);
+      if (!task || !M.canEdit(state, me(), task)) throw Error(`Không có quyền liên kết ${task?.code || 'task này'}.`);
+      const previousResource = state.resourceRecords.find(item => item.id === task.resourceId && item.id !== current.id);
+      if (previousResource) {
+        if (!canEditResourceV7(previousResource)) throw Error(`Không có quyền chuyển ${task.code} khỏi tài nguyên hiện tại.`);
+        previousResource.taskIds = resourceTaskIdsV7(previousResource).filter(id => id !== task.id);
+        previousResource.updatedAt = at;
+        previousResource.revisions ||= [];
+        previousResource.revisions.push({ id: V7.id(), at, actorId: session, action: 'Chuyển công việc sang tài nguyên khác', changes: [{ field: 'Công việc', old: task.code, new: '—' }], data: V7.clone(previousResource) });
+        delete task.resourceId; delete task.resourceData;
+      }
+      task.resourceId = current.id; task.resourceData = V7.clone(current); task.attachments = V7.clone(current.attachments || []); task.customFields = V7.clone(current.customFields || []); saveTaskResourceV7(task);
+    }
+    current.taskIds = selected; current.revisions ||= []; current.revisions.push({ id: V7.id(), at, actorId: session, action: 'Cập nhật liên kết công việc', changes: [{ field: 'Công việc', old: currentLinks.map(id => state.tasks.find(task => task.id === id)?.code).join(', '), new: selected.map(id => state.tasks.find(task => task.id === id)?.code).join(', ') }], data: V7.clone(current) });
+    persist(); closeOverlay(); render(); toast('Đã cập nhật liên kết công việc.');
+    } catch (error) { state = backup; throw error }
+  });
 }
 
 function catalogFormV7(id = '') {
@@ -442,7 +589,8 @@ function catalogFormV7(id = '') {
       done('Đã lưu văn bản vào danh mục');
     });
   $('#deleteCatalogV7')?.addEventListener('click', () => {
-    const linked = state.tasks.some(t => t.documentId === id || (t.documentIds || []).includes(id) || (t.officialIds || []).includes(id));
+    const linkedToResource = state.resourceRecords.some(record => [...(record.registeredDocumentIds || []), ...resourceDocumentIdsV7(record)].includes(id));
+    const linked = linkedToResource || state.tasks.some(t => t.documentId === id || (t.documentIds || []).includes(id) || (t.officialIds || []).includes(id) || (t.resourceData?.registeredDocumentIds || []).includes(id) || (t.resourceData?.assetDocumentIds || t.resourceData?.exchangeDocumentIds || []).includes(id));
     if (linked) doc.archived = true; else state.documents = state.documents.filter(d => d.id !== id);
     state.officials = state.documents; state.docs = state.documents; persist(); render();
     toast(linked ? 'Văn bản đã được lưu trữ; liên kết task được giữ.' : 'Đã xóa văn bản.');
@@ -451,7 +599,8 @@ function catalogFormV7(id = '') {
 
 function catalogDetailV7(id) {
   const d = state.documents.find(item => item.id === id); if (!d) return;
-  const linked = visibleTasks().filter(t => t.documentId === id || (t.documentIds || []).includes(id) || (t.officialIds || []).includes(id));
+  const resourceTaskIds = state.resourceRecords.filter(record => [...(record.registeredDocumentIds || []), ...resourceDocumentIdsV7(record)].includes(id)).flatMap(resourceTaskIdsV7);
+  const linked = visibleTasks().filter(t => resourceTaskIds.includes(t.id) || t.documentId === id || (t.documentIds || []).includes(id) || (t.officialIds || []).includes(id) || (t.resourceData?.registeredDocumentIds || []).includes(id) || (t.resourceData?.assetDocumentIds || t.resourceData?.exchangeDocumentIds || []).includes(id));
   drawer(`${d.documentType || d.type} ${d.no || ''}`, d.summary || 'Thông tin văn bản', `<div class="drawer-body"><dl class="task-meta">${[['Loại văn bản', d.documentType || d.type], ['Số', d.no || '—'], ['Ngày phát hành', day(d.date)], ['Trích yếu', d.summary || '—'], ['Cơ quan ban hành', d.agency || '—'], ['Ghi chú', d.note || '—']].map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>${fileLinks(d.files || [])}<div class="detail-actions"><button class="btn primary" id="editCatalogV7">Chỉnh sửa</button><button class="btn danger" id="removeCatalogV7">Xóa</button></div><h3>Task liên quan (${linked.length})</h3>${taskList(linked)}</div>`);
   $('#editCatalogV7').onclick = () => catalogFormV7(id);
   $('#removeCatalogV7').onclick = () => { $('#editForm')?.remove(); catalogFormV7(id); $('#deleteCatalogV7')?.click() };
@@ -460,29 +609,81 @@ function catalogDetailV7(id) {
 
 function resourceFormV7(id = '') {
   const current = state.resourceRecords.find(r => r.id === id);
-  if (current && !canEditResourceV7(current)) return toast('Bạn chỉ được sửa tài nguyên do mình quản lý.');
+  if (current && !canEditResourceV7(current)) return toast('Bạn không có quyền sửa tài nguyên này.');
   const directColumns = (state.resourcePrivateColumns || []).filter(isResourceDirectColumnV7);
-  resourceDraftV7 = V7.clone(current || { id: '', unit: '', agency: '', system: '', level: 'Địa phương', registeredDocumentIds: [], exchangeDocumentIds: [], attachments: [], hardwareColumns: ['STT', ...directColumns], hardwareRows: [{ STT: '1', ...Object.fromEntries(directColumns.map(c => [c, ''])) }], sharedHardwareRowCount: 1, documentAppendices: {}, customFields: [], revisions: [], createdBy: '', editors: [], createdAt: '', updatedAt: '' });
+  resourceDraftV7 = V7.clone(current || { id: '', unit: '', agency: '', system: '', level: 'Địa phương', registeredDocumentIds: [], assetDocumentIds: [], exchangeDocumentIds: [], attachments: [], createTask: false, hardwareColumns: ['STT', ...directColumns], hardwareRows: [{ STT: '1', ...Object.fromEntries(directColumns.map(c => [c, ''])) }], sharedHardwareRowCount: 1, documentAppendices: {}, customFields: [], revisions: [], createdBy: '', editors: [], createdAt: '', updatedAt: '' });
+  resourceDraftV7.assetDocumentIds ||= resourceDraftV7.exchangeDocumentIds || [];
   resourceDraftV7.sharedHardwareRowCount ||= Math.max(resourceDraftV7.hardwareRows?.length || 1, 1);
   resourceDraftV7.documentAppendices ||= {};
   (resourceDraftV7.registeredDocumentIds || []).forEach(docId => resourceDraftV7.documentAppendices[docId] ||= { columns: [], rows: Array.from({ length: resourceDraftV7.sharedHardwareRowCount }, () => ({})), privateRows: [] });
   drawResourceFormV7();
 }
 
+function resourceTaskCardV7(resource) {
+  if (!resource.createTask) return '';
+  const task = resource.taskDraft ||= { ...emptyTask(), type: 'resource', title: '', description: '', status: 'processing', managementGroupId: admin() ? '' : (M.personGroup(state, session) || ''), assigneeIds: admin() ? [] : [session] };
+  task.customTable ||= { name: 'Bảng dữ liệu công việc', columns: ['STT', 'Nội dung'], rows: [] };
+  return `<section class="surface resource-create-task-card" id="resourceTaskCardV7"><div class="toolbar"><div><h3>Tạo công việc kèm tài nguyên</h3><p class="small muted">Task và tài nguyên sẽ được lưu cùng lúc.</p></div></div>
+    <label class="field"><span>Tiêu đề công việc <b class="required">*</b></span><input name="resourceTaskTitleV7" required value="${esc(task.title)}" placeholder="Nhập tên công việc..."></label>
+    <label class="field"><span>Mô tả công việc</span><textarea name="resourceTaskDescriptionV7" rows="3" placeholder="Mô tả yêu cầu công việc...">${esc(task.description)}</textarea></label>
+    <div class="form-grid"><label class="field"><span>Trạng thái</span><select name="resourceTaskStatusV7">${Object.entries(WF).map(([key, label]) => `<option value="${key}" ${task.status === key ? 'selected' : ''}>${esc(label)}</option>`).join('')}</select></label>
+      <label class="field"><span>Nhóm quản lý <b class="required">*</b></span><select name="resourceTaskGroupV7" ${admin() ? '' : 'disabled'}><option value="">Chọn nhóm quản lý</option>${state.taskGroups.filter(g => !g.archived).map(g => `<option value="${g.id}" ${g.id === task.managementGroupId ? 'selected' : ''}>${esc(g.name)} (${esc(g.code)})</option>`).join('')}</select></label>
+      <label class="field"><span>Ngày bắt đầu <b class="required">*</b></span><input type="datetime-local" name="resourceTaskStartV7" required value="${localTime(task.start)}"></label>
+      <label class="field"><span>Hạn hoàn thành <b class="required">*</b></span><input type="datetime-local" name="resourceTaskDueV7" required value="${localTime(task.due)}"></label></div>
+    <h3>Người được giao <b class="required">*</b></h3>${admin() ? `<div class="assignee-list-modern">${assigneeChoices(task)}</div>` : `<div class="chip active">${esc(me().name)} (Tự giao cho mình)</div>`}
+    <div class="resource-task-custom-table"><div class="toolbar"><h3>Bảng dữ liệu tùy chỉnh</h3><div class="flex gap"><button type="button" class="btn" id="resourceTaskAddColV7">${icon('plus')} Thêm cột</button><button type="button" class="btn" id="resourceTaskAddRowV7">${icon('plus')} Thêm dòng</button></div></div><label class="field"><span>Tên bảng</span><input name="resourceTaskTableNameV7" value="${esc(task.customTable?.name || 'Bảng dữ liệu công việc')}"></label><div class="table-scroll">${renderCustomTableEditor(task)}</div></div>
+  </section>`;
+}
+
+function captureEmbeddedResourceTaskV7(resource) {
+  const form = $('#resourceFormV7'), task = resource.taskDraft;
+  if (!form || !task || !resource.createTask) return;
+  for (const [name, key] of [['resourceTaskTitleV7', 'title'], ['resourceTaskDescriptionV7', 'description'], ['resourceTaskStatusV7', 'status'], ['resourceTaskGroupV7', 'managementGroupId'], ['resourceTaskTableNameV7', 'tableName']]) if (form.elements[name]) {
+    if (key === 'tableName') task.customTable.name = form.elements[name].value; else task[key] = form.elements[name].value;
+  }
+  for (const name of ['resourceTaskStartV7', 'resourceTaskDueV7']) if (form.elements[name]) task[name === 'resourceTaskStartV7' ? 'start' : 'due'] = form.elements[name].value ? new Date(form.elements[name].value).toISOString() : '';
+  if (admin()) task.assigneeIds = $$('[data-assignee]').filter(input => input.checked).map(input => input.dataset.assignee);
+  else task.assigneeIds = [session];
+  $$('[data-custom-cell-row]').forEach(input => { const row = task.customTable.rows[+input.dataset.customCellRow]; if (row) row[input.dataset.customCellCol] = input.value });
+}
+
+function quickResourceDocumentV7(data, files = []) {
+  const no = String(data.no || '').trim(), type = 'Văn bản cấp tài nguyên';
+  const found = no && state.documents.find(doc => !doc.archived && (doc.documentType || doc.type) === type && normV7(doc.no) === normV7(no));
+  if (found) { resourceDraftV7.assetDocumentIds = [...new Set([...resourceDocumentIdsV7(resourceDraftV7), found.id])]; return found; }
+  const doc = { ...data, no, documentType: type, type, id: V7.id(), files, createdAt: V7.now(), updatedAt: V7.now() };
+  resourceDraftV7.pendingAssetDocument = doc;
+  resourceDraftV7.assetDocumentIds = [...new Set([...resourceDocumentIdsV7(resourceDraftV7), doc.id])];
+  return doc;
+}
+
 function drawResourceFormV7() {
-  const r = resourceDraftV7, docs = state.documents.filter(d => !d.archived);
-  drawer(r.id ? 'Chỉnh sửa tài nguyên' : 'Tạo tài nguyên', 'Tài nguyên được lưu độc lập với công việc.', `<form id="resourceFormV7" class="resource-v7-form">
+  const r = resourceDraftV7, registrationDocs = state.documents.filter(d => !d.archived && (d.documentType || d.type) === 'Công văn'), assetDocs = [...state.documents.filter(d => !d.archived && (d.documentType || d.type) === 'Văn bản cấp tài nguyên'), ...(r.pendingAssetDocument && !state.documents.some(d => d.id === r.pendingAssetDocument.id) ? [r.pendingAssetDocument] : [])];
+  const appendixHtml = (r.registeredDocumentIds || []).map(id => {
+    const doc = docs.find(item => item.id === id), appendix = r.documentAppendices[id] || { columns: [], rows: [], privateRows: [] };
+    const columns = resourceDocColumnsV7(id), rows = Array.from({ length: r.sharedHardwareRowCount }, (_, i) => ({ kind: 'shared', i, data: appendix.rows?.[i] || {} })).concat((appendix.privateRows || []).map((data, i) => ({ kind: 'private', i, data })));
+    const rowHtml = rows.map(({ kind, i, data }) => {
+      const identity = kind === 'shared' ? 'Chung' : `<div class="resource-private-identity"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="unit" value="${esc(data.unit || r.unit)}" placeholder="Tên đơn vị"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="agency" value="${esc(data.agency || r.agency)}" placeholder="Cơ quan quản lý"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="system" value="${esc(data.system || '')}" placeholder="Hệ thống"></div>`;
+      return `<tr><td>${identity}</td>${columns.map(column => `<td><input data-appendix-doc-v7="${id}" data-appendix-kind-v7="${kind}" data-appendix-row-v7="${i}" data-appendix-col-v7="${esc(column)}" value="${esc(data[column] ?? '')}"></td>`).join('')}</tr>`;
+    }).join('');
+    return `<div class="resource-doc-appendix"><h4>${esc(doc?.no || doc?.documentType || 'Văn bản')}</h4><div class="table-scroll"><table class="dynamic-data-table"><thead><tr><th>Phạm vi dòng / Thông tin hệ thống riêng</th>${columns.map(column => `<th>${esc(column)}</th>`).join('')}</tr></thead><tbody>${rowHtml}</tbody></table></div></div>`;
+  }).join('') || '<p class="muted">Chọn ít nhất một văn bản đăng ký để khai báo thông tin theo nhóm.</p>';
+  drawer(r.id ? 'Chỉnh sửa tài nguyên' : 'Tạo tài nguyên', 'Có thể lưu tài nguyên độc lập hoặc tạo kèm công việc.', `<form id="resourceFormV7" class="resource-v7-form">
     <section class="surface"><h3>Thông tin hệ thống</h3><div class="form-grid">${field('Tên đơn vị *', 'unit', r.unit, 'text', true)}${field('Cơ quan quản lý *', 'agency', r.agency, 'text', true)}${field('Hệ thống *', 'system', r.system, 'text', true)}<label class="field"><span>Cấp quản lý</span><select name="level"><option ${r.level === 'Địa phương' ? 'selected' : ''}>Địa phương</option><option ${r.level === 'Bộ ngành' ? 'selected' : ''}>Bộ ngành</option></select></label></div></section>
-    <section class="surface"><h3>Công văn đăng ký</h3>${docs.map(d => `<label class="resource-doc-choice"><input type="checkbox" data-resource-doc="registeredDocumentIds" value="${d.id}" ${(r.registeredDocumentIds || []).includes(d.id) ? 'checked' : ''}> ${esc(d.documentType)} · ${esc(d.no || 'Chưa có số')}</label>`).join('') || '<p class="muted">Chưa có văn bản trong danh mục.</p>'}</section>
-    <section class="surface"><h3>Văn bản trao đổi</h3>${docs.map(d => `<label class="resource-doc-choice"><input type="checkbox" data-resource-doc="exchangeDocumentIds" value="${d.id}" ${(r.exchangeDocumentIds || []).includes(d.id) ? 'checked' : ''}> ${esc(d.documentType)} · ${esc(d.no || 'Chưa có số')}</label>`).join('') || '<p class="muted">Chưa có văn bản trong danh mục.</p>'}</section>
+    <section class="surface"><h3>Công văn đăng ký</h3>${registrationDocs.map(d => `<label class="resource-doc-choice"><input type="checkbox" data-resource-doc="registeredDocumentIds" value="${d.id}" ${(r.registeredDocumentIds || []).includes(d.id) ? 'checked' : ''}> Công văn · ${esc(d.no || 'Chưa có số')}</label>`).join('') || '<p class="muted">Chưa có công văn trong danh mục.</p>'}</section>
+    <section class="surface"><div class="toolbar"><h3>Văn bản cấp tài nguyên</h3><span class="grow"></span><button class="btn" type="button" id="resourceQuickDocumentToggleV7">${icon('plus')} Tạo nhanh</button></div>${assetDocs.map(d => `<label class="resource-doc-choice"><input type="checkbox" data-resource-doc="assetDocumentIds" value="${d.id}" ${(resourceDocumentIdsV7(r)).includes(d.id) ? 'checked' : ''}> ${esc(d.no || 'Chưa có số')} · ${esc(d.summary || 'Văn bản cấp tài nguyên')}</label>`).join('') || '<p class="muted">Chưa có văn bản cấp tài nguyên trong danh mục.</p>'}
+      <div class="resource-quick-document-v7" id="resourceQuickDocumentV7" hidden><div class="form-grid"><label class="field"><span>Số văn bản</span><input name="quickDocNoV7"></label><label class="field"><span>Ngày phát hành</span><input name="quickDocDateV7" type="date"></label><label class="field"><span>Cơ quan ban hành</span><input name="quickDocAgencyV7"></label><label class="field"><span>Ghi chú</span><input name="quickDocNoteV7"></label></div><label class="field"><span>Trích yếu</span><textarea name="quickDocSummaryV7"></textarea></label><label class="field"><span>Tệp đính kèm</span><input type="file" id="quickDocFilesV7" multiple></label><button class="btn" type="button" id="resourceQuickDocumentSaveV7">Lưu văn bản vào danh mục và liên kết</button></div></section>
     <section class="surface"><div class="toolbar"><h3>Tệp đính kèm tài nguyên</h3><span class="grow"></span><label class="btn">${icon('upload')} Tải tệp lên<input id="resourceFilesV7" type="file" multiple hidden></label></div>${fileLinks(r.attachments || []) || '<p class="muted">Chưa có tệp đính kèm.</p>'}</section>
-    <section class="surface"><div class="toolbar"><h3>Thông tin theo nhóm văn bản</h3><span class="small muted">Cột con chỉ hiển thị trong nhóm số văn bản tương ứng</span></div><p class="small muted">Dùng các nút Thêm cột / Thêm hàng tại bảng Dữ liệu tài nguyên để mở rộng cấu trúc dùng chung.</p>${(r.registeredDocumentIds || []).map(id => { const d = docs.find(x => x.id === id); const app = r.documentAppendices[id] || { columns: [], rows: [], privateRows: [] }; const cols = resourceDocColumnsV7(id); const rows = Array.from({ length: r.sharedHardwareRowCount }, (_, i) => ({ kind: 'shared', i, data: app.rows?.[i] || {} })).concat((app.privateRows || []).map((data, i) => ({ kind: 'private', i, data }))); return `<div class="resource-doc-appendix"><h4>${esc(d?.no || d?.documentType || 'Văn bản')}</h4><div class="table-scroll"><table class="dynamic-data-table"><thead><tr><th>Phạm vi dòng / Thông tin hệ thống riêng</th>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(({ kind, i, data }) => `<tr><td>${kind === 'shared' ? 'Chung' : `<div class="resource-private-identity"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="unit" value="${esc(data.unit || r.unit)}" placeholder="Tên đơn vị"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="agency" value="${esc(data.agency || r.agency)}" placeholder="Cơ quan quản lý"><input data-appendix-meta-v7="${id}" data-appendix-row-v7="${i}" data-appendix-key-v7="system" value="${esc(data.system || '')}" placeholder="Hệ thống"></div>`}</td>${cols.map(c => `<td><input data-appendix-doc-v7="${id}" data-appendix-kind-v7="${kind}" data-appendix-row-v7="${i}" data-appendix-col-v7="${esc(c)}" value="${esc(data[c] ?? '')}"></td>`).join('')}</tr>`).join('')}</tbody></table></div></div>` }).join('') || '<p class="muted">Chọn ít nhất một văn bản đăng ký để khai báo thông tin theo nhóm.</p>'}</section>
+    <section class="surface"><div class="toolbar"><h3>Thông tin theo nhóm văn bản</h3><span class="small muted">Cột con chỉ hiển thị trong nhóm số văn bản tương ứng</span></div><p class="small muted">Dùng các nút Thêm cột / Thêm hàng tại bảng Dữ liệu tài nguyên để mở rộng cấu trúc dùng chung.</p>${appendixHtml}</section>
     <section class="surface"><div class="toolbar"><h3>Trường tùy chỉnh</h3><span class="grow"></span><button class="btn" type="button" id="resourceAddFieldV7">+ Thêm trường</button></div>${r.customFields.map((f, i) => `<div class="custom-row"><input data-resource-custom-name-v7="${i}" placeholder="Tên trường" value="${esc(f.name)}"><input data-resource-custom-value-v7="${i}" placeholder="Giá trị" value="${esc(f.value)}"><button type="button" data-resource-custom-del-v7="${i}">×</button></div>`).join('')}</section>
+    <section class="surface"><label class="resource-create-task-toggle"><input type="checkbox" name="createTaskV7" ${r.createTask ? 'checked' : ''}> Tạo kèm công việc</label><p class="small muted">Khi bật, tài nguyên và task sẽ được lưu cùng lúc.</p>${resourceTaskCardV7(r)}</section>
     <p class="error" id="resourceErrorV7" role="alert"></p><div class="modal-foot"><button type="button" class="btn" id="resourceCancelV7">Hủy</button><button type="submit" class="btn primary">Lưu tài nguyên</button></div></form>`, true);
   const form = $('#resourceFormV7');
   const capture = () => {
     for (const key of ['unit', 'agency', 'system', 'level']) if (form.elements[key]) r[key] = form.elements[key].value;
     $$('[data-resource-doc]').forEach(c => { const key = c.dataset.resourceDoc; r[key] ||= []; r[key] = r[key].filter(x => x !== c.value); if (c.checked) r[key].push(c.value) });
+    r.exchangeDocumentIds = r.assetDocumentIds || [];
+    captureEmbeddedResourceTaskV7(r);
     r.documentAppendices ||= {}; r.sharedHardwareRowCount ||= 1;
     (r.registeredDocumentIds || []).forEach(id => { const app = r.documentAppendices[id] ||= { columns: [], rows: [], privateRows: [] }; app.rows ||= []; while (app.rows.length < r.sharedHardwareRowCount) app.rows.push({}); app.privateRows ||= [] });
     $$('[data-resource-cell-v7]').forEach(input => { let row = r.hardwareRows[+input.dataset.resourceCellV7], col = r.hardwareColumns[+input.dataset.colV7]; if (row) row[col] = input.value });
@@ -493,29 +694,45 @@ function drawResourceFormV7() {
     $$('[data-resource-custom-value-v7]').forEach(e => r.customFields[+e.dataset.resourceCustomValueV7].value = e.value);
   };
 
-  form.oninput = capture; form.onchange = e => { capture(); if (e.target.matches('[data-resource-doc]')) drawResourceFormV7() };
-  form.onsubmit = e => { e.preventDefault(); capture(); try { saveResourceV7(r) } catch (err) { $('#resourceErrorV7').textContent = err.message } };
+  form.oninput = capture; form.onchange = e => { capture(); if (e.target.matches('[data-resource-doc], [name="createTaskV7"]')) { if (e.target.name === 'createTaskV7') r.createTask = e.target.checked; drawResourceFormV7() } };
+  form.onsubmit = e => { e.preventDefault(); capture(); try { saveResourceWithTaskV7(r) } catch (err) { $('#resourceErrorV7').textContent = err.message } };
   $('#resourceCancelV7').onclick = closeOverlay;
   $('#resourceFilesV7')?.addEventListener('change', async e => { try { r.attachments.push(...await storeFiles(e.target.files)); drawResourceFormV7() } catch (err) { $('#resourceErrorV7').textContent = err.message } });
   $('#resourceAddFieldV7').onclick = () => { capture(); r.customFields.push({ name: '', value: '' }); drawResourceFormV7() };
+  $('#resourceTaskAddColV7')?.addEventListener('click', () => { capture(); const name = prompt('Nhập tên cột mới:'); if (name?.trim() && !r.taskDraft.customTable.columns.includes(name.trim())) { r.taskDraft.customTable.columns.push(name.trim()); r.taskDraft.customTable.rows.forEach(row => row[name.trim()] = ''); drawResourceFormV7() } });
+  $('#resourceTaskAddRowV7')?.addEventListener('click', () => { capture(); const row = {}; r.taskDraft.customTable.columns.forEach((col, i) => row[col] = i ? '' : String(r.taskDraft.customTable.rows.length + 1)); r.taskDraft.customTable.rows.push(row); drawResourceFormV7() });
+  $$('[data-del-custom-col]').forEach(button => button.onclick = () => { capture(); const index = +button.dataset.delCustomCol, column = r.taskDraft.customTable.columns[index]; r.taskDraft.customTable.columns.splice(index, 1); r.taskDraft.customTable.rows.forEach(row => delete row[column]); drawResourceFormV7() });
+  $$('[data-del-custom-row]').forEach(button => button.onclick = () => { capture(); r.taskDraft.customTable.rows.splice(+button.dataset.delCustomRow, 1); drawResourceFormV7() });
+  $('#resourceQuickDocumentToggleV7')?.addEventListener('click', () => { const panel = $('#resourceQuickDocumentV7'); panel.hidden = !panel.hidden });
+  $('#resourceQuickDocumentSaveV7')?.addEventListener('click', async () => {
+    try {
+      capture(); const quick = $('#resourceFormV7'), files = quick.elements.quickDocFilesV7.files.length ? await storeFiles(quick.elements.quickDocFilesV7.files) : [];
+      const doc = quickResourceDocumentV7({ no: quick.elements.quickDocNoV7.value, date: quick.elements.quickDocDateV7.value, summary: quick.elements.quickDocSummaryV7.value, agency: quick.elements.quickDocAgencyV7.value, note: quick.elements.quickDocNoteV7.value }, files);
+      r.pendingAssetDocument = doc; drawResourceFormV7(); toast('Đã liên kết văn bản cấp tài nguyên. Văn bản sẽ được lưu cùng tài nguyên.');
+    } catch (err) { $('#resourceErrorV7').textContent = err.message }
+  });
   $$('[data-resource-custom-del-v7]').forEach(b => b.onclick = () => { capture(); r.customFields.splice(+b.dataset.resourceCustomDelV7, 1); drawResourceFormV7() });
 }
 
-function saveResourceV7(draft) {
+function saveResourceV7(draft, { defer = false, allowTaskCreator = false } = {}) {
+  const pendingAssetDocument = draft.pendingAssetDocument;
+  draft = V7.clone(draft);
+  delete draft.createTask; delete draft.taskDraft; delete draft.pendingAssetDocument;
+  draft.assetDocumentIds ||= draft.exchangeDocumentIds || [];
   if (!draft.unit.trim() || !draft.agency.trim() || !draft.system.trim()) throw Error('Nhập tên đơn vị, cơ quan quản lý và hệ thống.');
   if (Object.values(draft.documentAppendices || {}).some(app => (app.privateRows || []).some(row => !row.unit?.trim() || !row.agency?.trim() || !row.system?.trim()))) throw Error('Nhập đủ tên đơn vị, cơ quan quản lý và hệ thống cho từng dòng riêng.');
   const key = [draft.unit, draft.agency, draft.system].map(normV7).join('|');
   const existing = state.resourceRecords.find(item => item.id !== draft.id && [item.unit, item.agency, item.system].map(normV7).join('|') === key);
   const current = state.resourceRecords.find(item => item.id === draft.id);
-  const target = current || existing;
+  let target = current || existing;
   const old = target ? V7.clone(target) : null;
-  if (target && !canEditResourceV7(target)) throw Error('Bạn không có quyền sửa tài nguyên này.');
+  if (target && !canEditResourceV7(target) && !allowTaskCreator) throw Error('Bạn không có quyền sửa tài nguyên này.');
   const at = V7.now(), actor = session;
   if (target) {
     const revisions = target.revisions || [], createdBy = target.createdBy || actor, createdAt = target.createdAt || at;
     const appendices = current ? draft.documentAppendices : { ...(target.documentAppendices || {}) };
     if (!current) for (const [docId, app] of Object.entries(draft.documentAppendices || {})) { const prior = appendices[docId] || { columns: [], rows: [], privateRows: [] }; appendices[docId] = { columns: [...new Set([...(prior.columns || []), ...(app.columns || [])])], rows: Array.from({ length: Math.max(prior.rows?.length || 0, app.rows?.length || 0) }, (_, i) => ({ ...prior.rows?.[i], ...app.rows?.[i] })), privateRows: [...(prior.privateRows || []), ...(app.privateRows || [])] } }
-    Object.assign(target, draft, { id: target.id, createdBy, createdAt, revisions, registeredDocumentIds: current ? draft.registeredDocumentIds : [...new Set([...(target.registeredDocumentIds || []), ...draft.registeredDocumentIds])], exchangeDocumentIds: current ? draft.exchangeDocumentIds : [...new Set([...(target.exchangeDocumentIds || []), ...draft.exchangeDocumentIds])], attachments: current ? draft.attachments : [...new Map([...(target.attachments || []), ...draft.attachments].map(file => [file.id, file])).values()], hardwareRows: current ? draft.hardwareRows : [...(target.hardwareRows || []), ...draft.hardwareRows], hardwareColumns: [...new Set([...(target.hardwareColumns || []), ...draft.hardwareColumns])], sharedHardwareRowCount: Math.max(target.sharedHardwareRowCount || 0, draft.sharedHardwareRowCount || 0), documentAppendices: appendices, customFields: current ? draft.customFields : [...(target.customFields || []), ...draft.customFields], updatedAt: at });
+    Object.assign(target, draft, { id: target.id, createdBy, createdAt, revisions, registeredDocumentIds: current ? draft.registeredDocumentIds : [...new Set([...(target.registeredDocumentIds || []), ...draft.registeredDocumentIds])], assetDocumentIds: current ? (draft.assetDocumentIds || []) : [...new Set([...resourceDocumentIdsV7(target), ...(draft.assetDocumentIds || [])])], exchangeDocumentIds: current ? (draft.assetDocumentIds || []) : [...new Set([...resourceDocumentIdsV7(target), ...(draft.assetDocumentIds || [])])], taskIds: resourceTaskIdsV7(target), attachments: current ? draft.attachments : [...new Map([...(target.attachments || []), ...draft.attachments].map(file => [file.id, file])).values()], hardwareRows: current ? draft.hardwareRows : [...(target.hardwareRows || []), ...draft.hardwareRows], hardwareColumns: [...new Set([...(target.hardwareColumns || []), ...draft.hardwareColumns])], sharedHardwareRowCount: Math.max(target.sharedHardwareRowCount || 0, draft.sharedHardwareRowCount || 0), documentAppendices: appendices, customFields: current ? draft.customFields : [...(target.customFields || []), ...draft.customFields], updatedAt: at });
     target.editors = [...new Set([...(target.editors || []), actor])];
     target.revisions ||= [];
     const snapshot = V7.clone(target); delete snapshot.revisions;
@@ -524,22 +741,66 @@ function saveResourceV7(draft) {
   } else {
     Object.assign(draft, { id: V7.id(), createdBy: actor, editors: [actor], createdAt: at, updatedAt: at, revisions: [{ id: V7.id(), at, actorId: actor, action: 'Tạo tài nguyên', changes: [], data: V7.clone(draft) }] });
     state.resourceRecords.push(draft);
+    target = draft;
   }
+  if (pendingAssetDocument && !state.documents.some(doc => doc.id === pendingAssetDocument.id)) {
+    const pending = pendingAssetDocument, duplicate = pending.no && state.documents.find(doc => !doc.archived && (doc.documentType || doc.type) === pending.documentType && normV7(doc.no) === normV7(pending.no));
+    if (duplicate) draft.assetDocumentIds = [...new Set([...(draft.assetDocumentIds || []), duplicate.id])];
+    else state.documents.push(pending);
+    target.assetDocumentIds = [...new Set([...(target.assetDocumentIds || []), duplicate?.id || pending.id])];
+    target.exchangeDocumentIds = target.assetDocumentIds;
+    state.officials = state.documents; state.docs = state.documents;
+  }
+  for (const linked of linkedResourceTasksV7(target)) {
+    if (linked.type !== 'resource') continue;
+    const previous = JSON.stringify({ attachments: linked.attachments || [], customFields: linked.customFields || [], resourceData: linked.resourceData || {} });
+    linked.attachments = V7.clone(target.attachments || []); linked.customFields = V7.clone(target.customFields || []); linked.resourceData = V7.clone(target);
+    if (previous !== JSON.stringify({ attachments: linked.attachments, customFields: linked.customFields, resourceData: linked.resourceData })) M.revision(linked, actor, 'Cập nhật thông tin dùng chung tài nguyên', [{ field: 'Thông tin tài nguyên / tệp / trường tùy chỉnh', old: JSON.parse(previous), new: { attachments: linked.attachments, customFields: linked.customFields, resourceData: linked.resourceData } }], at);
+  }
+  if (defer) return target;
   persist(); resourceDraftV7 = null; closeOverlay(); render(); toast(existing ? 'Đã gộp thông tin vào hệ thống cùng đơn vị và cơ quan quản lý.' : 'Đã lưu tài nguyên.');
+  return target;
+}
+
+function saveResourceWithTaskV7(draft) {
+  const backup = V7.clone(state);
+  try {
+    if (!draft.createTask) return saveResourceV7(draft);
+    captureEmbeddedResourceTaskV7(draft);
+    const task = draft.taskDraft;
+    if (!task?.title?.trim()) throw Error('Nhập tiêu đề công việc đi kèm.');
+    if (!task.managementGroupId) throw Error('Chọn nhóm quản lý cho công việc đi kèm.');
+    task.type = 'resource'; task.resourceData = V7.clone(draft); task.attachments = V7.clone(draft.attachments || []); task.customFields = V7.clone(draft.customFields || []);
+    const resource = saveResourceV7(draft, { defer: true, allowTaskCreator: true });
+    task.resourceId = resource.id;
+    task.resourceData = V7.clone(resource);
+    const savedTask = M.saveTask(state, me(), task);
+    saveTaskResourceV7(savedTask);
+    if (draft.pendingAssetDocument && !state.documents.some(doc => doc.id === draft.pendingAssetDocument.id)) state.documents.push(draft.pendingAssetDocument);
+    state.officials = state.documents; state.docs = state.documents;
+    commitTaskAttachments(); persist(); resourceDraftV7 = null; closeOverlay(); render(); toast('Đã lưu tài nguyên và công việc đi kèm.');
+    return resource;
+  } catch (error) { state = backup; throw error; }
 }
 
 function resourceDetailV7(id, revisionId = '') {
   const r = state.resourceRecords.find(item => item.id === id); if (!r) return;
-  const history = [...(r.revisions || [])].sort((a, b) => b.at.localeCompare(a.at));
-  const selected = history.find(item => item.id === revisionId) || history[0];
-  const snap = selected?.data || r;
+  const linkedTasks = linkedResourceTasksV7(r);
+  const history = [
+    ...(r.revisions || []).map(item => ({ ...item, kind: 'resource', key: `resource:${item.id}` })),
+    ...linkedTasks.flatMap(task => (task.revisions || []).map(item => ({ ...item, kind: 'task', taskId: task.id, taskCode: task.code, key: `task:${task.id}:${item.id}` })))
+  ].sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  const selected = history.find(item => item.key === revisionId || item.id === revisionId) || history[0];
+  const snap = selected?.kind === 'task' ? selected.data : selected?.data || r;
   const docAppendices = (snap.registeredDocumentIds || []).map(docId => { const d = state.documents.find(x => x.id === docId); const app = snap.documentAppendices?.[docId]; if (!d || !app) return ''; const cols = resourceDocColumnsV7(docId, [snap]); const rows = [...(app.rows || []).map((row, i) => ({ scope: `Dòng chung ${i + 1}`, row })), ...(app.privateRows || []).map((row, i) => ({ scope: `Dòng riêng ${i + 1} · ${row.unit || ''} / ${row.agency || ''} / ${row.system || ''}`, row }))]; return `<h3>${esc(d.no || d.documentType)}</h3><div class="table-scroll"><table class="data-table"><thead><tr><th>Phạm vi / hệ thống</th>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows.map(({ scope, row }) => `<tr><td>${esc(scope)}</td>${cols.map(c => `<td>${esc(row[c] || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` }).join('');
-  const values = [['Tên đơn vị', snap.unit], ['Cơ quan quản lý', snap.agency], ['Hệ thống', snap.system], ['Cấp quản lý', snap.level], ['Công văn đăng ký', (snap.registeredDocumentIds || []).map(id => state.documents.find(d => d.id === id)?.no || '').filter(Boolean).join(', ') || '—'], ['Văn bản trao đổi', (snap.exchangeDocumentIds || []).map(id => state.documents.find(d => d.id === id)?.no || '').filter(Boolean).join(', ') || '—']];
-  drawer(`${r.unit} / ${r.agency}`, 'Thông tin tài nguyên', `<div class="resource-v7-detail"><aside class="resource-v7-timeline"><h3>Lịch sử cập nhật</h3>${history.map(h => `<button class="timeline-btn ${selected?.id === h.id ? 'selected' : ''}" data-resource-history-v7="${h.id}"><strong>${esc(h.action)}</strong><small>${fmt(h.at)} · ${esc(userName(h.actorId))}</small></button>`).join('') || '<p class="muted">Chưa có lịch sử.</p>'}</aside><section class="resource-v7-snapshot"><h2>${esc(snap.system)}</h2><dl class="task-meta">${values.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v || '—')}</dd></div>`).join('')}</dl>${docAppendices}<h3>Tệp đính kèm</h3>${fileLinks(snap.attachments || [])}<h3>Thông tin bổ sung</h3>${(snap.customFields || []).map(f => `<div class="detail-pair"><span>${esc(f.name || 'Trường')}</span><strong>${esc(f.value || '—')}</strong></div>`).join('') || '<p class="muted">Chưa có trường bổ sung.</p>'}<p class="small muted">${selected ? `${esc(selected.action)} bởi ${esc(userName(selected.actorId))} · ${fmt(selected.at)}` : ''}</p><div class="detail-actions">${canEditResourceV7(r) ? '<button class="btn primary" id="editResourceV7">Chỉnh sửa</button><button class="btn danger" id="deleteResourceV7">Xóa tài nguyên</button>' : ''}</div></section></div>`, true);
+  const values = selected?.kind === 'task'
+    ? [['Mã task', snap.code], ['Tiêu đề', snap.title], ['Trạng thái', WF[snap.status] || snap.status], ['Người được giao', (snap.assigneeIds || []).map(userName).join(', ') || '—'], ['Ngày bắt đầu', snap.start ? fmt(snap.start) : '—'], ['Hạn hoàn thành', snap.due ? fmt(snap.due) : '—'], ['Mô tả', snap.description || '—']]
+    : [['Tên đơn vị', snap.unit], ['Cơ quan quản lý', snap.agency], ['Hệ thống', snap.system], ['Cấp quản lý', snap.level], ['Công văn đăng ký', (snap.registeredDocumentIds || []).map(id => state.documents.find(d => d.id === id)?.no || '').filter(Boolean).join(', ') || '—'], ['Văn bản cấp tài nguyên', resourceDocumentIdsV7(snap).map(resourceDocNumberV7).filter(Boolean).join(', ') || '—']];
+  drawer(`${r.unit} / ${r.agency}`, 'Thông tin tài nguyên', `<div class="resource-v7-detail"><aside class="resource-v7-timeline"><h3>Lịch sử cập nhật</h3>${history.map(h => `<button class="timeline-btn ${selected?.key === h.key ? 'selected' : ''}" data-resource-history-v7="${esc(h.key)}"><span class="small">${h.kind === 'task' ? 'Công việc' : 'Tài nguyên'}</span><strong>${esc(h.kind === 'task' ? `${h.taskCode} · ${h.action}` : h.action)}</strong><small>${fmt(h.at)} · ${esc(userName(h.actorId))}</small></button>`).join('') || '<p class="muted">Chưa có lịch sử.</p>'}</aside><section class="resource-v7-snapshot"><h2>${esc(selected?.kind === 'task' ? (snap.title || selected.taskCode) : snap.system)}</h2>${selected?.kind === 'task' ? `<div class="detail-actions"><button type="button" class="btn" data-resource-task-v7="${esc(selected.taskId)}">Mở chi tiết task</button></div>` : ''}<dl class="task-meta">${values.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v || '—')}</dd></div>`).join('')}</dl>${selected?.kind === 'task' ? `<h3>Thay đổi trong mốc này</h3>${(selected.changes || []).map(change => `<div class="detail-pair"><span>${esc(change.field)}</span><strong>${esc(JSON.stringify(change.new ?? '—'))}</strong></div>`).join('') || '<p class="muted">Không có chi tiết trường thay đổi.</p>'}` : `${docAppendices}<h3>Tệp đính kèm</h3>${fileLinks(snap.attachments || [])}<h3>Thông tin bổ sung</h3>${(snap.customFields || []).map(f => `<div class="detail-pair"><span>${esc(f.name || 'Trường')}</span><strong>${esc(f.value || '—')}</strong></div>`).join('') || '<p class="muted">Chưa có trường bổ sung.</p>'}`}<h3>Công việc liên kết (${linkedTasks.length})</h3>${linkedTasks.map(task => `<button type="button" class="timeline-btn" data-resource-task-v7="${esc(task.id)}"><strong>${esc(task.code || task.title)}</strong><small>${esc(task.title)} · ${esc(WF[task.status] || task.status)}</small></button>`).join('') || '<p class="muted">Chưa có công việc liên kết.</p>'}<p class="small muted">${selected ? `${esc(selected.action)} bởi ${esc(userName(selected.actorId))} · ${fmt(selected.at)}` : ''}</p><div class="detail-actions">${canEditResourceV7(r) ? '<button class="btn primary" id="editResourceV7">Chỉnh sửa</button><button class="btn danger" id="deleteResourceV7">Xóa tài nguyên</button>' : ''}</div></section></div>`, true);
   $('#overlay .drawer')?.classList.add('resource-v7-drawer');
   $$('[data-resource-history-v7]').forEach(b => b.onclick = () => resourceDetailV7(id, b.dataset.resourceHistoryV7));
   $('#editResourceV7')?.addEventListener('click', () => resourceFormV7(id));
-  $('#deleteResourceV7')?.addEventListener('click', () => { state.resourceRecords = state.resourceRecords.filter(x => x.id !== id); persist(); render(); toast('Đã xóa tài nguyên') });
+  $('#deleteResourceV7')?.addEventListener('click', () => { const at = V7.now(); linkedTasks.forEach(task => { if (task.resourceId === id) { delete task.resourceId; delete task.resourceData; M.revision(task, session, 'Gỡ liên kết do xóa tài nguyên', [{ field: 'Tài nguyên', old: id, new: '—' }], at) } }); state.resourceRecords = state.resourceRecords.filter(x => x.id !== id); persist(); render(); toast('Đã xóa tài nguyên và giữ nguyên các task liên quan.') });
 }
 
 function bindV7() {
@@ -559,8 +820,8 @@ function bindV7() {
   $('#addProjectionColumnBottom')?.addEventListener('click', addCol);
   $('#exportResourceExcelV7')?.addEventListener('click', () => {
     const recs = state.resourceRecords.filter(record => {
-      if (resourceFilters.self && record.createdBy !== session && !(record.editors || []).includes(session)) return false;
-      if (resourceFilters.documents?.length && !resourceFilters.documents.some(id => [...(record.registeredDocumentIds || []), ...(record.exchangeDocumentIds || [])].includes(id))) return false;
+      if (resourceFilters.self && !linkedResourceTasksV7(record).some(task => (task.assigneeIds || []).includes(session))) return false;
+      if (resourceFilters.documents?.length && !resourceFilters.documents.some(id => [...(record.registeredDocumentIds || []), ...resourceDocumentIdsV7(record)].includes(id))) return false;
       return !resourceSearchV7 || `${record.unit} ${record.agency} ${record.system}`.toLocaleLowerCase('vi').includes(resourceSearchV7.toLocaleLowerCase('vi'));
     }).sort((a, b) => a.unit.localeCompare(b.unit, 'vi') || a.agency.localeCompare(b.agency, 'vi') || a.system.localeCompare(b.system, 'vi'));
     exportResourceExcelV7(recs);
@@ -571,6 +832,8 @@ function bindV7() {
     row.onkeydown = e => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('button')) { e.preventDefault(); resourceDetailV7(row.dataset.resourceV7) } };
   });
   $$('[data-resource-v7-detail]').forEach(btn => btn.onclick = e => { e.stopPropagation(); resourceDetailV7(btn.dataset.resourceV7Detail) });
+  $$('[data-resource-link-edit-v7]').forEach(btn => btn.onclick = e => { e.stopPropagation(); resourceLinksEditV7(btn.dataset.resourceLinkRecordV7, btn.dataset.resourceLinkEditV7) });
+  $$('[data-resource-task-v7]').forEach(btn => btn.onclick = e => { e.stopPropagation(); taskDrawer(btn.dataset.resourceTaskV7) });
   $$('[data-resource-cell-edit-v7]').forEach(cell => {
     const edit = e => { e.stopPropagation(); resourceCellEditV7(cell.dataset.resourceCellEditV7, +cell.dataset.resourceRowEditV7, cell.dataset.resourceKindEditV7, cell.dataset.resourceDocEditV7 || '', cell.dataset.resourceColumnEditV7) };
     cell.onclick = edit; cell.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); edit(e) } };
