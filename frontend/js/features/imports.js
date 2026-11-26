@@ -187,7 +187,10 @@ function groupedHeader(docs) {
 
 function upgradeHeader() {
   let table = $('#resourcePanel table');
-  if (table) table.querySelector('thead').outerHTML = groupedHeader(Object.keys(state.schemas));
+  if (table && !table.classList.contains('resource-v7-table')) {
+    let th = table.querySelector('thead');
+    if (th) th.outerHTML = groupedHeader(Object.keys(state.schemas));
+  }
 }
 
 const originalBind = bind;

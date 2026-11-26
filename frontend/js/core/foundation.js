@@ -80,9 +80,13 @@ function seed() {
     columns: [],
     rows: seedWorkbookRows(stamp),
     docs: [
-      { id: uid(), no: '952', date: '2025-03-15', summary: 'Đăng ký nhu cầu tài nguyên hạ tầng điện toán đám mây', agency: 'Cục C12', note: '' },
-      { id: uid(), no: '4651', date: '2025-09-20', summary: 'Rà soát, bổ sung nhu cầu tài nguyên và phương án bảo đảm an toàn thông tin', agency: 'Cục C12', note: '' }
+      { id: uid(), no: '952', date: '2025-03-15', summary: 'Đăng ký nhu cầu tài nguyên hạ tầng điện toán đám mây', documentType: 'Công văn', type: 'Công văn', agency: 'Cục C12', note: '', files: [] },
+      { id: uid(), no: '4651', date: '2025-09-20', summary: 'Rà soát, bổ sung nhu cầu tài nguyên và phương án bảo đảm an toàn thông tin', documentType: 'Công văn', type: 'Công văn', agency: 'Cục C12', note: '', files: [] }
     ],
+    get documents() { return this.docs; },
+    set documents(v) { this.docs = v; },
+    get officials() { return this.docs; },
+    set officials(v) { this.docs = v; },
     knowledge: [
       { id: uid(), title: 'Luật Chuyển đổi số 148/2025/QH15', type: 'Luật', summary: 'Quy định nguyên tắc, chính sách, điều phối quốc gia, biện pháp bảo đảm chuyển đổi số.', note: 'Tài liệu tham khảo', files: [] },
       { id: uid(), title: 'Hướng dẫn quản lý nhu cầu tài nguyên', type: 'Hướng dẫn', summary: 'Quy trình đăng ký, rà soát và đối chiếu nhu cầu hạ tầng cho các hệ thống thông tin.', note: 'Tài liệu nghiệp vụ', files: [] },
@@ -107,6 +111,11 @@ function seed() {
 let state;
 try { state = JSON.parse(localStorage.getItem('c12-prototype-v4')) } catch { }
 if (state?.version !== 4) state = seed();
+if (state) {
+  state.documents ||= state.docs || [];
+  state.officials ||= state.documents;
+  state.docs ||= state.documents;
+}
 
 let session = sessionStorage.getItem('c12-v5-session') || localStorage.getItem('c12-session') || 'demo-u-g-HT',
   page = location.hash.slice(1) || 'home',
