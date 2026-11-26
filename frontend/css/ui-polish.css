@@ -1150,3 +1150,479 @@ html.dark {
     font-size: 12px;
   }
 }
+
+/* Dense resource grid: keep headers readable while reducing row height. */
+.resource-v7-table {
+  font-size: 11px;
+  line-height: 1.2;
+}
+.resource-v7-table th,
+.resource-v7-table td {
+  padding: 3px 5px !important;
+  line-height: 1.2;
+}
+.resource-v7-table tbody tr,
+.resource-v7-table tbody td {
+  min-height: 26px;
+}
+.resource-v7-table th {
+  font-size: 10.5px;
+  line-height: 1.15;
+}
+.resource-v7-table th.th-sub {
+  position: relative;
+  width: 84px;
+  min-width: 78px;
+  max-width: 100px;
+  padding: 20px 4px 4px !important;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.resource-v7-table th.th-sub:is([title*="Disk"], [title*="Sizing"], [title*="License"]) {
+  width: 112px;
+  min-width: 104px;
+  max-width: 128px;
+}
+.resource-v7-table th.th-sub:is([title="vCPU"], [title="vGPU"], [title="RAM"], [title="RAM (GB)"], [title="GPU (GB)"]) {
+  width: 78px;
+  min-width: 72px;
+  max-width: 88px;
+  white-space: nowrap;
+}
+.resource-v7-table .resource-v7-column-heading {
+  position: static;
+  display: block;
+  min-height: 0;
+  padding: 0;
+  line-height: 1.15;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+.resource-v7-table .resource-v7-delete-column {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border-color: rgba(239, 68, 68, .4);
+  background: rgba(239, 68, 68, .1);
+  color: #dc2626;
+  opacity: 1;
+  transform: none;
+}
+.resource-v7-table th.th-sub:hover .resource-v7-delete-column {
+  background: rgba(239, 68, 68, .16);
+  border-color: rgba(239, 68, 68, .62);
+  color: #b91c1c;
+}
+.resource-v7-table .resource-v7-delete-column:focus-visible {
+  outline: 2px solid rgba(239, 68, 68, .32);
+  outline-offset: 1px;
+}
+.resource-v7-table .resource-v7-delete-column svg {
+  width: 10px;
+  height: 10px;
+}
+.resource-v7-table .resource-edit-cell {
+  padding-right: 20px !important;
+}
+.resource-v7-table .resource-editable-link {
+  padding: 14px 16px 2px 2px;
+  line-height: 1.2;
+}
+.resource-v7-table .resource-edit-indicator {
+  top: 2px;
+  right: 3px;
+  width: 13px;
+  height: 13px;
+}
+.resource-v7-table .resource-edit-indicator svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Extra-compact resource grid sizing. */
+.resource-v7-table {
+  font-size: 10.5px;
+  line-height: 1.12;
+}
+.resource-v7-table th,
+.resource-v7-table td {
+  padding: 2px 3px !important;
+  line-height: 1.12;
+}
+.resource-v7-table tbody tr,
+.resource-v7-table tbody td {
+  min-height: 22px;
+}
+.resource-v7-table tbody tr {
+  height: 22px;
+}
+.resource-v7-table .resource-cell-value {
+  -webkit-line-clamp: 2;
+  line-height: 1.12;
+}
+.resource-v7-table .col-action {
+  width: 34px;
+  min-width: 34px;
+  max-width: 34px;
+}
+.resource-v7-table .col-action .icon-btn-sm {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  padding: 3px;
+}
+.resource-v7-table .col-stt {
+  width: 32px;
+  min-width: 32px;
+  max-width: 32px;
+}
+.resource-v7-table .col-unit {
+  width: 92px;
+  min-width: 92px;
+  max-width: 92px;
+}
+.resource-v7-table .col-agency {
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+}
+.resource-v7-table .col-system {
+  width: 156px;
+  min-width: 156px;
+  max-width: 156px;
+}
+.resource-v7-table .col-docs {
+  width: 86px;
+  min-width: 86px;
+  max-width: 86px;
+}
+.resource-v7-table .col-docs .chip {
+  margin: 1px;
+  padding: 1px 4px;
+  font-size: 9.5px;
+  line-height: 1.1;
+}
+.resource-v7-table .col-asset-docs {
+  width: 168px;
+  min-width: 168px;
+  max-width: 168px;
+}
+.resource-v7-table .col-task-links {
+  width: 148px;
+  min-width: 148px;
+  max-width: 148px;
+}
+.resource-v7-table th.th-sub {
+  width: 70px;
+  min-width: 64px;
+  max-width: 82px;
+  padding: 17px 3px 3px !important;
+}
+.resource-v7-table th.th-sub:is([title*="Disk"], [title*="Sizing"], [title*="License"]) {
+  width: 90px;
+  min-width: 84px;
+  max-width: 104px;
+}
+.resource-v7-table th.th-sub:is([title="vCPU"], [title="vGPU"], [title="RAM"], [title="RAM (GB)"], [title="GPU (GB)"]) {
+  width: 64px;
+  min-width: 60px;
+  max-width: 70px;
+}
+.resource-v7-table .resource-v7-delete-column {
+  top: 2px;
+  right: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 4px;
+}
+.resource-v7-table .resource-v7-delete-column svg {
+  width: 8px;
+  height: 8px;
+}
+.resource-v7-table .resource-edit-cell {
+  padding-right: 15px !important;
+}
+.resource-v7-table .resource-editable-link {
+  padding: 12px 12px 1px 1px;
+}
+.resource-v7-table .resource-edit-indicator {
+  top: 1px;
+  right: 2px;
+  width: 11px;
+  height: 11px;
+}
+.resource-v7-table .resource-edit-indicator svg {
+  width: 8px;
+  height: 8px;
+}
+
+/* Consistent, more opaque inner surfaces for task/resource forms and details. */
+:root {
+  --flow-sidebar-bg: rgba(255, 255, 255, .82);
+  --flow-body-bg: rgba(255, 255, 255, .66);
+  --flow-surface-bg: rgba(255, 255, 255, .76);
+  --flow-surface-border: rgba(255, 255, 255, .62);
+  --flow-surface-shadow: 0 8px 20px rgba(15, 23, 42, .09), inset 0 1px 0 rgba(255, 255, 255, .66);
+}
+html.dark {
+  --flow-sidebar-bg: rgba(15, 23, 42, .9);
+  --flow-body-bg: rgba(15, 23, 42, .78);
+  --flow-surface-bg: rgba(30, 41, 59, .84);
+  --flow-surface-border: rgba(255, 255, 255, .18);
+  --flow-surface-shadow: 0 10px 24px rgba(0, 0, 0, .2), inset 0 1px 0 rgba(255, 255, 255, .12);
+}
+
+.task-editor-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 340px);
+  align-items: start;
+  gap: 12px;
+  padding: 12px;
+  background: var(--flow-body-bg);
+}
+.task-editor-main,
+.task-editor-side {
+  border: 1px solid var(--flow-surface-border);
+  border-radius: 18px;
+  background: var(--flow-body-bg);
+  box-shadow: var(--flow-surface-shadow);
+}
+.task-editor-main {
+  gap: 12px;
+  padding: 16px;
+}
+.task-editor-side {
+  position: sticky;
+  top: 12px;
+  gap: 12px;
+  padding: 12px;
+  border-left: 1px solid var(--flow-surface-border);
+}
+.task-editor-main > .surface,
+.task-editor-side > .surface,
+.task-editor-main > .task-attachments-section,
+.task-editor-main > .custom-table-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--flow-surface-border) !important;
+  border-radius: 16px !important;
+  background: var(--flow-surface-bg) !important;
+  box-shadow: var(--flow-surface-shadow);
+}
+.task-editor-main > .task-basic-surface,
+.task-editor-side-section,
+.task-primary-document,
+.task-attachments-section,
+.custom-table-container,
+.resource-v7-form > .surface,
+.task-resource-doc-grid > .surface,
+.task-resource-system-v7,
+.task-resource-appendices-v7 {
+  gap: 12px;
+}
+.task-editor-side-section > h3,
+.task-editor-main-section > h3,
+.resource-v7-form > .surface > h3,
+.task-resource-fields-v7 h3 {
+  margin: 0;
+}
+.task-editor-side-section .field,
+.task-editor-main-section .field,
+.resource-v7-form > .surface .field {
+  margin: 0;
+}
+.task-editor-side-section .custom-row {
+  gap: 8px;
+  margin: 0;
+}
+.task-resource-fields-v7,
+.task-resource-doc-grid {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.task-resource-doc-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.task-resource-fields-v7 > .surface,
+.task-resource-doc-grid > .surface,
+.resource-v7-form > .surface {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--flow-surface-border);
+  border-radius: 16px;
+  background: var(--flow-surface-bg);
+  box-shadow: var(--flow-surface-shadow);
+}
+.task-resource-fields-v7 .resource-doc-choice,
+.resource-v7-form .resource-doc-choice {
+  margin: 0;
+  padding: 7px 0;
+}
+.task-editor-drawer .drawer-head,
+.task-editor-drawer .modal-foot,
+.resource-v7-drawer .drawer-head,
+.resource-v7-drawer .modal-foot {
+  background: var(--flow-sidebar-bg);
+}
+
+.task-drawer-layout {
+  grid-template-columns: minmax(205px, 230px) minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px;
+  background: var(--flow-body-bg);
+}
+.task-detail-drawer .task-version-list,
+.resource-v7-timeline {
+  border: 1px solid var(--flow-surface-border);
+  border-radius: 18px;
+  background: var(--flow-sidebar-bg);
+  box-shadow: var(--flow-surface-shadow);
+}
+.task-detail-drawer .task-version-list {
+  padding: 14px;
+}
+.task-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--flow-surface-border);
+  border-radius: 18px;
+  background: var(--flow-body-bg);
+  box-shadow: var(--flow-surface-shadow);
+}
+.task-detail-drawer .task-detail-body {
+  background: var(--flow-body-bg);
+}
+.task-detail-section,
+.task-detail-body .task-resource-summary,
+.task-detail-body .task-document-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--flow-surface-border) !important;
+  border-radius: 16px;
+  background: var(--flow-surface-bg) !important;
+  box-shadow: var(--flow-surface-shadow);
+}
+.task-detail-section h3,
+.task-resource-summary h3,
+.task-document-summary h3 {
+  margin: 0;
+}
+.task-detail-section .section-title {
+  margin: 0;
+}
+.task-detail-section .task-meta,
+.task-resource-summary .task-meta,
+.task-document-summary .task-meta {
+  margin: 0;
+}
+.task-detail-comments-surface .comment-list,
+.task-detail-revisions-surface .change-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.task-detail-comments-surface article,
+.task-detail-revisions-surface .change-log > div {
+  margin: 0 !important;
+  border-color: var(--flow-surface-border) !important;
+}
+
+.resource-v7-form {
+  gap: 12px;
+  padding: 16px;
+  background: var(--flow-body-bg);
+}
+.resource-v7-detail {
+  gap: 12px;
+  padding: 12px;
+  background: var(--flow-body-bg);
+}
+.resource-v7-timeline {
+  gap: 8px;
+  padding: 14px;
+  border-right: 1px solid var(--flow-surface-border);
+}
+.resource-v7-timeline > h3 {
+  margin: 0 0 4px;
+}
+.resource-v7-snapshot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--flow-surface-border);
+  border-radius: 18px;
+  background: var(--flow-body-bg);
+  box-shadow: var(--flow-surface-shadow);
+}
+.resource-v7-detail-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.resource-v7-detail-heading h2 {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.resource-v7-detail-section {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--flow-surface-border);
+  border-radius: 16px;
+  background: var(--flow-surface-bg);
+  box-shadow: var(--flow-surface-shadow);
+}
+.resource-v7-detail-section h3 {
+  margin: 0 0 10px;
+}
+.resource-v7-detail-section .task-meta {
+  margin: 0;
+}
+.resource-v7-history-appendix .table-scroll {
+  margin: 0;
+}
+.resource-v7-linked-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.resource-v7-snapshot > .detail-actions {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .task-editor-layout,
+  .task-drawer-layout,
+  .resource-v7-detail {
+    gap: 10px;
+    padding: 10px;
+  }
+  .task-editor-main,
+  .task-editor-side,
+  .task-detail-body,
+  .resource-v7-snapshot {
+    padding: 12px;
+  }
+  .task-editor-side {
+    position: static;
+  }
+  .task-resource-doc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

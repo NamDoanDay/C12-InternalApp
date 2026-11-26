@@ -69,22 +69,20 @@ CRUD văn bản độc lập với task. Khi task xử lý văn bản lưu, nế
 
 ## 5. Quản lý tài nguyên
 
-Quản lý tài nguyên là phân hệ độc lập, không tạo task. Thao tác chính là Tạo tài nguyên, xem/chỉnh sửa bản ghi và theo dõi lịch sử. Form có thông tin hệ thống, file đính kèm tài nguyên, Công văn đăng ký, Văn bản trao đổi, phụ lục phần cứng và trường tùy chỉnh.
+Quản lý tài nguyên có collection riêng, đồng thời hỗ trợ tạo task loại **Quản lý tài nguyên** trong form task hoặc bật **Tạo kèm công việc** ngay trong form tài nguyên. Ở luồng kèm task, tài nguyên và task được lưu cùng thao tác; một resource có thể liên kết nhiều task, còn một resource task liên kết đúng một resource (đơn vị/cơ quan/hệ thống). Tệp đính kèm và trường tùy chỉnh dùng chung giữa resource và các task liên kết. Mã resource task theo Nhóm quản lý.
 
-Bảng tổng hợp gộp theo Tên đơn vị → Cơ quan quản lý → Hệ thống, hiển thị gộp ô dọc cho các giá trị liền nhau. Công văn đăng ký và Văn bản trao đổi là các cột liên kết. Mỗi công văn có nhóm cột con riêng theo schema (ví dụ vCPU, RAM, Disk / Block); các cột con chỉ mang tên trường, nhóm cha mang số công văn. Chỉ hiện nhóm công văn đang liên kết với dữ liệu. Không tạo “phụ lục riêng” tách ngoài nhóm công văn.
+Form tài nguyên có thông tin hệ thống, Công văn đăng ký, Văn bản cấp tài nguyên (loại văn bản dùng chung trong Danh mục văn bản), phụ lục phần cứng, tệp đính kèm và trường tùy chỉnh. Có thể tạo nhanh Văn bản cấp tài nguyên trong form; nếu cùng loại và số đã có thì liên kết bản ghi sẵn, nếu chưa có thì thêm vào Danh mục văn bản khi lưu tài nguyên.
 
-Hai thao tác bảng: thêm cột chung (chọn nhóm công văn) hoặc cột riêng nối sau nhóm Công văn đăng ký/Văn bản trao đổi; thêm hàng chung (chọn đơn vị, cơ quan, hệ thống) hoặc hàng riêng để nhập thủ công. Cột 952/4651 chỉ xuất hiện nếu nhóm đó có trên bản ghi. Theme nhóm đang được yêu cầu: `#475569` cho 4651, `#919b7b` cho 952.
+Bảng tổng hợp gộp theo Tên đơn vị → Cơ quan quản lý → Hệ thống và có các cột liên kết Công văn đăng ký, Văn bản cấp tài nguyên, Công việc (Task). Mỗi Công văn đăng ký trong danh mục có nhóm cột con riêng, nhóm cha mang số văn bản và cột con chỉ mang tên trường; bộ lọc Công văn giới hạn các nhóm đang hiển thị. Công văn 952 và 4651 giữ schema đặc thù hiện có. Các công văn khác tự nhận schema mặc định `vGPU`, `RAM (GB)`, `Disk / Block (TB)`, `Disk / File Storage (TB)`, `Disk / Object (TB)`, `License`; schema cũ nếu có được giữ sau các cột mặc định. Header `colspan`, ô dữ liệu, chi tiết và Excel dùng cùng schema; xóa cột có xác nhận và xóa giá trị của cột đó khỏi các hàng thuộc đúng công văn. Người dùng chỉ thấy/xóa điều khiển schema nếu có quyền sửa mọi resource đang liên kết với công văn đó; admin luôn có quyền. Các cột định danh/thao tác cố định không xóa được. Không tạo “phụ lục riêng” tách ngoài nhóm công văn.
 
-Bộ lọc: tìm đơn vị/cơ quan/hệ thống, văn bản/công văn liên kết, và phạm vi “Được giao cho tôi / Tất cả”. Xuất Excel phải phản ánh bộ lọc và cấu trúc hiển thị, gồm merge đơn vị/cơ quan/hệ thống và nhóm cột theo văn bản. Không được giả danh file XLSX bằng CSV/HTML; nếu thư viện XLSX không tải được thì báo yêu cầu tải lại trang.
+Thao tác bảng gồm thêm cột chung (chọn một Công văn đăng ký), cột riêng, hàng chung (chọn đơn vị/cơ quan/hệ thống) và hàng riêng. Bộ lọc gồm tìm đơn vị/cơ quan/hệ thống, văn bản liên kết và phạm vi “Được giao cho tôi / Tất cả”. Export Excel phản ánh tập dữ liệu đang lọc, merge đơn vị/cơ quan/hệ thống và toàn bộ nhóm cột theo văn bản. Không được giả danh file XLSX bằng CSV/HTML; nếu thư viện XLSX không tải được thì báo yêu cầu tải lại trang.
 
 ### Hiện trạng và khoảng lệch tài nguyên
 
-- V7 lưu resource records độc lập, đúng hướng phân hệ riêng; có CRUD, attachment, document links, appendix, custom fields và revisions.
-- Bảng hiện triển khai các nhóm cột chung 952/4651 và gộp dòng đơn vị/cơ quan/hệ thống.
-- Bộ lọc “Được giao cho tôi” hiện lọc creator/editor, không theo task được giao. Do resource không có task link, chuẩn assignee-based **chưa được hỗ trợ**.
-- Quyền sửa resource hiện admin/creator/editor, chưa khớp yêu cầu trước đó admin hoặc người được giao task nguồn.
+- V7 lưu resource records riêng và hỗ trợ liên kết resource/task; quyền sửa resource xét admin, người tạo resource, hoặc người tạo/được giao ít nhất một task liên kết.
+- Bộ lọc “Được giao cho tôi” lọc resource có task liên kết đang giao cho user hiện tại.
 - Excel đang xuất từ dữ liệu lọc nhưng phần phụ lục đa hàng có thể chỉ lấy dòng đầu, nên chưa bảo đảm giống hệt bảng trong mọi trường hợp.
-- Mã nhóm công văn/schema 952/4651 hiện là các nhóm cứng trong migration; thêm schema động cho văn bản khác cần được xác nhận và triển khai.
+- Schema mặc định và schema động được lưu trong state phía trình duyệt (`resourceAppendixSchemas`); chưa có đồng bộ server hoặc bảo đảm phân quyền phía server.
 
 ## 6. Dữ liệu tài nguyên từ công văn và lịch sử (yêu cầu đã chốt, cần phân biệt với V7)
 

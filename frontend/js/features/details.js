@@ -9,17 +9,18 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
     const doc = state.documents.find(item => item.id === id), appendix = resourceData.documentAppendices?.[id];
     if (!doc || !appendix) return '';
     const columns = typeof resourceDocColumnsV7 === 'function' ? resourceDocColumnsV7(id, [resourceData]) : appendix.columns || [];
-    return `<section class="surface"><h3>${esc(doc.documentType || doc.type)} ${esc(doc.no || '')}</h3><div class="table-scroll"><table class="data-table"><thead><tr>${columns.map(column => `<th>${esc(column)}</th>`).join('')}</tr></thead><tbody>${(appendix.rows || []).map(row => `<tr>${columns.map(column => `<td>${esc(row[column] || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
+    return `<section class="surface task-detail-section task-detail-appendix"><h3>${esc(doc.documentType || doc.type)} ${esc(doc.no || '')}</h3><div class="table-scroll"><table class="data-table"><thead><tr>${columns.map(column => `<th>${esc(column)}</th>`).join('')}</tr></thead><tbody>${(appendix.rows || []).map(row => `<tr>${columns.map(column => `<td>${esc(row[column] || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`;
   }).join('') : '';
-  return `<div class="task-detail-title">
+  return `<section class="surface task-detail-title task-detail-section task-detail-summary-surface">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
       <span class="chip active">${esc(t.code)}</span>
       ${badge(t)}
     </div>
     <h2 style="font-size:20px;font-weight:700;margin-bottom:6px">${esc(t.title)}</h2>
     <p class="muted" style="line-height:1.6">${esc(t.description || 'Chưa có mô tả công việc')}</p>
-  </div>
+  </section>
 
+  <section class="surface task-detail-section task-detail-meta-surface">
   <dl class="task-meta">
     ${[
       ['Loại công việc', t.type === 'resource' ? 'Quản lý tài nguyên' : t.type === 'document' ? 'Xử lý văn bản' : 'Task thường'],
@@ -34,11 +35,13 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
 
   ${Date.now() < Date.parse(t.start) ? '<p class="notice">Chưa đến ngày bắt đầu công việc.</p>' : ''}
   ${readonly ? '<p class="notice">Bản lịch sử chỉ đọc. Chọn bản hiện tại để cập nhật dữ liệu.</p>' : ''}
+  </section>
 
   ${resourceData ? `<section class="surface task-resource-summary"><h3>Thông tin tài nguyên liên kết</h3><dl class="task-meta">${[['Tên đơn vị', resourceData.unit], ['Cơ quan quản lý', resourceData.agency], ['Hệ thống', resourceData.system], ['Công văn đăng ký', resourceDocValues(resourceData.registeredDocumentIds)], ['Văn bản cấp tài nguyên', resourceDocValues(resourceData.assetDocumentIds || resourceData.exchangeDocumentIds)]].map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value || '—')}</dd></div>`).join('')}</dl>${resourceAppendices}</section>` : ''}
 
   <!-- Custom Table cho Task thường nếu có -->
   ${t.customTable ? `
+    <section class="surface task-detail-section task-detail-custom-table">
     <div class="section-title"><h3>${esc(t.customTable.name || 'Bảng dữ liệu tùy chỉnh')}</h3></div>
     <div class="table-scroll compact-scroll">
       <table class="data-table">
@@ -48,23 +51,29 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
         </tbody>
       </table>
     </div>
+    </section>
   `: ''}
 
   ${t.type === 'document' ? `<section class="surface task-document-summary"><h3>Văn bản xử lý</h3><dl class="task-meta">${[['Loại văn bản',t.documentType],['Số văn bản',t.documentNumber||'—'],['Trích yếu',t.documentSummary||'—']].map(([k,v])=>`<div><dt>${k}</dt><dd>${esc(v||'—')}</dd></div>`).join('')}</dl></section>` : ''}
 
   <!-- Tệp đính kèm -->
   ${t.attachments?.length ? `
-    <div class="section-title"><h3>${t.type === 'resource' ? 'Tệp đính kèm tài nguyên' : 'Tệp đính kèm khác'}</h3></div>
-    <div>${fileLinks(t.attachments)}</div>
+    <section class="surface task-detail-section task-detail-attachments">
+      <div class="section-title"><h3>${t.type === 'resource' ? 'Tệp đính kèm tài nguyên' : 'Tệp đính kèm khác'}</h3></div>
+      <div>${fileLinks(t.attachments)}</div>
+    </section>
   `: ''}
 
   <!-- Thông tin bổ sung -->
   ${t.customFields?.length ? `
-    <div class="section-title"><h3>Thông tin bổ sung</h3></div>
-    <dl class="task-meta">${t.customFields.map(c => `<div><dt>${esc(c.name)}</dt><dd>${esc(c.value)}</dd></div>`).join('')}</dl>
+    <section class="surface task-detail-section task-detail-custom-fields">
+      <div class="section-title"><h3>Thông tin bổ sung</h3></div>
+      <dl class="task-meta">${t.customFields.map(c => `<div><dt>${esc(c.name)}</dt><dd>${esc(c.value)}</dd></div>`).join('')}</dl>
+    </section>
   `: ''}
 
   <!-- Bình luận trao đổi -->
+  <section class="surface task-detail-section task-detail-comments-surface">
   <div class="section-title"><h3>Bình luận & Trao đổi</h3></div>
   <div class="comment-list">
     ${(t.comments || []).map(c => `<article style="padding:10px 0;border-bottom:1px solid var(--border)">
@@ -87,8 +96,10 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
       ${admin() || current.creatorId === session ? '<button class="btn danger" id="archiveTaskDetail">Lưu trữ công việc</button>' : ''}
     </div>
   `: ''}
+  </section>
 
   <!-- Nhật ký thay đổi -->
+  <section class="surface task-detail-section task-detail-revisions-surface">
   <div class="section-title"><h3>Nhật ký thay đổi</h3></div>
   <div class="change-log">
     ${current.revisions.slice().reverse().map(r => `<div style="padding:8px 0 8px 12px;border-left:2px solid var(--action);margin-bottom:8px">
@@ -96,7 +107,7 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
       <small style="color:var(--muted);display:block">${fmt(r.at)} · ${esc(userName(r.actorId))}</small>
       ${r.changes.map(c => `<p class="small" style="margin:3px 0">${esc(c.field)}: <span style="text-decoration:line-through;color:var(--muted)">${esc(shortValue(c.old))}</span> → <strong>${esc(shortValue(c.new))}</strong></p>`).join('')}
     </div>`).join('')}
-  </div>`;
+  </div></section>`;
 }
 
 function shortValue(v) {
@@ -137,7 +148,7 @@ function taskDrawer(id, revisionId = '') {
 
   drawer(current.code, current.title, `
     <div class="task-drawer-layout">
-      <aside class="task-version-list">
+      <aside class="surface task-version-list">
         <h3 style="margin-bottom:12px">Lịch sử công việc</h3>
         <button class="quick-chip btn primary" id="currentTaskVersion" style="width:100%;text-align:left;margin-bottom:8px">Bản hiện tại</button>
         ${current.revisions.slice().reverse().map(r => `

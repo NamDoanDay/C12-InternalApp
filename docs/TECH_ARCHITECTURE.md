@@ -57,6 +57,7 @@ Rà soát 26/11/2026. Đây là mô tả code hiện có, không phải kiến t
 
 - Tasks, catalog documents, groups, people, account, comments/revisions và notifications nằm trong state prototype.
 - V7 resource records là collection độc lập với task. Một số API/renderer cũ liên quan task-resource vẫn được tải; V7 override là luồng resource hiện hành.
+- Schema cột phụ lục theo công văn được lưu trong `state.resourceAppendixSchemas`; schema 952/4651 tiếp tục dùng bộ cột đặc thù, còn công văn khác nhận bộ 6 cột mặc định. Bảng V7 dựng header/data/export từ schema này; thay đổi schema là client-side state.
 - Catalog dùng `state.documents`; alias cũ `officials`/`docs` phục vụ migration/tương thích.
 - Stats page có một số fixture; không coi mọi widget là live data.
 

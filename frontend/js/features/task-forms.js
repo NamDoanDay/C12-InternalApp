@@ -113,6 +113,7 @@ function renderTaskForm() {
         <div class="task-editor-layout">
           <!-- MAIN AREA -->
           <div class="task-editor-main">
+            <section class="surface task-editor-main-section task-basic-surface">
             <!-- Tiêu đề công việc: Compact single-line -->
             <label class="field">
               <span>Tiêu đề công việc <span class="required">*</span></span>
@@ -124,6 +125,7 @@ function renderTaskForm() {
               <span>Mô tả công việc</span>
               <textarea name="description" rows="3" ${lock} placeholder="Tóm tắt yêu cầu, nội dung chỉ đạo hoặc mục tiêu công việc...">${esc(t.description)}</textarea>
             </label>
+            </section>
 
             ${t.type === 'resource' && typeof renderResourceTaskFieldsV7 === 'function' ? renderResourceTaskFieldsV7(t) : ''}
             ${t.type === 'document' ? `<section class="surface task-primary-document">
@@ -137,7 +139,7 @@ function renderTaskForm() {
             </section>` : ''}
 
             <!-- Tệp đính kèm độc lập với danh mục văn bản -->
-            <div class="task-attachments-section" style="background:var(--app);padding:14px 18px;border-radius:10px;border:1px solid var(--border)">
+            <section class="surface task-attachments-section">
               <div class="section-title" style="margin:0 0 10px;display:flex;align-items:center;justify-content:space-between">
                 <h3 style="margin:0">${t.type === 'resource' ? 'Tệp đính kèm tài nguyên' : 'Tệp đính kèm'}</h3>
                 <label class="btn text" style="cursor:pointer">
@@ -146,9 +148,9 @@ function renderTaskForm() {
                 </label>
               </div>
               <div>${fileLinks(t.attachments, true) || '<span class="small muted">Chưa có tệp đính kèm.</span>'}</div>
-            </div>
+            </section>
 
-            <div class="custom-table-container">
+            <section class="surface custom-table-container">
                 <div class="custom-table-header-bar">
                   <div>
                     <span class="small muted" style="font-weight:600;text-transform:uppercase;color:var(--action)">${t.type === 'document' ? 'Văn bản liên quan · Bảng dữ liệu tùy chỉnh' : 'Bảng dữ liệu tùy chỉnh (Custom Table)'}</span>
@@ -165,11 +167,12 @@ function renderTaskForm() {
                 <div class="table-scroll compact-scroll" style="margin-top:10px">
                   ${renderCustomTableEditor(t)}
                 </div>
-              </div>
+            </section>
           </div>
 
           <!-- SIDEBAR: METADATA & PHÂN QUYỀN -->
           <aside class="task-editor-side">
+            <section class="surface task-editor-side-section task-settings-section">
             <label class="field">
               <span>Loại công việc</span>
               <select name="type" ${lock}>
@@ -194,8 +197,9 @@ function renderTaskForm() {
               </select>
               ${!admin() ? '<span class="small muted">Khóa theo nhóm hiện tại của cán bộ trong tổ</span>' : ''}
             </label>
+            </section>
 
-            <div class="divider"></div>
+            <section class="surface task-editor-side-section">
             <h3>Người được giao</h3>
             ${admin() ? `
               <label class="field assignee-group-selector">
@@ -216,7 +220,9 @@ function renderTaskForm() {
               <p class="small muted" style="margin-top:4px">Cán bộ chỉ tự giao công việc cho chính mình.</p>
             `}
 
-            <div class="divider"></div>
+            </section>
+
+            <section class="surface task-editor-side-section">
             <h3>Lên lịch thực hiện</h3>
             <label class="field">
               <span>Ngày bắt đầu *</span>
@@ -228,7 +234,9 @@ function renderTaskForm() {
             </label>
             ${dueLock ? '<p class="small muted">Chỉ admin hoặc người tạo task được thay đổi hạn.</p>' : ''}
 
-            <div class="divider"></div>
+            </section>
+
+            <section class="surface task-editor-side-section task-custom-fields-section">
             <div class="section-title" style="margin:0;display:flex;align-items:center;justify-content:space-between">
               <h3 style="margin:0">Trường tùy chỉnh</h3>
               <button type="button" class="icon-btn" id="addTaskCustom" aria-label="Thêm trường">${icon('plus')}</button>
@@ -238,6 +246,7 @@ function renderTaskForm() {
               <input data-custom-value="${i}" placeholder="Giá trị" value="${esc(c.value)}">
               <button type="button" data-custom-remove="${i}" aria-label="Xóa trường">${icon('close')}</button>
             </div>`).join('')}
+            </section>
           </aside>
         </div>
 

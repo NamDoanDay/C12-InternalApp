@@ -28,11 +28,13 @@ Floating Glassmorphism tối giản: panels như các bề mặt nổi trên n�
 ## 4. Quy tắc các view đặc thù
 
 - **Quản lý công việc:** title/action; filter; donut + legend; tab aggregate/view switch và board/table theo thứ tự trong SPEC. Tab và summary dùng cùng bộ lọc trạng thái. Donut có lỗ rỗng thật, tổng ở tâm, legend gọn và đồng màu với segments.
-- **Quản lý tài nguyên:** bảng gộp Đơn vị/Cơ quan/Hệ thống; nhóm cột theo văn bản; cỡ chữ/padding gọn; hover chỉ tô hàng trỏ trực tiếp. Nhóm màu hiện yêu cầu: 4651 `#475569`, 952 `#919b7b`. Export phản ánh filter và merge; nếu XLSX lib thiếu, thông báo lỗi thay vì tạo file giả.
+- **Thống kê:** Tổng quan công việc hiển thị đủ bốn summary card theo cùng thứ tự tổng/đang xử lý/hoàn thành/chậm muộn; số liệu theo phạm vi task mà user xem được và các filter task hiện hành. Card tổng mở Quản lý công việc ở tab Tổng công việc.
+- **Quản lý tài nguyên:** bảng gộp Đơn vị/Cơ quan/Hệ thống; nhóm cột theo văn bản; cỡ chữ/padding gọn; hover chỉ tô hàng trỏ trực tiếp. Công văn 952/4651 giữ schema riêng; công văn khác nhận sáu cột mặc định. Cột con có nút xóa riêng trong header, yêu cầu xác nhận và xóa dữ liệu của đúng nhóm; header `colspan`, body và Excel cùng đọc schema hiện hành. Không đặt nút xóa lên cột định danh/thao tác cố định. Nhóm màu hiện yêu cầu: 4651 `#475569`, 952 `#919b7b`. Export phản ánh filter và merge; nếu XLSX lib thiếu, thông báo lỗi thay vì tạo file giả.
 - **Danh mục văn bản:** một danh mục, tabs theo loại văn bản, tìm kiếm và bảng; không dựng danh mục Công văn tách biệt.
 - **Cây sơ đồ:** graph theo nhánh nhóm; drag/drop thay đổi group, có đường thao tác không cần kéo nếu thiết bị không hỗ trợ.
 - **Kiến thức tổ:** card độc lập với gap/padding, text/action wrap được; filters vẫn hiển thị rõ.
 - **Modal/drawer:** nền header/body thống nhất, child surfaces tách lớp nhẹ; không lộ content phía sau gây nhiễu.
+- **Form/chi tiết task và tài nguyên:** sidebar thao tác/lịch sử dùng nền kính đậm hơn vùng nội dung; các nhóm thông tin, văn bản/phụ lục, tệp, trường tùy chỉnh, bình luận, revisions và task liên kết được gom vào surface riêng. Nhịp gap giữa surface là 12px, padding panel 14–16px; token `--flow-sidebar-bg`, `--flow-body-bg`, `--flow-surface-bg` có giá trị riêng cho LIGHT/DARK.
 
 ## 5. CSS và Tailwind trong repo
 

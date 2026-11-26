@@ -317,41 +317,44 @@ function homeWorkspace() {
 // =========================================================
 // YÊU CẦU 2: THẺ TASK SUMMARIES COMPACT VỚI ICON TRẠNG THÁI RIÊNG
 // =========================================================
-function summaryCards(ts, includeTotal = true) {
+function summaryCards(ts, includeTotal = true, totalFirst = false) {
   let doneCount = ts.filter(t => M.bucket(t) === 'done').length,
     procCount = ts.filter(t => M.bucket(t) === 'processing').length,
     lateCount = ts.filter(t => M.bucket(t) === 'late').length,
     totalCount = ts.length;
-
-  return `<div class="task-summaries">
-    <button type="button" class="summary-card done" data-bucket="done">
-      <div class="summary-icon-wrap">${icon('checkCircle')}</div>
-      <div class="summary-content">
-        <strong>${doneCount}</strong>
-        <span>Đã hoàn thành</span>
-      </div>
-    </button>
-    <button type="button" class="summary-card processing" data-bucket="processing">
-      <div class="summary-icon-wrap">${icon('clock')}</div>
-      <div class="summary-content">
-        <strong>${procCount}</strong>
-        <span>Đang xử lý</span>
-      </div>
-    </button>
-    <button type="button" class="summary-card late" data-bucket="late">
-      <div class="summary-icon-wrap">${icon('alertTriangle')}</div>
-      <div class="summary-content">
-        <strong>${lateCount}</strong>
-        <span>Chậm muộn</span>
-      </div>
-    </button>
-    ${includeTotal ? `<button type="button" class="summary-card total" data-bucket="">
+  const totalCard = `<button type="button" class="summary-card total" data-bucket="">
       <div class="summary-icon-wrap">${icon('folder')}</div>
       <div class="summary-content">
         <strong>${totalCount}</strong>
         <span>Tổng công việc</span>
       </div>
-    </button>` : ''}
+    </button>`;
+
+  const doneCard = `<button type="button" class="summary-card done" data-bucket="done">
+      <div class="summary-icon-wrap">${icon('checkCircle')}</div>
+      <div class="summary-content">
+        <strong>${doneCount}</strong>
+        <span>Đã hoàn thành</span>
+      </div>
+    </button>`;
+  const processingCard = `<button type="button" class="summary-card processing" data-bucket="processing">
+      <div class="summary-icon-wrap">${icon('clock')}</div>
+      <div class="summary-content">
+        <strong>${procCount}</strong>
+        <span>Đang xử lý</span>
+      </div>
+    </button>`;
+  const lateCard = `<button type="button" class="summary-card late" data-bucket="late">
+      <div class="summary-icon-wrap">${icon('alertTriangle')}</div>
+      <div class="summary-content">
+        <strong>${lateCount}</strong>
+        <span>Chậm muộn</span>
+      </div>
+    </button>`;
+  const statusCards = totalFirst ? `${processingCard}${doneCard}${lateCard}` : `${doneCard}${processingCard}${lateCard}`;
+
+  return `<div class="task-summaries">
+    ${includeTotal && totalFirst ? totalCard : ''}${statusCards}${includeTotal && !totalFirst ? totalCard : ''}
   </div>`;
 }
 
@@ -565,6 +568,10 @@ function renderTableTasks(filtered) {
 
 function statsWorkspace() {
   let ts = visibleTasks();
+  const savedBucket = activeTaskFilter.bucket;
+  activeTaskFilter.bucket = '';
+  const summaryTasks = ts.filter(taskMatchesFilters).filter(t => [t.title, t.code, fmt(t.start), fmt(t.due), t.start, t.due].join(' ').toLocaleLowerCase('vi').includes(taskSearch.toLocaleLowerCase('vi')));
+  activeTaskFilter.bucket = savedBucket;
 
   // Activities
   let activities = [
@@ -578,7 +585,7 @@ function statsWorkspace() {
   let filteredActivities = calSelectedDate ? activities.filter(a => a.date === calSelectedDate) : activities;
 
   return head('Thống kê công việc') +
-    `<section class="surface stats-summary-surface"><div class="section-title"><h2>Tổng quan công việc</h2></div>${summaryCards(ts, false)}</section>` +
+    `<section class="surface stats-summary-surface"><div class="section-title"><h2>Tổng quan công việc</h2></div>${summaryCards(summaryTasks, true, true)}</section>` +
     `<div class="stats-grid-layout">
       <!-- CỘT TRÁI: THEO NHÓM QUẢN LÝ (ACCORDION) -->
       <section class="surface panel-pad">
