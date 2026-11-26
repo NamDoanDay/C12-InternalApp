@@ -711,6 +711,205 @@ html.dark {
   }
 }
 
+/* Compact resource table: keep the wide schema inside its own scroll area. */
+.resource-v7-panel .table-scroll {
+  min-width: 0;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.resource-v7-table {
+  width: max-content;
+  min-width: 100%;
+  table-layout: fixed;
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+
+.resource-v7-table th,
+.resource-v7-table td {
+  box-sizing: border-box;
+  height: auto;
+  padding: 5px 7px !important;
+  vertical-align: middle;
+}
+
+.resource-v7-table th {
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.resource-v7-table td {
+  max-width: 240px;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.resource-v7-table .resource-cell-value {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+
+.resource-v7-table .col-stt { width: 42px; min-width: 42px; text-align: center; }
+.resource-v7-table .col-unit { width: 112px; min-width: 112px; max-width: 112px; }
+.resource-v7-table .col-agency { width: 142px; min-width: 142px; max-width: 142px; }
+.resource-v7-table .col-system { width: 205px; min-width: 205px; max-width: 205px; }
+.resource-v7-table .col-docs { width: 96px; min-width: 96px; text-align: center; }
+.resource-v7-table .col-action { width: 44px; min-width: 44px; text-align: center; }
+.resource-v7-table th.th-sub,
+.resource-v7-table td.resource-doc-cell { width: 178px; min-width: 116px; max-width: 220px; }
+.resource-v7-table th.th-sub:is([title*="vCPU"], [title*="RAM"], [title*="GPU"], [title*="Disk"], [title*="Sizing"]),
+.resource-v7-table td.resource-doc-cell:is([title^="vCPU:"], [title^="RAM"], [title^="GPU"], [title^="Disk"], [title^="Sizing"]) {
+  width: 86px;
+  min-width: 76px;
+  max-width: 96px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.resource-v7-table .col-docs .chip {
+  margin: 1px;
+  padding: 2px 6px;
+  font-size: 10px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+/* Group colors use the requested hues with theme-aware glass mixes. */
+.resource-v7-table .th-doc-952 {
+  --resource-doc-accent: #919b7b;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--resource-doc-accent) 24%, var(--surface-card));
+  border-bottom: 2px solid color-mix(in srgb, var(--resource-doc-accent) 72%, transparent);
+}
+.resource-v7-table .th-sub-952,
+.resource-v7-table td.cell-952 {
+  background: color-mix(in srgb, #919b7b 9%, var(--glass-row-bg));
+}
+.resource-v7-table .th-sub-952 { border-top: 1px solid color-mix(in srgb, #919b7b 30%, transparent); }
+.resource-v7-table .th-doc-4651 {
+  --resource-doc-accent: #475569;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--resource-doc-accent) 22%, var(--surface-card));
+  border-bottom: 2px solid color-mix(in srgb, var(--resource-doc-accent) 68%, transparent);
+}
+.resource-v7-table .th-sub-4651,
+.resource-v7-table td.cell-4651 {
+  background: color-mix(in srgb, #475569 8%, var(--glass-row-bg));
+}
+.resource-v7-table .th-sub-4651 { border-top: 1px solid color-mix(in srgb, #475569 28%, transparent); }
+.resource-v7-table .th-doc-group:not(.th-doc-952):not(.th-doc-4651) {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--action) 14%, var(--surface-card));
+  border-bottom: 2px solid color-mix(in srgb, var(--action) 44%, transparent);
+}
+
+/* A rowspan cell spans several visual rows, so don't trigger the sibling row tint from it. */
+.resource-v7-table tbody tr:hover:not(:has(> td[rowspan]:hover)) > td,
+.resource-v7-table tbody tr:focus-within > td {
+  background-color: var(--table-row-hover) !important;
+}
+/* Keep cell-level hover styling from overriding the active row tint. */
+.resource-v7-table tbody td:hover {
+  background-color: inherit !important;
+  border-radius: 0 !important;
+  border-color: inherit !important;
+  box-shadow: none !important;
+  position: static !important;
+  z-index: auto !important;
+}
+.resource-v7-table tbody tr[data-resource-v7] { cursor: pointer; }
+.resource-v7-table .resource-edit-cell { cursor: cell; }
+
+@media (max-width: 760px) {
+  .resource-v7-table { font-size: 11px; }
+  .resource-v7-table .col-unit { width: 100px; min-width: 100px; max-width: 100px; }
+  .resource-v7-table .col-agency { width: 122px; min-width: 122px; max-width: 122px; }
+  .resource-v7-table .col-system { width: 170px; min-width: 170px; max-width: 170px; }
+}
+
+/* Give direct content groups a consistent inset inside every page surface. */
+#app .main .surface > :is(
+  .toolbar,
+  .filters,
+  .controls-container,
+  .task-filters,
+  .resource-v7-filters,
+  .knowledge-filter-bar,
+  .kanban-tabs,
+  .table-scroll,
+  .table-footer,
+  .section-title,
+  .task-search
+) {
+  box-sizing: border-box;
+  padding-inline: clamp(14px, 1.5vw, 22px);
+}
+
+.resource-v7-filters {
+  align-items: end;
+  min-width: 0;
+  padding-block: 4px;
+}
+
+.resource-v7-filters > .task-search {
+  flex: 1 1 300px;
+  min-width: min(100%, 260px);
+}
+
+.resource-v7-filters > .resource-document-filter {
+  flex: 0 1 320px;
+  width: min(320px, 100%);
+  min-width: min(100%, 220px);
+  max-width: 320px;
+}
+
+.resource-v7-filters > .resource-self-filter {
+  flex: 0 1 200px;
+  width: min(200px, 100%);
+  min-width: min(100%, 170px);
+}
+
+.resource-v7-filters > .field select {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 680px) {
+  #app .main .surface > :is(
+    .toolbar,
+    .filters,
+    .controls-container,
+    .task-filters,
+    .resource-v7-filters,
+    .knowledge-filter-bar,
+    .kanban-tabs,
+    .table-scroll,
+    .table-footer,
+    .section-title,
+    .task-search
+  ) {
+    padding-inline: 12px;
+  }
+
+  .resource-v7-filters > .task-search,
+  .resource-v7-filters > .resource-document-filter,
+  .resource-v7-filters > .resource-self-filter {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+}
+
 /* Header search: half-height, centered controls within the floating header. */
 #app .header {
   align-items: center;

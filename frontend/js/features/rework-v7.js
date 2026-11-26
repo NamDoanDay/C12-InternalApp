@@ -13,6 +13,7 @@ if (typeof upgradeHeader !== 'undefined') upgradeHeader = function () { };
 let catalogTypeFilter = 'all', catalogSearchV7 = '', resourceSearchV7 = '', resourceDraftV7, resourceTimelineV7 = '';
 const catalogTypesV7 = V7.DOCUMENT_TYPES;
 const normV7 = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
+const resourceCellV7 = (value, label = '') => `<span class="resource-cell-value"${label ? ` title="${esc(label)}"` : ''}>${esc(value || '—')}</span>`;
 const resourceRowsV7 = record => record.hardwareRows?.length ? record.hardwareRows : [{ STT: '1' }];
 const resourceDisplayRowsV7 = (record, docIds) => {
   const sharedCount = Math.max(resourceRowsV7(record).length, record.sharedHardwareRowCount || 0, ...docIds.map(id => record.documentAppendices?.[id]?.rows?.length || 0), 1);
@@ -189,11 +190,11 @@ resourcesWorkspace = function () {
 
   return head('Quản lý tài nguyên', '', btn('Tạo tài nguyên', 'new-resource', 'plus', 'primary')) +
     `<section class="surface resource-v7-panel" id="resourcePanel">
-      <div class="toolbar"><strong>Dữ liệu tài nguyên tổng hợp</strong><span class="badge-count">${records.length} hệ thống</span><span class="grow"></span><button class="btn" id="exportResourceExcelV7" ${records.length ? '' : 'disabled'}>${icon('download')} Xuất Excel</button><button class="btn text" id="addProjectionColumn">${icon('plus')} Thêm cột</button>${ib('expand', 'fullscreen', 'Phóng to hoặc thu nhỏ bảng')}</div>
+      <div class="toolbar"><strong>Dữ liệu tài nguyên tổng hợp</strong><span class="badge-count">${records.length} hệ thống</span><span class="grow"></span><button class="btn" id="exportResourceExcelV7" ${records.length ? '' : 'disabled'}>${icon('download')} Xuất Excel</button>${ib('expand', 'fullscreen', 'Phóng to hoặc thu nhỏ bảng')}</div>
       <div class="resource-v7-filters">
         <label class="task-search">${icon('search')}<input id="resourceSearchV7" value="${esc(resourceSearchV7)}" placeholder="Tìm tên đơn vị, cơ quan quản lý, hệ thống..."></label>
-        <label class="field"><span>Công văn</span><select id="resourceDocumentFilterV7"><option value="">Tất cả</option>${docs.map(d => `<option value="${d.id}" ${resourceFilters.documents?.includes(d.id) ? 'selected' : ''}>Công văn ${esc(d.no || d.documentType)} · ${esc(d.summary || '')}</option>`).join('')}</select></label>
-        <label class="checkbox-field"><input id="resourceSelfV7" type="checkbox" ${resourceFilters.self ? 'checked' : ''}> Được giao cho tôi</label>
+        <label class="field resource-document-filter"><span>Công văn</span><select id="resourceDocumentFilterV7"><option value="">Tất cả</option>${docs.map(d => `<option value="${d.id}" ${resourceFilters.documents?.includes(d.id) ? 'selected' : ''}>Công văn ${esc(d.no || d.documentType)} · ${esc(d.summary || '')}</option>`).join('')}</select></label>
+        <label class="field resource-self-filter"><span>Phạm vi</span><select id="resourceSelfV7"><option value="all" ${resourceFilters.self ? '' : 'selected'}>Tất cả</option><option value="mine" ${resourceFilters.self ? 'selected' : ''}>Được giao cho tôi</option></select></label>
         ${resourceSearchV7 || resourceFilters.documents?.length || resourceFilters.self ? '<button class="btn text" id="clearResourceV7">Xóa bộ lọc</button>' : ''}
       </div>
       <div class="table-scroll"><table class="data-table resource-v7-table"><thead><tr><th rowspan="2" class="col-stt">STT</th><th rowspan="2" class="col-unit">Tên đơn vị</th><th rowspan="2" class="col-agency">Cơ quan quản lý</th><th rowspan="2" class="col-system">Hệ thống</th><th rowspan="2" class="col-docs">Công văn đăng ký</th>${show952 && cols952.length ? `<th colspan="${cols952.length}" class="th-doc-group th-doc-952">Công văn 952</th>` : ''}${show4651 && cols4651.length ? `<th colspan="${cols4651.length}" class="th-doc-group th-doc-4651">Công văn 4651</th>` : ''}<th rowspan="2" class="col-action">Thao tác</th></tr><tr>${show952 ? cols952.map(c => `<th class="th-sub th-sub-952" title="${esc(c)}">${esc(formatShortHeader(c))}</th>`).join('') : ''}${show4651 ? cols4651.map(c => `<th class="th-sub th-sub-4651" title="${esc(c)}">${esc(formatShortHeader(c))}</th>`).join('') : ''}</tr></thead><tbody>
@@ -210,13 +211,13 @@ resourcesWorkspace = function () {
       let rowHtml = `<tr data-resource-v7="${record.id}" tabindex="0">`;
       if (unitSpan > 0) {
         rowHtml += `<td class="col-stt" rowspan="${unitSpan}">${esc(stt || (ri + 1))}</td>`;
-        rowHtml += `<td class="col-unit" rowspan="${unitSpan}"><strong>${esc(unit)}</strong></td>`;
+        rowHtml += `<td class="col-unit" rowspan="${unitSpan}"><strong>${resourceCellV7(unit)}</strong></td>`;
       }
       if (agencySpan > 0) {
-        rowHtml += `<td class="col-agency" rowspan="${agencySpan}">${esc(agency)}</td>`;
+        rowHtml += `<td class="col-agency" rowspan="${agencySpan}">${resourceCellV7(agency)}</td>`;
       }
       if (systemSpan > 0) {
-        rowHtml += `<td class="col-system" rowspan="${systemSpan}"><strong>${esc(system)}</strong></td>`;
+        rowHtml += `<td class="col-system" rowspan="${systemSpan}"><strong>${resourceCellV7(system)}</strong></td>`;
         rowHtml += `<td class="col-docs" rowspan="${systemSpan}">${docsBadge}</td>`;
       }
       if (show952) {
@@ -224,7 +225,7 @@ resourcesWorkspace = function () {
         const vals952 = app952?.rows?.[i] || {};
         rowHtml += cols952.map(c => {
           const val = vals952[c] ?? '';
-          return `<td class="resource-edit-cell cell-952" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc952?.id || ''}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${esc(val || '—')}</td>`;
+          return `<td class="resource-edit-cell resource-doc-cell cell-952" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc952?.id || ''}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${resourceCellV7(val, c)}</td>`;
         }).join('');
       }
       if (show4651) {
@@ -232,7 +233,7 @@ resourcesWorkspace = function () {
         const vals4651 = app4651?.rows?.[i] || {};
         rowHtml += cols4651.map(c => {
           const val = vals4651[c] ?? '';
-          return `<td class="resource-edit-cell cell-4651" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc4651?.id || ''}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${esc(val || '—')}</td>`;
+          return `<td class="resource-edit-cell resource-doc-cell cell-4651" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc4651?.id || ''}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${resourceCellV7(val, c)}</td>`;
         }).join('');
       }
       if (systemSpan > 0) {
@@ -549,13 +550,12 @@ function bindV7() {
   $$('[data-catalog-v7-new]').forEach(btn => btn.onclick = () => catalogFormV7());
   $('#resourceSearchV7')?.addEventListener('input', e => { resourceSearchV7 = e.target.value; render() });
   $('#resourceDocumentFilterV7')?.addEventListener('change', e => { resourceFilters.documents = e.target.value ? [e.target.value] : []; render() });
-  $('#resourceSelfV7')?.addEventListener('change', e => { resourceFilters.self = e.target.checked; render() });
+  $('#resourceSelfV7')?.addEventListener('change', e => { resourceFilters.self = e.target.value === 'mine'; render() });
   $('#resourceAddCommonColV7')?.addEventListener('click', () => resourceTableActionV7('common-column'));
   $('#resourceAddPrivateColV7')?.addEventListener('click', () => resourceTableActionV7('private-column'));
   $('#resourceAddCommonRowV7')?.addEventListener('click', () => resourceTableActionV7('common-row'));
   $('#resourceAddPrivateRowV7')?.addEventListener('click', () => resourceTableActionV7('private-row'));
   const addCol = () => resourceTableActionV7('common-column');
-  $('#addProjectionColumn')?.addEventListener('click', addCol);
   $('#addProjectionColumnBottom')?.addEventListener('click', addCol);
   $('#exportResourceExcelV7')?.addEventListener('click', () => {
     const recs = state.resourceRecords.filter(record => {
