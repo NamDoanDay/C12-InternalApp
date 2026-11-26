@@ -1,43 +1,39 @@
 # PRD — C12 / P4 - T1 Internal App
 
-Bản thay đổi ngày 16/11/2026. Các quyết định phỏng vấn nằm trong CHANGE_REQUIREMENTS.md; chi tiết hành vi ở SPEC.md và quyền ở PERMISSIONS.md. Kết quả QA ngày 15/11 chỉ áp dụng prototype v4.
+Cập nhật 26/11/2026. PRD nêu mục tiêu sản phẩm; chi tiết nghiệp vụ chuẩn trong [SPEC.md](SPEC.md), quyền tại [PERMISSIONS.md](PERMISSIONS.md), kiến trúc hiện tại tại [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md).
 
-## Mục tiêu và phạm vi
-Xây dựng không gian làm việc theo phong cách Cloud Console để giao việc theo nhóm, quản lý công văn/văn bản và theo dõi tài nguyên có nguồn từ task. Người dùng xem việc cá nhân, việc được giao và việc trong nhóm theo quyền. Admin quản lý toàn bộ công việc, nhóm và cấu trúc tổ.
+## Mục tiêu
 
-Tiếp tục dùng HTML, Tailwind và JavaScript thuần cho prototype cục bộ. Giữ đăng nhập/đăng ký mô phỏng, duyệt tài khoản, hồ sơ nhân sự độc lập với tài khoản và Kiến thức tổ. Thay bộ chọn bốn phong cách bằng Cloud Console duy nhất cùng chủ đề màu/nền cá nhân. Backend và xác thực thật thuộc giai đoạn MVP.
+Một workspace nội bộ tiếng Việt để quản lý công việc, văn bản, tài nguyên, kiến thức chuyên môn và nhân sự của tổ. Giao diện cần hỗ trợ kiểm soát quyền theo role, nhóm và assignment; lịch sử thay đổi phải có thể truy vết. Thiết kế Floating Glassmorphism tối giản, dễ đọc ở LIGHT/DARK.
 
-## Tiêu chí nghiệm thu bản mới
-| Mã | Kết quả cần đạt |
-|---|---|
-| C01 | Chỉ có phong cách Cloud Console. Header có icon chọn bảng màu, gradient và ảnh nền; chế độ sáng/tối vẫn dễ đọc. |
-| C02 | Cả hai loại task yêu cầu tiêu đề, ngày bắt đầu và hạn hoàn thành có giờ/phút. Task theo công văn cần ít nhất một công văn đủ số, ngày phát hành và trích yếu; tệp không bắt buộc. |
-| C03 | Admin lọc người theo nhiều nhóm rồi chọn từng người nhận. Chọn nhóm không tự giao việc. User chỉ tự giao cho mình. |
-| C04 | Task có một trạng thái chung; mọi người được giao đều có thể cập nhật trạng thái đó. |
-| C05 | Task hoàn thành luôn vào thẻ Đã hoàn thành. Tại đúng hạn chưa chậm; quá hạn 1 phút tính 1 ngày, quá 24 giờ tính 2 ngày. Task có ngày bắt đầu trong tương lai vẫn vào thẻ Đang xử lý. |
-| C06 | Admin đổi hạn của mọi task; user chỉ đổi hạn task mình tạo. Thay đổi hạn có lịch sử cũ/mới và tính lại tổng hợp. |
-| C07 | User xem task nếu thuộc nhóm quản lý hoặc nhóm của một người nhận. Quyền chỉ xem nhóm không cấp quyền cập nhật task. |
-| C08 | Cây sơ đồ là graph có nhóm và thành viên theo thứ bậc; admin CRUD và kéo thả chuyển nhóm, có cách thao tác bằng bàn phím. Mỗi người chỉ thuộc một nhóm. |
-| C09 | Chuyển nhóm người nhận duy nhất của task theo công văn làm đổi nhóm quản lý và mã hiển thị, giữ ID nội bộ. Task nhiều người giữ mã, task thường giữ mã DAILY. Có lịch sử chuyển nhóm. |
-| C10 | Công văn và Văn bản là hai danh mục CRUD riêng. Lưu mục mới trong phiếu task bổ sung ngay vào danh mục, không chờ lưu task. |
-| C11 | Đơn vị và Cơ quan quản lý là thông tin chung của task; mỗi dòng phụ lục có Hệ thống riêng. Mỗi dòng tạo một dòng tài nguyên; trùng Đơn vị + Cơ quan + Hệ thống thì gộp qua các task, không cộng tổng. |
-| C12 | Lọc 952 giữ dòng đăng ký 952 và 4651 với cả hai nhóm, loại dòng chỉ có 4267. Bộ lọc cá nhân không làm tăng quyền xem hoặc sửa. |
-| C13 | Sửa ô tài nguyên cập nhật đúng dòng phụ lục của task nguồn và tạo revision. User chỉ sửa nguồn đang giao cho mình, admin sửa mọi nguồn. Giá trị hiện tại lấy lần lưu mới nhất. |
-| C14 | Sidebar gồm Hệ thống, Phân loại công văn, Lịch sử cập nhật task và Chi tiết. Phần công văn phía trên giữ nguyên khi chuyển task; phần bổ sung thay theo task/revision. Bản cũ chỉ đọc. |
-| C15 | Tạo task gửi thông báo cho admin, người được giao và người thao tác; loại trùng người nhận. Thêm người nhận gửi thông báo ngay cho người mới. Có Tất cả/Chưa đọc và mở task. |
-| C16 | Chỉ upload tài nguyên trong phiếu task; không có upload trực tiếp tại Quản lý tài nguyên. |
-| C17 | Phụ lục tài nguyên cho thêm dòng/cột/tệp; trường tùy chỉnh của task độc lập với cột tùy chỉnh trên bảng chính. |
-| C18 | Nâng phiên bản giữ dữ liệu và bản sao v4; không tự xóa localStorage hoặc bịa task/lịch sử cho dữ liệu cũ. |
-| C19 | Prototype thông báo giữa các tab cùng trình duyệt/origin, danh tính độc lập theo tab. Tài liệu nói rõ đây không phải realtime đa thiết bị. |
-| C20 | Trang task của user có Nhiệm vụ cá nhân và Được giao cho tôi; admin có bộ lọc, ba thẻ tổng hợp và thêm việc. Có lối truy cập các task nhóm được phép xem. |
-| C21 | CRUD danh mục, nhóm, nhân sự và task không làm đứt liên kết hoặc mất lịch sử; chính sách lưu trữ thay xóa vĩnh viễn được ghi là đề xuất. |
-| C22 | Giao diện có nhãn form, lỗi rõ ràng, focus bàn phím, đóng bằng Esc, responsive và tương phản đủ ở các theme. |
+## Phạm vi
 
-Các tiêu chí trên là mục tiêu nghiệm thu, chưa phải kết quả kiểm thử.
+- Trang chính: tổng quan tổ, quick access, văn bản gần đây và tình hình task.
+- Quản lý công việc: task xử lý văn bản / task thường, gán người, workflow, hạn, thông báo, filter, Kanban 3 cột/Table và donut thống kê theo phạm vi.
+- Danh mục văn bản: một kho, tabs theo 8 loại văn bản.
+- Quản lý tài nguyên: bản ghi độc lập, văn bản liên kết, hardware appendix, custom fields, bảng gộp và xuất XLSX.
+- Kiến thức tổ: nội dung/tệp và filter metadata.
+- Cây sơ đồ: graph nhóm, thành viên, kéo thả chuyển nhóm.
+- Quản lý nhân sự: hồ sơ Person, User account và duyệt đăng ký.
+- Thống kê: tổng hợp task theo quyền; cần phân biệt dữ liệu live và fixture.
 
-## Không tự mở rộng
-Không thêm tiến độ riêng từng người, không tự giao cho cả nhóm, không thêm role theo chức danh. Không tự OCR/AI mọi tài liệu hoặc cộng tổng phụ lục. Không tuyên bố đồng bộ đa thiết bị khi chỉ dùng kho trình duyệt.
+## Tiêu chí sản phẩm chuẩn
 
-## Quyết định còn mở
-OPEN_QUESTIONS.md ghi các đề xuất còn cần xác nhận, nhất là xử lý dữ liệu v4 chưa có task nguồn và chính sách vòng đời dữ liệu. Mapping mỗi dòng phụ lục thành hệ thống đã được chốt, không còn là câu hỏi mở.
+1. Task được gán cho người cụ thể; lọc nhóm không đồng nghĩa giao nhóm.
+2. Status tổng hợp duy nhất: hoàn thành ưu tiên; nếu chưa hoàn thành thì quá due time là chậm muộn; còn lại đang xử lý.
+3. Task task-list tabs và summary dùng cùng bộ lọc; Kanban giữ ba cột aggregate.
+4. Công văn là một loại trong Danh mục văn bản; loại + số dùng để liên kết/tạo mục khi lưu task.
+5. Quản lý tài nguyên độc lập với task và có table grouping theo đơn vị/cơ quan/hệ thống cùng nhóm cột văn bản.
+6. Phân quyền được kiểm tra ở mọi đường truy cập; prototype hiện chỉ client-side, production cần server-side enforcement.
+7. Theme, modal, table và surface tuân theo [FRONTEND_RULES.md](FRONTEND_RULES.md).
 
+## Khoảng cách triển khai đã biết
+
+- Resource “Được giao cho tôi” chưa dựa trên task assignment vì resource records không gắn task; code lọc creator/editor.
+- Quyền sửa resource hiện admin/creator/editor, chưa phải admin/assignee của task nguồn.
+- Xuất resource XLSX cần kiểm tra trường hợp phụ lục nhiều hàng; code có thể chỉ xuất hàng đầu, không khớp hoàn toàn màn hình.
+- Nhóm cột resource hiện tập trung schema 952/4651, chưa là schema động tổng quát cho mọi loại văn bản.
+- Trang thống kê có activity/calendar fixture tĩnh.
+- Prototype không có backend, bảo mật tài khoản hoặc đồng bộ nhiều thiết bị.
+
+Đây là ghi nhận code hiện tại, không phải thay đổi chuẩn nghiệp vụ. Xem đầy đủ trong SPEC.

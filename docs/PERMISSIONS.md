@@ -1,36 +1,32 @@
-# Ma trận quyền bản thay đổi
+# Ma trận quyền
 
-Chỉ có admin và user. Chức danh trên graph không tạo thêm role đăng nhập. Hồ sơ Person và tài khoản User vẫn tách biệt, có liên kết.
+Cập nhật 26/11/2026. Chuẩn nghiệp vụ tại [SPEC.md](SPEC.md). App có hai role: `admin` và `user`; chức danh Person không tạo thêm role. Bảng dưới là chuẩn đã chốt, không phải khẳng định backend đã enforce.
 
-| Hành động | Admin | User tạo task đó | User được giao, không phải người tạo | User chỉ cùng nhóm |
+| Hành động | Admin | User tạo task | User được giao (không tạo) | User chỉ xem qua nhóm |
 |---|---|---|---|---|
-| Xem task | Mọi task | Có | Có | Có nếu thuộc nhóm quản lý hoặc nhóm của người nhận |
-| Tạo task | Giao bất kỳ người nào | Chỉ tự giao cho mình | Chỉ tự giao task mới cho mình | Chỉ tự giao task mới cho mình |
-| Sửa title/description/start date/nhóm quản lý | Có | Có, không mở rộng người nhận | Không | Không |
-| Đổi due date | Có | Có | Không | Không |
-| Đổi assignee | Có | Chỉ chính mình | Không | Không |
-| Đổi trạng thái chung/bình luận | Có | Có | Có | Không |
-| Tài liệu, phụ lục tài nguyên, trường tùy chỉnh task | Có | Có | Có | Không |
-| Xóa task | Có | Có với task mình tạo | Không | Không |
-| Xem revision cũ | Có | Có | Có | Có theo phạm vi task; revision chỉ đọc |
-| Sửa ô bảng Dữ liệu tài nguyên | Mọi ô | Chỉ khi task nguồn đang giao cho mình | Chỉ khi task nguồn đang giao cho mình | Không |
+| Xem task | Tất cả | Có | Có | Có nếu thuộc nhóm quản lý hoặc nhóm của assignee |
+| Tạo task | Giao cho người phù hợp | Chỉ tự giao mình | Task mới chỉ tự giao mình | Task mới chỉ tự giao mình |
+| Chọn nhiều assignee/nhóm | Có; nhóm chỉ lọc người | Không | Không | Không |
+| Sửa title/mô tả/start/nhóm/assignee của task người khác | Có | Task tự tạo theo rule | Không | Không |
+| Sửa due date | Tất cả task | Task tự tạo | Không | Không |
+| Cập nhật workflow status/bình luận | Có | Có | Có | Không |
+| Sửa tài liệu/phụ lục/custom field trong task được phép | Có | Có | Có | Không |
+| Xóa task | Có | Task mình tạo | Không | Không |
+| Sửa Dữ liệu tài nguyên | Tất cả ô | Theo rule assignee task nguồn | Theo rule assignee task nguồn | Không |
+| Quản lý nhóm, nhân sự, tài khoản/duyệt | Có | Không | Không | Không |
+| Đọc/đánh dấu notification | Notification của chính mình | Notification của chính mình | Notification của chính mình | Notification của chính mình |
 
-Quyền người tạo không tự cho phép sửa ô nguồn của task không giao cho mình; quy tắc ô do người dùng chốt là admin hoặc assignee. User task tự tạo ban đầu phải tự giao nên hai điều kiện thường cùng đúng.
+Quyền xem task theo chuẩn: admin OR creator OR assignee OR user thuộc nhóm quản lý task OR user thuộc nhóm hiện tại của một assignee. Chỉ xem qua nhóm không cấp quyền sửa. Mọi search, count, export, notification và drawer phải áp dụng cùng phạm vi xem.
 
-## Phân hệ khác
+## Phân hệ danh mục và kiến thức
 
-- Admin duyệt/tạo/quản lý tài khoản; CRUD nhóm và nhân sự; sửa graph/kéo thả. User không có các hành động này.
-- Danh mục Công văn và Văn bản: cả admin/user CRUD theo quyền danh mục đã chốt ở bản cũ, tiếp tục áp dụng; hành động xóa liên kết được bảo vệ theo đề xuất ở SPEC.
-- Kiến thức tổ: cả admin/user CRUD bài và tệp như bản trước.
-- Mỗi tài khoản chỉ đọc/đánh dấu thông báo của chính mình; admin không mặc nhiên đánh dấu thông báo người khác.
-- Tùy chọn theme là cá nhân.
-- Header tìm kiếm, danh sách tài nguyên, mở trực tiếp task bằng ID, lịch sử và thông báo đều phải dùng cùng hàm kiểm tra quyền xem; không chỉ ẩn nút.
+Yêu cầu trước đây cho phép CRUD danh mục và kiến thức; trong code thao tác CRUD hiện không nhất thiết phân biệt admin/user. Nếu cần thay đổi quyền này, yêu cầu cần được chốt lại; không tự nâng quyền dựa vào chức vụ graph.
 
-## Phạm vi nhóm
+## Khoảng lệch hiện tại
 
-`canViewTask = admin OR creator OR assignee OR user.groupId in {managementGroupId, current groups of assignees}`. Không có auto-assignment chỉ vì chọn nhóm.
+- Prototype kiểm tra quyền bằng JavaScript phía client; không đủ làm ranh giới bảo mật production.
+- Resource records độc lập, chưa có liên kết task nguồn; UI hiện cấp sửa theo admin/creator/editor. Do đó chuẩn sửa theo assignee task chưa thể áp dụng đầy đủ.
+- Resource filter “Được giao cho tôi” hiện kiểm tra creator/editor, không assignment.
+- Cây graph và nhóm thay đổi client-side; không có kiểm tra API/server.
 
-Quyền nhóm cập nhật khi chuyển thành viên; lịch sử không bị ghi lại thành nhóm mới. Quyền xem revision cũ đi theo quyền xem task hiện tại là đề xuất triển khai, chưa phải yêu cầu riêng về bảo mật lịch sử.
-
-Prototype chỉ mô phỏng quyền ở frontend; MVP bắt buộc thực thi tương đương tại API và truy vấn dữ liệu.
-
+Khi triển khai backend, mọi rule trong bảng phải được enforce ở API/query, không dựa trên việc ẩn button.

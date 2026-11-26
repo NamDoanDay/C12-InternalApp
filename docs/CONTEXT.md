@@ -1,32 +1,36 @@
-# Bối cảnh và thuật ngữ — 16/11/2026
+# Bối cảnh dự án và thuật ngữ
 
-C12 / P4 - T1 Internal App tiếp tục dùng HTML/Tailwind/JavaScript, prototype trước MVP. Yêu cầu ngày 16/11 chuyển trọng tâm sang task là nguồn nghiệp vụ cho tài nguyên. Bản tài liệu v4 ngày15/11 được lưu trong archive/v4.
+Cập nhật 26/11/2026. Đây là prototype quản trị nội bộ C12/P4-T1, hiện chạy hoàn toàn phía trình duyệt. Mục tiêu là duyệt và hoàn thiện luồng công việc; chưa phải hệ thống production.
 
 ## Thuật ngữ
-- Admin/User: đúng hai role truy cập.
-- Person: hồ sơ nhân sự, có thể chưa có tài khoản User. Chức danh graph không phải role.
-- Group: nhóm công tác; mỗi thành viên chỉ một nhóm hiện tại.
-- Nhóm quản lý task: cấp mã task theo công văn, độc lập nhóm lọc người nhận.
-- Assignment: giao cho từng người, không tự giao cho cả nhóm.
-- Task: theo công văn hoặc thường; ID nội bộ bất biến, mã hiển thị có thể đổi.
-- Workflow status: Đang xử lý, Đang lấy số, Đang trình ký, Đã hoàn thành.
-- Aggregate status: Đã hoàn thành, Đang xử lý, Chậm muộn; suy ra từ workflow và hạn.
-- Công văn/Văn bản: hai danh mục riêng.
-- Attachment: tệp vật lý, không đồng nghĩa mục danh mục.
-- Resource item: một dòng phụ lục với Hệ thống riêng; Đơn vị/Cơ quan chung task.
-- Resource row: dòng tổng hợp theo Đơn vị + Cơ quan + Hệ thống, có nguồn từng ô.
-- Task revision: bản chụp lịch sử chỉ đọc, không phải task mới.
 
-## Nguồn tham chiếu
-Ảnh graph mô tả cấu trúc node/edge, không sao chép tên người mẫu. Ảnh theme mô tả bảng màu, gradient và ảnh nền. Ảnh phiếu task mô tả nội dung trái và metadata/custom fields phải. Ảnh hai bảng task dùng cho cá nhân/được giao; hai danh mục cũng tách riêng theo yêu cầu.
+| Thuật ngữ | Nghĩa trong dự án |
+|---|---|
+| User / Person | Tài khoản đăng nhập / hồ sơ nhân sự; có thể liên kết nhưng là hai thực thể |
+| Group | Nhóm chuyên môn, ví dụ HT, HTM, DN, MC, HPCAI, QLVB |
+| Nhóm quản lý task | Nhóm phân loại/quản lý task và mã; tách khỏi nhóm dùng để lọc assignee |
+| Assignee | Thành viên được giao task cụ thể; nhóm không nhận task tự động |
+| Workflow status | Giá trị trạng thái do người dùng chọn/cập nhật |
+| Aggregate status | Đang xử lý/Đã hoàn thành/Chậm muộn, tính theo workflow + due time |
+| Văn bản | Danh mục đơn nhất có loại; Công văn là một loại văn bản |
+| Resource | Bản ghi tài nguyên độc lập trong phân hệ Quản lý tài nguyên hiện tại |
+| Surface | Khối UI gom nhóm thành phần cùng chức năng |
+| Revision | Bản chụp thay đổi/lịch sử của bản ghi theo mô hình tương ứng |
 
-reference/test.xlsx vẫn là nguồn cấu trúc nhóm952/4651 nhiều tầng. Metadata pháp lý trong ví dụ chưa được xác minh. Dòng iCaMau đăng ký4267 nhưng số liệu nằm trong vùng4651 là bất nhất nguồn; giữ raw/cảnh báo, không tự suy thành nhu cầu4267.
+## Quy tắc đọc mâu thuẫn
 
-## Nguồn quyết định
-CHANGE_REQUIREMENTS là ledger phỏng vấn mới. SPEC mô tả luồng; PERMISSIONS mô tả quyền. Đề xuất kỹ thuật không thay câu trả lời người dùng. Những câu hỏi đã được chốt không tiếp tục để pending.
+`SPEC.md` là chuẩn nghiệp vụ đã xác nhận; code là bằng chứng hiện trạng. Khi lệch nhau, tài liệu nêu cả yêu cầu lẫn trạng thái thực tế. Tài liệu đề xuất không tự trở thành quyết định. Các quyết định cũ bị thay thế được ghi chú ở SPEC, không dùng làm yêu cầu hiện hành.
 
-Upload chỉ trong task. Quyền sửa ô user theo assignment của task nguồn. Bốn style và gallery là lịch sử, không là hướng đang triển khai.
+Các quyết định quan trọng nhất: task xử lý văn bản và task thường; danh mục văn bản thống nhất; Quản lý tài nguyên độc lập với task; graph có nhánh nhóm; phân quyền admin/user; Floating Glassmorphism tối giản. Chi tiết ở [SPEC.md](SPEC.md).
 
 ## Giới hạn prototype
-Kho trình duyệt không phải cơ sở dữ liệu đa người dùng; cập nhật giữa các tab cùng origin không phải realtime đa thiết bị. Danh tính mỗi tab độc lập và không lưu mật khẩu thật. Không deploy trong giai đoạn preview. QA15/11 không phải nghiệm thu bản thay đổi.
 
+- State chính lưu localStorage, identity demo theo tab lưu sessionStorage.
+- BroadcastChannel và `storage` events chỉ chia sẻ thay đổi giữa các tab cùng browser/origin.
+- Không có API/backend, đăng nhập bảo mật, authorization phía server, multi-device sync hay lịch sử phía server.
+- Các dữ liệu seed/demo và fixture phải được phân biệt với dữ liệu live.
+- Không giả định các thư viện CDN luôn sẵn có; luồng phụ thuộc thư viện cần báo lỗi có thể xử lý được.
+
+## Tham chiếu
+
+Ảnh/mockup dùng để định hướng bố cục, không là nguồn dữ liệu nghiệp vụ. Workbook trong `reference/` dùng cho cấu trúc cột tài nguyên; nếu dữ liệu mẫu bất nhất, không suy đoán dữ liệu thật.

@@ -1,34 +1,28 @@
 # C12 / P4 - T1 Internal App
 
-Prototype nội bộ bằng **HTML + Tailwind + JavaScript thuần**, không React. Bản thay đổi ngày 16/11/2026 dùng một phong cách Cloud Console, quản lý task theo nhóm và liên kết task với dữ liệu tài nguyên. Backend, xác thực thật và đồng bộ đa thiết bị thuộc giai đoạn MVP sau.
+Prototype workspace nội bộ chạy bằng HTML, Tailwind CSS v4 và JavaScript thuần.
 
-## Preview cục bộ
+## Điểm bắt đầu
 
-Tại thư mục dự án, chạy:
+- [Hướng dẫn cho AI/IDE](AGENTS.md)
+- [Index tài liệu](docs/INDEX.md)
+- [Đặc tả nghiệp vụ chuẩn](docs/SPEC.md)
+- [Quy tắc Front-end](docs/FRONTEND_RULES.md)
+
+## Chạy local
+
+Ở root repo:
 
 ```powershell
 python -m http.server 8002 --bind 127.0.0.1
 ```
 
-Nếu cổng 8002 đang phục vụ thì mở trực tiếp, không chạy thêm máy chủ.
+Mở [http://127.0.0.1:8002/frontend/](http://127.0.0.1:8002/frontend/) để dùng ứng dụng, hoặc [http://127.0.0.1:8002/docs/preview.html](http://127.0.0.1:8002/docs/preview.html) để xem index tài liệu. Cổng 8002 cần đang trống; dừng server bằng Ctrl+C.
 
-- [Ứng dụng](http://127.0.0.1:8002/frontend/)
-- [Tài liệu trong trình duyệt](http://127.0.0.1:8002/docs/preview.html)
-- [Yêu cầu thay đổi](docs/CHANGE_REQUIREMENTS.md)
-- [Đặc tả](docs/SPEC.md)
-- [Ma trận quyền](docs/PERMISSIONS.md)
-- [Root kiểm tra đặc tả](docs/ROOT_REVIEW.md)
-- [Workbook tham chiếu](reference/test.xlsx)
+Tailwind CLI đã nằm trong dependency cục bộ. Sau khi sửa CSS source, có thể chạy `npm run build:css`; `npm run watch:css` dùng trong lúc phát triển. Build CSS không cần cho việc chỉ sửa nội dung HTML/JS. Fonts, XLSX/Mammoth CDN cần kết nối mạng.
 
-Dừng máy chủ tự chạy bằng Ctrl+C. Không cần npm build cho cấu trúc HTML tĩnh. Thư viện/fonts qua CDN cần Internet.
+## Phạm vi và giới hạn
 
-## Trạng thái và giới hạn
+Đây là prototype: state lưu trong trình duyệt, danh tính demo theo tab, thông báo/storage sync chỉ giữa tab cùng browser và origin. Chưa có backend, xác thực an toàn, server-side authorization hay realtime đa thiết bị. Không dùng thông tin nhạy cảm thật.
 
-Tài liệu bản mới đã được đối chiếu trước khi triển khai frontend. Các tiêu chí trong PRD là mục tiêu nghiệm thu, chưa phải tuyên bố mọi chức năng đã đạt. Xem ghi chú bàn giao và kết quả kiểm thử mới của root.
-
-Auth và quyền trong prototype chỉ mô phỏng để duyệt luồng; không dùng mật khẩu sản xuất. Danh tính từng tab dùng sessionStorage, dữ liệu chung dùng kho trình duyệt. Thông báo giữa các tab cùng origin khác với realtime giữa nhiều máy.
-
-Dữ liệu v4 cần được giữ nguyên và sao lưu khi nâng phiên bản. Nguồn cũ chưa có task chỉ được chuyển thành task khi admin bổ sung các trường bắt buộc; không bịa lịch sử hoặc tự reset dữ liệu.
-
-Parser chỉ được công bố theo phần đã kiểm chứng; không mặc định đọc mọi DOCX/XLSX hoặc có AI/OCR. [QA15/11](docs/QA.md) là lịch sử v4, không phải nghiệm thu bản thay đổi. Bộ bốn phong cách cũ đã bị thay bằng Cloud Console; tài liệu cũ ở [archive/v4](docs/archive/v4/README.md).
-
+Tài liệu phân biệt nghiệp vụ đã xác nhận với hành vi code hiện tại. Khi code chưa đáp ứng chuẩn, khoảng lệch được ghi rõ trong SPEC/PRD; không coi yêu cầu là tính năng đã hoàn thành. Xem [docs/INDEX.md](docs/INDEX.md) để tìm tài liệu.
