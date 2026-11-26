@@ -12,7 +12,7 @@ Cập nhật 26/11/2026. Chuẩn nghiệp vụ tại [SPEC.md](SPEC.md). App có
 | Cập nhật workflow status/bình luận | Có | Có | Có | Không |
 | Sửa tài liệu/phụ lục/custom field trong task được phép | Có | Có | Có | Không |
 | Xóa task | Có | Task mình tạo | Không | Không |
-| Sửa Dữ liệu tài nguyên | Tất cả ô | Theo rule assignee task nguồn | Theo rule assignee task nguồn | Không |
+| Sửa Resource | Toàn bộ | Nếu là người tạo Resource, hoặc người tạo/assignee của ít nhất một task liên kết | Nếu là người tạo Resource, hoặc người tạo/assignee của ít nhất một task liên kết | Không chỉ từ quyền xem task theo nhóm |
 | Quản lý nhóm, nhân sự, tài khoản/duyệt | Có | Không | Không | Không |
 | Đọc/đánh dấu notification | Notification của chính mình | Notification của chính mình | Notification của chính mình | Notification của chính mình |
 
@@ -25,8 +25,8 @@ Yêu cầu trước đây cho phép CRUD danh mục và kiến thức; trong cod
 ## Khoảng lệch hiện tại
 
 - Prototype kiểm tra quyền bằng JavaScript phía client; không đủ làm ranh giới bảo mật production.
-- Resource records độc lập, chưa có liên kết task nguồn; UI hiện cấp sửa theo admin/creator/editor. Do đó chuẩn sửa theo assignee task chưa thể áp dụng đầy đủ.
-- Resource filter “Được giao cho tôi” hiện kiểm tra creator/editor, không assignment.
+- Resource là collection riêng nhưng có `taskIds` và task có `resourceId`; UI cấp sửa cho admin, người tạo resource, hoặc người tạo/assignee của ít nhất một task liên kết. Quyền chỉ xem task qua nhóm không cấp quyền sửa resource.
+- Resource filter “Được giao cho tôi” lọc resource có ít nhất một task liên kết đang giao cho user hiện tại.
 - Cây graph và nhóm thay đổi client-side; không có kiểm tra API/server.
 
 Khi triển khai backend, mọi rule trong bảng phải được enforce ở API/query, không dựa trên việc ẩn button.

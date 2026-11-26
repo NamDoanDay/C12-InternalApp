@@ -1,39 +1,33 @@
 # PRD — C12 / P4 - T1 Internal App
 
-Cập nhật 26/11/2026. PRD nêu mục tiêu sản phẩm; chi tiết nghiệp vụ chuẩn trong [SPEC.md](SPEC.md), quyền tại [PERMISSIONS.md](PERMISSIONS.md), kiến trúc hiện tại tại [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md).
+Cập nhật 26/11/2026. Đây là tóm tắt mục tiêu sản phẩm. Nghiệp vụ chi tiết tại [SPEC.md](SPEC.md), quyền tại [PERMISSIONS.md](PERMISSIONS.md), kiến trúc đang chạy tại [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md), quy tắc UI tại [FRONTEND_RULES.md](FRONTEND_RULES.md).
 
 ## Mục tiêu
 
-Một workspace nội bộ tiếng Việt để quản lý công việc, văn bản, tài nguyên, kiến thức chuyên môn và nhân sự của tổ. Giao diện cần hỗ trợ kiểm soát quyền theo role, nhóm và assignment; lịch sử thay đổi phải có thể truy vết. Thiết kế Floating Glassmorphism tối giản, dễ đọc ở LIGHT/DARK.
+Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục văn bản, dữ liệu tài nguyên, kiến thức chuyên môn và nhân sự tổ. Đây là prototype chạy phía trình duyệt, không phải hệ thống production.
 
-## Phạm vi
+## Phân hệ
 
-- Trang chính: tổng quan tổ, quick access, văn bản gần đây và tình hình task.
-- Quản lý công việc: task xử lý văn bản / task thường, gán người, workflow, hạn, thông báo, filter, Kanban 3 cột/Table và donut thống kê theo phạm vi.
-- Danh mục văn bản: một kho, tabs theo 8 loại văn bản.
-- Quản lý tài nguyên: bản ghi độc lập, văn bản liên kết, hardware appendix, custom fields, bảng gộp và xuất XLSX.
-- Kiến thức tổ: nội dung/tệp và filter metadata.
-- Cây sơ đồ: graph nhóm, thành viên, kéo thả chuyển nhóm.
-- Quản lý nhân sự: hồ sơ Person, User account và duyệt đăng ký.
-- Thống kê: tổng hợp task theo quyền; cần phân biệt dữ liệu live và fixture.
+- **Trang chính:** thông tin nội bộ tổ, quân số/nhóm, quick access, văn bản gần đây và công việc cần theo dõi.
+- **Quản lý công việc:** task Xử lý văn bản, Quản lý tài nguyên và Task thường; workflow, phân công, lịch, tìm kiếm/lọc; bốn tab aggregate; Kanban ba cột hoặc Table; donut theo phạm vi lọc.
+- **Quản lý tài nguyên:** Resource độc lập, có thể liên kết nhiều task; task Quản lý tài nguyên gắn đúng một resource. Form resource hỗ trợ tạo task kèm trong cùng lần lưu. Resource và task dùng chung attachments/custom fields; bảng tổng hợp nhóm theo đơn vị/cơ quan/hệ thống và nhóm appendix theo Công văn đăng ký.
+- **Danh mục văn bản:** một catalog duy nhất gồm Công văn, Thông tư, Nghị định, Quyết định, Luật, Nghị quyết, Báo cáo, Văn bản cấp tài nguyên, Các loại văn bản khác. Task xử lý văn bản liên kết văn bản chính bằng ID; Resource liên kết riêng Công văn đăng ký và Văn bản cấp tài nguyên bằng ID.
+- **Kiến thức tổ:** bài viết/tài liệu có metadata cấp ban hành, cơ quan, loại văn bản và bộ lọc.
+- **Cây sơ đồ tổ:** graph theo nhánh nhóm; kéo thả thành viên cập nhật nhóm hiện tại.
+- **Quản lý nhân sự:** Person, liên kết User, tài khoản và duyệt đăng ký.
+- **Thống kê:** tổng hợp task theo phạm vi người dùng; một số widget hoạt động/lịch là fixture, không phải dữ liệu trực tiếp.
 
-## Tiêu chí sản phẩm chuẩn
+## Nguyên tắc sản phẩm
 
-1. Task được gán cho người cụ thể; lọc nhóm không đồng nghĩa giao nhóm.
-2. Status tổng hợp duy nhất: hoàn thành ưu tiên; nếu chưa hoàn thành thì quá due time là chậm muộn; còn lại đang xử lý.
-3. Task task-list tabs và summary dùng cùng bộ lọc; Kanban giữ ba cột aggregate.
-4. Công văn là một loại trong Danh mục văn bản; loại + số dùng để liên kết/tạo mục khi lưu task.
-5. Quản lý tài nguyên độc lập với task và có table grouping theo đơn vị/cơ quan/hệ thống cùng nhóm cột văn bản.
-6. Phân quyền được kiểm tra ở mọi đường truy cập; prototype hiện chỉ client-side, production cần server-side enforcement.
-7. Theme, modal, table và surface tuân theo [FRONTEND_RULES.md](FRONTEND_RULES.md).
+1. Quyền truy cập task áp dụng trước tìm kiếm, bộ đếm, biểu đồ, bảng và drawer.
+2. Aggregate status: Đã hoàn thành ưu tiên; task chưa hoàn thành quá due time là Chậm muộn; còn lại là Đang xử lý.
+3. Tab trạng thái và summary card dùng chung bộ lọc; Kanban luôn giữ ba cột aggregate.
+4. Công văn là một loại văn bản trong catalog chung. Loại + số dùng để liên kết bản ghi sẵn hoặc tạo văn bản mới theo luồng đã chốt.
+5. Resource và Task được liên kết rõ bằng ID; không suy luận dữ liệu resource như bản chiếu từ task.
+6. Một Công văn mới trong catalog tạo nhóm cột appendix mặc định trong bảng tài nguyên ở lần render tiếp theo, nhưng không tự tạo resource hay gán Công văn vào resource. “Văn bản cấp tài nguyên” không tạo nhóm appendix Công văn.
+7. Floating Glassmorphism tối giản phải cân bằng độ trong, độ tương phản và phân tầng surface trên LIGHT/DARK.
+8. Không mô tả yêu cầu chuẩn như tính năng đã triển khai nếu code chưa thể hiện; liệt kê khoảng lệch tại [SPEC.md](SPEC.md).
 
-## Khoảng cách triển khai đã biết
+## Giới hạn hiện tại
 
-- Resource “Được giao cho tôi” chưa dựa trên task assignment vì resource records không gắn task; code lọc creator/editor.
-- Quyền sửa resource hiện admin/creator/editor, chưa phải admin/assignee của task nguồn.
-- Xuất resource XLSX cần kiểm tra trường hợp phụ lục nhiều hàng; code có thể chỉ xuất hàng đầu, không khớp hoàn toàn màn hình.
-- Nhóm cột resource hiện tập trung schema 952/4651, chưa là schema động tổng quát cho mọi loại văn bản.
-- Trang thống kê có activity/calendar fixture tĩnh.
-- Prototype không có backend, bảo mật tài khoản hoặc đồng bộ nhiều thiết bị.
-
-Đây là ghi nhận code hiện tại, không phải thay đổi chuẩn nghiệp vụ. Xem đầy đủ trong SPEC.
+State lưu localStorage và session identity trong sessionStorage; chỉ đồng bộ tab cùng origin. Không có backend, API, xác thực an toàn, phân quyền server, hoặc đồng bộ nhiều thiết bị. Tệp và thư viện CDN phụ thuộc môi trường tải. Export tài nguyên cần được rà soát với workbook nếu yêu cầu tương đương hoàn toàn về merge cells/appendix nhiều dòng.

@@ -13,6 +13,7 @@ Cập nhật 26/11/2026. Đây là prototype quản trị nội bộ C12/P4-T1, 
 | Workflow status | Giá trị trạng thái do người dùng chọn/cập nhật |
 | Aggregate status | Đang xử lý/Đã hoàn thành/Chậm muộn, tính theo workflow + due time |
 | Văn bản | Danh mục đơn nhất có loại; Công văn là một loại văn bản |
+| Công văn đăng ký / Văn bản cấp tài nguyên | Hai liên kết Resource riêng: Công văn có phụ lục nhóm cột; Văn bản cấp tài nguyên là loại catalog riêng, không tạo nhóm appendix |
 | Resource | Bản ghi tài nguyên độc lập trong phân hệ Quản lý tài nguyên hiện tại |
 | Surface | Khối UI gom nhóm thành phần cùng chức năng |
 | Revision | Bản chụp thay đổi/lịch sử của bản ghi theo mô hình tương ứng |
@@ -21,7 +22,7 @@ Cập nhật 26/11/2026. Đây là prototype quản trị nội bộ C12/P4-T1, 
 
 `SPEC.md` là chuẩn nghiệp vụ đã xác nhận; code là bằng chứng hiện trạng. Khi lệch nhau, tài liệu nêu cả yêu cầu lẫn trạng thái thực tế. Tài liệu đề xuất không tự trở thành quyết định. Các quyết định cũ bị thay thế được ghi chú ở SPEC, không dùng làm yêu cầu hiện hành.
 
-Các quyết định quan trọng nhất: task xử lý văn bản và task thường; danh mục văn bản thống nhất; Quản lý tài nguyên độc lập với task; graph có nhánh nhóm; phân quyền admin/user; Floating Glassmorphism tối giản. Chi tiết ở [SPEC.md](SPEC.md).
+Các quyết định quan trọng nhất: ba loại task (xử lý văn bản, quản lý tài nguyên, task thường); danh mục văn bản thống nhất; Resource có collection riêng nhưng có thể liên kết với task; graph có nhánh nhóm; phân quyền admin/user; Floating Glassmorphism tối giản. Chi tiết ở [SPEC.md](SPEC.md).
 
 ## Giới hạn prototype
 

@@ -3,7 +3,7 @@
 Ngày rà soát: 26/11/2026. Đây là điểm vào duy nhất cho AI/IDE. Đọc theo thứ tự:
 
 1. [AGENTS.md](../AGENTS.md) — quy tắc nhanh cho agent và thứ tự nguồn chuẩn.
-2. [SPEC.md](SPEC.md) — nghiệp vụ đã chốt, hiện trạng code và khoảng lệch.
+2. [SPEC.md](SPEC.md) — nghiệp vụ đã chốt, hiện trạng code và khoảng lệch; bao gồm luồng liên kết Task–Resource–Văn bản và sinh nhóm cột Công văn.
 3. [PERMISSIONS.md](PERMISSIONS.md) — ma trận quyền theo role/quan hệ task.
 4. [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) — cấu trúc, nạp script, state, storage, migration.
 5. [FRONTEND_RULES.md](FRONTEND_RULES.md) — thiết kế, CSS/theme, layout và tương tác.

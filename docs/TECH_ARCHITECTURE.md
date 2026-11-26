@@ -56,9 +56,12 @@ Rà soát 26/11/2026. Đây là mô tả code hiện có, không phải kiến t
 ## Runtime data paths cần nhớ
 
 - Tasks, catalog documents, groups, people, account, comments/revisions và notifications nằm trong state prototype.
-- V7 resource records là collection độc lập với task. Một số API/renderer cũ liên quan task-resource vẫn được tải; V7 override là luồng resource hiện hành.
-- Schema cột phụ lục theo công văn được lưu trong `state.resourceAppendixSchemas`; schema 952/4651 tiếp tục dùng bộ cột đặc thù, còn công văn khác nhận bộ 6 cột mặc định. Bảng V7 dựng header/data/export từ schema này; thay đổi schema là client-side state.
-- Catalog dùng `state.documents`; alias cũ `officials`/`docs` phục vụ migration/tương thích.
+- V7 resource records là collection độc lập nhưng liên kết nhiều-nhiều ở phía resource (`taskIds`) với task resource có một `resourceId`; resource task chỉ giữ đúng một resource. `resourceData`, attachments và custom fields được đồng bộ snapshot trong các bản ghi liên kết. Khi tạo resource kèm task, V7 dùng snapshot state để rollback nếu lưu lỗi; không có transaction backend.
+- Resource được tìm/gộp theo khóa đã chuẩn hóa Tên đơn vị + Cơ quan quản lý + Hệ thống khi lưu; task resource mới liên kết resource theo `resourceId` hiện tại hoặc cùng khóa nghiệp vụ, nếu không có thì tạo resource.
+- Schema cột appendix theo Công văn: `resourcesWorkspace()` lấy mọi `state.documents` active có type `Công văn` để dựng header. `resourceDocColumnsV7()` chọn schema tùy chỉnh ở `state.resourceAppendixSchemas`, schema đặc thù 952/4651, hoặc sáu cột mặc định; cột appendix đã lưu theo resource cũng được hợp nhất. Do đó Công văn mới tạo header nhóm ở lần render workspace tài nguyên, nhưng không tự tạo resource hay liên kết vào resource. Schema/cột được sửa là client-side state.
+- Resource lưu liên kết Công văn ở `registeredDocumentIds`, Văn bản cấp tài nguyên ở `assetDocumentIds` (alias cũ `exchangeDocumentIds`), phụ lục theo `documentAppendices[documentId]`; cột Task trong bảng lấy mã từ quan hệ task. Task Xử lý văn bản lưu `documentId` đến catalog item chính. Các liên kết này không tự suy ra lẫn nhau.
+- Catalog dùng `state.documents`; alias cũ `officials`/`docs` phục vụ migration/tương thích. Loại danh mục khai báo ở `DOCUMENT_TYPES` trong `frontend/js/core/model.js`, gồm cả “Văn bản cấp tài nguyên”.
+- Văn bản được archive nếu đang được task/resource tham chiếu; hard-delete chỉ áp dụng văn bản chưa liên kết. Renderer tài nguyên chỉ dựng appendix groups cho văn bản active, vì vậy archived doc có thể còn link/data nhưng không còn xuất hiện thành nhóm cột trên bảng/export.
 - Stats page có một số fixture; không coi mọi widget là live data.
 
 ## Giới hạn và an toàn thay đổi
