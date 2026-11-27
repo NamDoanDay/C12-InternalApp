@@ -6,9 +6,17 @@
 
 ## 1. Sản phẩm và phân hệ
 
-C12 / P4 - T1 Internal App là workspace nội bộ quản lý công việc, văn bản, tài nguyên, kiến thức và nhân sự. Giao diện dùng tiếng Việt, HTML, Tailwind CSS và JavaScript thuần; runtime gồm Node.js/Express, Socket.IO, MySQL và Nginx. Mô hình lưu state hiện tương thích bằng workspace JSON snapshot cùng các bảng domain mirror; không coi đây là mô hình quan hệ đã chuẩn hóa hoàn toàn.
+C12 / P4 - T1 Internal App là workspace nội bộ quản lý công việc, văn bản, tài nguyên, kiến thức và nhân sự. Giao diện dùng tiếng Việt, HTML, Tailwind CSS và JavaScript thuần. **Hiện trạng triển khai:** SPA chạy trên trình duyệt, state workspace lưu trong localStorage; không có backend, API, realtime hoặc database. Đây là chế độ demo cục bộ, không phải triển khai nhiều người dùng.
 
 Các view: Trang chính; For you (Công việc) gồm Quản lý công việc, Thống kê, Quản lý tài nguyên, Danh mục văn bản; Chuyên môn tổ gồm Kiến thức tổ và Cây sơ đồ tổ; Quản lý nhân sự dành cho admin. Header có tìm kiếm, chuyển LIGHT/DARK, chủ đề cá nhân, thông báo và tài khoản.
+
+### 1.1 Đăng nhập demo, phiên và thiết lập người dùng
+
+- Lần chạy đầu, nếu chưa có `c12-local-session`, code chọn User demo `demo-u-g-HT` (hoặc user đầu tiên) và ghi ID đó vào localStorage; vì vậy lần đầu thường vào thẳng Trang chính dưới vai trò User mà không hiện form đăng nhập.
+- Form đăng nhập cục bộ tìm theo email hoặc tên hiển thị của User đã được duyệt. Dù có ô mật khẩu, hiện tại code không xác minh mật khẩu và không lưu mật khẩu. Checkbox “Ghi nhớ đăng nhập” chưa điều khiển hành vi phiên.
+- Form đăng ký yêu cầu tên/email/mật khẩu trên giao diện, nhưng handler chỉ lưu tên/email với trạng thái `pending`; mật khẩu bị bỏ qua. Admin có thể duyệt hoặc từ chối yêu cầu; khi duyệt có thể liên kết Person có sẵn hoặc tạo hồ sơ Person mới. User pending/rejected không đăng nhập được.
+- Admin có thể tạo tài khoản demo đã duyệt, chọn role và liên kết Person; không có mật khẩu đăng nhập. Menu tài khoản cho đổi tên hiển thị, chuyển vai trò demo, đăng xuất; admin có thể khôi phục seed, việc này thay thế workspace hiện lưu trong trình duyệt sau khi xác nhận.
+- Đây là luồng mô phỏng phục vụ demo. Không coi là xác thực, quản lý mật khẩu, ghi nhớ phiên bảo mật hoặc quy trình phê duyệt production.
 
 Chuẩn thiết kế là **Floating Glassmorphism tối giản**: nền kính vừa phải, blur có kiểm soát, viền sáng mảnh, shadow mềm, chữ tương phản cao, surfaces gom nhóm theo chức năng, khoảng đệm ngang thoáng, responsive và scrollbar gọn. Chi tiết ở `FRONTEND_RULES.md`.
 
@@ -56,7 +64,7 @@ Workflow status hiện dùng: Khởi tạo, Đang xử lý, Đang lấy số, Đ
 2. Nếu chưa hoàn thành và hiện tại đã quá due date thì **Chậm muộn**.
 3. Còn lại là **Đang xử lý**. Task chưa tới start date vẫn thuộc nhóm này.
 
-Quá hạn được tính theo thời điểm ngày + giờ/phút. Tại đúng due time chưa trễ; trễ một phần ngày tính 1 ngày, sau 24 giờ tính 2 ngày (ceiling theo khoảng thời gian quá hạn). Form tạo/sửa dùng thời gian local của trình duyệt; API so sánh timestamp ISO theo epoch UTC. Chưa có cấu hình timezone nghiệp vụ riêng cho ngày hạn.
+Quá hạn được tính theo thời điểm ngày + giờ/phút. Tại đúng due time chưa trễ; trễ một phần ngày tính 1 ngày, sau 24 giờ tính 2 ngày (ceiling theo khoảng thời gian quá hạn). Form tạo/sửa dùng thời gian local của trình duyệt; model client so sánh timestamp ISO theo epoch UTC. Chưa có cấu hình timezone nghiệp vụ riêng cho ngày hạn.
 
 ### 3.3 Danh sách, bộ lọc, biểu đồ
 
@@ -64,7 +72,17 @@ Bốn tab tiếng Việt tương ứng Tổng công việc, Đang xử lý, Đã
 
 Bộ lọc phụ gồm tìm title/mã/ngày, Nhóm quản lý, Văn bản và loại task (Xử lý văn bản, Quản lý tài nguyên, Task thường). Chỉ tính task mà user được phép xem. Donut hiển thị ba aggregate status của phạm vi filter hiện hành; tổng ở tâm là số task trong phạm vi. Số lượng task nhiều assignee vẫn đếm một lần.
 
-### 3.4 Mã task và chuyển nhóm
+Các bộ lọc đa chọn dùng OR giữa nhiều lựa chọn trong cùng một nhóm filter, và AND giữa các nhóm filter khác nhau. Chọn/bỏ/chọn tất cả cập nhật đồng thời tab, donut, Kanban và Table; tab chỉ lọc theo aggregate status. Tìm kiếm task so khớp title, mã, ngày bắt đầu và ngày kết thúc. Bản Table của admin dùng một danh sách; User thấy các nhóm “Nhiệm vụ cá nhân”, “Được giao cho tôi” và “Công việc cùng nhóm” trong phạm vi được phép xem.
+
+### 3.4 Chi tiết, bình luận, nhật ký và nhập phụ lục
+
+- Task mở drawer chi tiết với thông tin loại, workflow status, nhóm quản lý, assignee, lịch, người tạo; task resource có thêm thông tin hệ thống, Công văn đăng ký, Văn bản cấp tài nguyên và phụ lục; task xử lý văn bản hiển thị loại/số/trích yếu. Custom table, file và custom fields hiện có được hiển thị.
+- Drawer có danh sách revision, bản hiện tại và bản lịch sử chỉ đọc. Nhật ký ghi actor, thời gian, hành động và các trường cũ/mới theo thao tác đã được model ghi revision; đây không phải audit log máy chủ và không bảo đảm mọi thay đổi có revision.
+- Người có quyền sửa task có thể thêm bình luận; bình luận được lưu cùng task và tạo revision. Admin hoặc creator có thể lưu trữ task; lịch sử được giữ. Đóng modal/drawer bằng X, backdrop hoặc Esc không lưu form đang sửa.
+- Task editor cho phép thêm/xóa cột, hàng trong custom table và quản lý tệp. Luồng “Nhập phụ lục tài nguyên” trong task yêu cầu nhập đơn vị/cơ quan và chọn Công văn trước; đọc DOCX/XLSX, xem/chỉnh preview, chỉ thêm vào draft sau khi xác nhận, rồi dữ liệu chỉ được ghi cùng lần lưu task. Các snapshot không khớp cặp đơn vị/cơ quan hoặc Công văn đã chọn bị bỏ qua.
+- Không có nút xuất danh sách task trong view Quản lý công việc hiện tại. Export XLSX hiện có ở bảng Dữ liệu tài nguyên tổng hợp; nó dùng tập resource đang lọc và thư viện nạp CDN.
+
+### 3.5 Mã task và chuyển nhóm
 
 Task xử lý văn bản dùng tiền tố theo nhóm (ví dụ `Task-HT-01`, `Task-HPCAI-01`, `Task-HTM-01`); task thường dùng `Task-DAILY-01`. Mã là nhãn tra cứu, ID nội bộ không đổi khi mã được cấp lại.
 
@@ -111,11 +129,13 @@ Tạo Công văn **không** tự tạo dòng tài nguyên, không tự đăng k�
 
 Thao tác bảng gồm thêm cột chung (chọn một Công văn đăng ký), cột riêng, hàng chung (chọn đơn vị/cơ quan/hệ thống) và hàng riêng. Bộ lọc gồm tìm đơn vị/cơ quan/hệ thống, văn bản liên kết và phạm vi “Được giao cho tôi / Tất cả”. Export Excel phản ánh tập dữ liệu đang lọc, merge đơn vị/cơ quan/hệ thống và toàn bộ nhóm cột theo văn bản. Không được giả danh file XLSX bằng CSV/HTML; nếu thư viện XLSX không tải được thì báo yêu cầu tải lại trang.
 
+Hàng phụ lục chung được dùng chung theo số dòng của các Công văn đã chọn; hàng phụ lục riêng lưu theo đúng Công văn đăng ký và có thể nhập các giá trị định danh riêng. Cột riêng nằm ngoài các nhóm Công văn. Render bảng, chỉnh sửa ô và export đọc schema/các hàng chung-riêng từ cùng state resource; khi xuất, code dựng XLSX với các dòng phụ lục chung và riêng, các nhóm/cột con và merge ô định danh. Nút mắt ở cột Thao tác là đường mở chi tiết; click vào phần còn lại của hàng không mở drawer. Hover chỉ nhấn hàng đang trỏ chuột.
+
 ### Hiện trạng và khoảng lệch tài nguyên
 
 - V7 lưu resource records riêng và hỗ trợ liên kết resource/task; quyền sửa resource xét admin, người tạo resource, hoặc người tạo/được giao ít nhất một task liên kết.
 - Bộ lọc “Được giao cho tôi” lọc resource có task liên kết đang giao cho user hiện tại.
-- Excel đang xuất từ dữ liệu lọc nhưng phần phụ lục đa hàng có thể chỉ lấy dòng đầu, nên chưa bảo đảm giống hệt bảng trong mọi trường hợp.
+- Export XLSX hiện đã lấy các dòng phụ lục chung và riêng từ dữ liệu đang lọc, dựng nhóm header/cột con và merge ô định danh. Việc giống tuyệt đối bảng trên màn hình hoặc workbook tham chiếu chưa được xác nhận bằng đối chiếu trực quan trên Excel; không coi đó là lỗi đã kiểm thử hay bảo đảm tương thích in ấn.
 - Schema mặc định và schema động được lưu trong state phía trình duyệt (`resourceAppendixSchemas`); chưa có đồng bộ server hoặc bảo đảm phân quyền phía server.
 - Mặc định sáu cột cho Công văn mới được suy ra khi render; state schema riêng chỉ được lưu khi có thay đổi schema. Nếu người dùng xóa hết cột của một Công văn, schema rỗng được lưu và nhóm header bị ẩn. Đây là hành vi code hiện tại; cần quyết định nếu nghiệp vụ muốn luôn giữ ít nhất một cột mặc định.
 - Khi một văn bản đang được Resource/Task tham chiếu bị xóa, code lưu trữ thay vì hard-delete để giữ ID liên kết. Tuy vậy, bảng tài nguyên và bộ chọn chỉ lấy văn bản active; Công văn lưu trữ vì thế không còn nhóm appendix trong bảng/export dù liên kết và dữ liệu phụ lục vẫn còn trong state. Cần xác nhận có nên tiếp tục hiển thị nhóm archived/read-only để tránh dữ liệu bị khuất.
@@ -124,7 +144,7 @@ Thao tác bảng gồm thêm cột chung (chọn một Công văn đăng ký), c
 
 Resource là bản ghi độc lập, không phải projection từ task. Mỗi resource lưu revision có actor, thời điểm, thao tác, trường thay đổi và snapshot dữ liệu. Task resource lưu `resourceId`/`resourceData`; resource lưu `taskIds`. Màn chi tiết resource ghép lịch sử resource và revisions của các task liên kết thành timeline, cho phép mở chi tiết task. Khi cập nhật resource, thông tin resource, file và custom fields được đồng bộ sang task loại Quản lý tài nguyên liên kết và ghi revision task nếu nội dung dùng chung thay đổi. Khi bỏ liên kết/xóa resource, task được giữ lại; liên kết bị gỡ và task có revision ghi nhận việc đó.
 
-Khi tạo resource kèm task, thao tác được thực hiện cùng một lần lưu ở state phía client; nếu gặp lỗi, state được phục hồi từ snapshot trước lưu. Đây không phải transaction database/server. Lịch sử và liên kết chỉ tồn tại trong storage trình duyệt.
+Khi tạo resource kèm task, thao tác được thực hiện cùng một lần lưu ở state phía client; nếu gặp lỗi, state được phục hồi từ snapshot trước lưu. Lịch sử và liên kết chỉ tồn tại trong storage trình duyệt. Không có transaction database/server.
 
 ## 7. Cây sơ đồ tổ
 
@@ -136,9 +156,13 @@ Chuyển nhóm không gỡ assignee khỏi task hiện có. Quy tắc mã, Nhóm
 
 Danh sách bài kiến thức có cấp ban hành (Trung ương/Địa phương), cơ quan ban hành, loại văn bản, tiêu đề/nội dung, ngày và file đính kèm nếu có. Có filter theo cấp, cơ quan và loại; CRUD và xem chi tiết. Cơ quan/loại là metadata nội dung, không tự tạo văn bản trong danh mục văn bản trừ khi người dùng thao tác riêng ở danh mục.
 
+Form hiện có số ký hiệu, loại văn bản, cấp, cơ quan, ngày ban hành, ngày hiệu lực, trích yếu và ghi chú/nguồn. Detail có các vùng thuộc tính, toàn văn, văn bản liên quan và tệp. Hành vi CRUD không được giới hạn rõ theo admin/user trong UI hiện tại; xem mục “Điểm cần xác nhận” dưới đây và không suy diễn đây là quyền đã chốt.
+
 ## 9. Nhân sự và tài khoản
 
 Person và User là hai đối tượng riêng có thể liên kết. Admin quản lý hồ sơ, tài khoản, duyệt đăng ký và nhóm. Cây dùng hồ sơ Person; task assignment cần tài khoản phù hợp để đăng nhập. Chức vụ hiển thị không tạo quyền ngoài role admin/user.
+
+Hồ sơ Person lưu tên, chức vụ, cấp graph, loại nhân sự (cán bộ/tạm tuyển/hợp đồng), nhóm chuyên môn, email, điện thoại và ghi chú. Xóa Person giữ User và gỡ liên kết `personId`. Tài khoản admin tạo có trạng thái approved; yêu cầu đăng ký công khai tạo tài khoản pending. User tạo từ hồ sơ/duyệt đăng ký không đồng nghĩa có mật khẩu.
 
 ## 10. Thông báo, lịch sử và tìm kiếm
 
@@ -146,20 +170,34 @@ Task mới: thông báo admin, assignee và actor, khử trùng người nhận.
 
 Tìm kiếm toàn cục và tìm kiếm từng màn phải chỉ trả kết quả user được phép xem. Task revisions/lịch sử trạng thái, bình luận và chỉnh sửa nằm trong chi tiết task.
 
+**Hiện trạng giao diện:** phím `/` đưa focus vào tìm kiếm toàn cục khi focus không ở input/textarea/select. Kết quả workspace search hiện tìm task theo title, mã, mô tả và aliases, có lọc quyền qua `visibleTasks()`; nó không phải tìm kiếm hợp nhất toàn bộ entity. Một implementation cũ trong `app-shell.js` từng tìm resource/catalog/person/knowledge, nhưng view override hiện hành dùng `workspaceSearch()` nên không được xem các loại đó là kết quả tìm kiếm toàn cục đang hoạt động.
+
+Thông báo hiện chỉ được tạo từ luồng task create/assignment; không có bằng chứng mọi cập nhật resource/document/knowledge đều sinh notification. Drawer cho lọc tất cả/chưa đọc, đánh dấu từng mục hoặc tất cả đã đọc; click thông báo đánh dấu đã đọc và mở task tương ứng nếu task còn tồn tại/quyền cho phép.
+
 ## 11. Trang chính và thống kê
 
 Trang chính hiển thị thông tin tổ (tên tổ, quân số từ nhân sự, số nhóm và người phụ trách), phiên bản Cloud Console 1.0, số task theo dõi và task trễ; có quick access và văn bản gần đây.
 
-Thống kê task phải dùng quyền và aggregate status như Quản lý công việc. **Hiện trạng code:** hoạt động và lịch trên trang thống kê có dữ liệu mẫu tĩnh, lịch tháng 11/2026; không coi đó là số liệu live.
+Trang chính tính summary task trong phạm vi được xem; các nút truy cập nhanh điều hướng tới task, resource, catalog, graph, knowledge và stats. Số quân số tính theo toàn bộ `state.people`, số nhóm theo nhóm chưa archive; tên tổ/phiên bản là nội dung tĩnh trong view.
+
+Thống kê task tính summary theo task user được xem và áp dụng bộ lọc task đang có. Card “Tổng công việc” mở màn task với tab tổng. Theo nhóm quản lý là accordion có số task/hoàn thành/chậm muộn và bảng chi tiết. **Hiện trạng code:** widget Activity dùng năm bản ghi fixture tĩnh; lịch cố định tháng 11/2026, chọn ngày chỉ lọc Activity fixture. Không coi lịch/Activity là dữ liệu live, và nút đổi tháng chưa có đầy đủ logic thay đổi tháng trong implementation hiện tại.
 
 ## 12. Quyền
 
 Ma trận chi tiết tại [PERMISSIONS.md](PERMISSIONS.md). Quy tắc cốt lõi: admin xem/sửa toàn cục; người tạo/assignee xem task; user thuộc nhóm quản lý hoặc nhóm assignee có thể xem task nhưng chỉ xem. User chỉ được chỉnh sửa các trường task theo vai trò đã nêu; admin hoặc người tạo được đổi due date. Nhóm chỉ lọc picker, không assign tự động.
 
-Code hiện kiểm tra JWT/account status ở API; API cũng chặn một số thay đổi role, task và resource. Do UI đang ghi theo workspace snapshot, đối chiếu rule chi tiết trong `backend/src/modules/permissions.js`; không suy diễn mọi quyền đã được enforce hoàn toàn chỉ từ việc ẩn nút UI.
+**Hiện trạng:** role và quyền được mô phỏng phía client để hỗ trợ demo. Người dùng có thể sửa state hoặc đổi role qua công cụ trình duyệt; đây không phải ranh giới bảo mật. Không lưu mật khẩu máy chủ hoặc JWT.
 
 ## 13. Dữ liệu, migrations và giới hạn
 
-Không reset storage để đổi schema. SQL migration phải giữ dữ liệu đã có; database seed chỉ chạy khi chưa có workspace. Theo quyết định hiện hành, không import các khóa `c12-prototype-v*`; giữ nguyên chúng trên trình duyệt và dùng MySQL seed mới. Không tự dựng task/history hoặc timestamp ngoài bộ dữ liệu seed khai báo. JWT session nằm trong sessionStorage; tùy chọn theme vẫn dùng localStorage. Workspace và domain mirror lưu trong MySQL.
+Workspace hiện lưu trong localStorage `c12-workspace-v7`, session demo trong `c12-local-session`; theme/palette cũng lưu cục bộ. `demo-workspace.js` cung cấp seed ban đầu cho workspace trống, còn `seedTaskDemo()` và `migrateResourceColumnsV7()` có các bước augmentation/chuẩn hóa một lần theo version khi khởi chạy/mở view liên quan. Không còn MySQL seed, SQL migration, JWT hoặc Socket.IO trong source hiện hành. XLSX/Mammoth còn phụ thuộc CDN; tính năng phụ thuộc thư viện phải hiển thị lỗi rõ nếu thiếu. Không khẳng định parser/OCR ngoài phần code thực sự xử lý.
 
-Socket.IO phát `workspace.updated` sau khi API commit MySQL thành công; không phát trước commit. API mutations hiện tập trung ở snapshot endpoint, chưa tách thành endpoint riêng cho từng form/use case. XLSX/Mammoth còn phụ thuộc CDN; tính năng phụ thuộc thư viện phải hiển thị lỗi rõ nếu thiếu. Không khẳng định parser/OCR ngoài phần code thực sự xử lý.
+**Rủi ro dữ liệu đã biết:** augmentation `seedTaskDemo()` thay các resource có ID demo trùng `demo-resource-{mã nhóm}` bằng fixture mới, ngoài việc thêm dữ liệu demo khác. Migration V7 cũng dọn schema/record demo cũ và giảm mật độ một phần dữ liệu nhu cầu địa phương theo điều kiện nhận diện thay đổi. Vì vậy mở workspace cũ chưa có `demoSeedVersion >= 2` có thể thay đổi state cục bộ; đây không chỉ là seed khi kho trống. Sao lưu dữ liệu trước khi mở phiên bản code có migration nếu cần giữ mọi chỉnh sửa demo. Không tự xóa/reset localStorage để khắc phục lỗi và không giả định các migration hiện tại có rollback.
+
+Không tự import hoặc xóa các localStorage key legacy. Các khóa tùy chọn giao diện hiện có: `c12-dark` (LIGHT/DARK), `c12-text-palette` (preset hoặc màu chữ tùy chọn), `c12-style` (dataset theme); màu accent/nền cá nhân lưu trong `state.themeByUser[session]` cùng workspace. Nền cá nhân nhận gradient, URL HTTPS hoặc ảnh tải lên tối đa 2 MB. Reset seed thay workspace qua UI sau xác nhận, không phải thao tác database.
+
+### Điểm cần xác nhận khi thay đổi nghiệp vụ
+
+- Quyền CRUD của User thường với Danh mục văn bản và Kiến thức tổ chưa được chốt thành ma trận rõ. Code UI hiện cho thao tác thêm/sửa/xóa ở một số luồng mà không kiểm tra `admin()` đồng nhất. Tài liệu ghi nhận hành vi này, không khẳng định đó là chuẩn phân quyền cuối.
+- Ô mật khẩu/“Ghi nhớ đăng nhập” trên trang đăng nhập chưa có hành vi xác thực/lưu tương ứng; cần quyết định nếu muốn chuyển prototype thành đăng nhập thực.
+- Tìm kiếm toàn cục hiện hành chỉ tìm task; các entity khác có tìm kiếm riêng theo màn. Nếu yêu cầu tìm kiếm hợp nhất, cần chốt loại entity và quyền hiển thị.

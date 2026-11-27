@@ -29,12 +29,11 @@ let activeTaskFilter = { groups: [], documents: [], types: [], bucket: '' },
   selectedResourceDoc = '',
   themeOpen = false;
 
-// Business state is hydrated from the API. Existing browser storage is intentionally untouched.
-state = M.migrate(state);
+// Preserve the seeded or browser-saved V7 workspace. M.migrate is reserved for legacy V5 imports.
 seedTaskDemo();
 
 const persist = () => {
-  return window.C12Api?.persist(state);
+  return save();
 };
 window.C12SaveV5 = persist;
 
@@ -228,13 +227,17 @@ view = function () {
 
 action = function (a) {
   if (a === 'switch') {
-    return window.C12Api?.loginDemo(admin() ? 'user' : 'admin');
+    const target = admin() ? state.users.find(u => u.id === 'demo-u-g-HT') || state.users.find(u => u.role === 'user') : state.users.find(u => u.role === 'admin');
+    return target && login(target.id);
   }
   if (a === 'logout') {
-    return window.C12Api?.logout();
+    setLocalSession(''); auth(); return;
   }
   if (a === 'reset') {
-    return window.C12Api?.resetWorkspace();
+    if (confirm('Khôi phục bộ dữ liệu mẫu? Các thay đổi đã lưu trong trình duyệt sẽ bị thay thế.')) {
+      state = seed(); save(); setLocalSession(state.users.find(u => u.id === 'demo-u-g-HT')?.id || ''); page = 'home'; render();
+    }
+    return;
   }
   if (a === 'new-task') return taskForm();
   if (a === 'themes') return themesDialog();
@@ -259,7 +262,9 @@ done = async function (message) {
 };
 
 login = function (id) {
-  return window.C12Api?.loginDemo(id === 'admin' ? 'admin' : 'user');
+  setLocalSession(id);
+  page = 'home';
+  render();
 };
 
 // =========================================================

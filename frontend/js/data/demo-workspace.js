@@ -54,7 +54,7 @@ function makeWorkspace() {
     ['Quy trình rà soát an toàn hệ thống', 'Hướng dẫn', 'Thông tư', 'Bộ Công an'],
     ['Hướng dẫn quản lý dữ liệu dùng chung', 'Quy định', 'Nghị định', 'Chính phủ'],
     ['Quy trình phối hợp xử lý sự cố', 'Quy trình', 'Quyết định', 'UBND tỉnh Cà Mau']
-  ].map(([title, type, docType, agency], i) => ({ id: `knowledge-${i + 1}`, title, no: `HD-C12-2026-0${i + 1}`, type, docType, level: i === 2 ? 'Địa phương' : 'Trung ương', agency, date: ago(-i - 2).slice(0, 10), effectiveDate: '', summary: 'Tài liệu mẫu phục vụ hướng dẫn nghiệp vụ và phối hợp của tổ.', content: 'Nội dung tham khảo được seed trong MySQL.', related: '', note: '', files: [] }));
+  ].map(([title, type, docType, agency], i) => ({ id: `knowledge-${i + 1}`, title, no: `HD-C12-2026-0${i + 1}`, type, docType, level: i === 2 ? 'Địa phương' : 'Trung ương', agency, date: ago(-i - 2).slice(0, 10), effectiveDate: '', summary: 'Tài liệu mẫu phục vụ hướng dẫn nghiệp vụ và phối hợp của tổ.', content: 'Nội dung tham khảo trong bộ dữ liệu mẫu chạy trên trình duyệt.', related: '', note: '', files: [] }));
   const schemas = {
     '952': ['vCPU', 'RAM (GB)', 'Disk / Block (TB)', 'Disk / File Storage (TB)', 'Disk / Object (TB)', 'License', 'Giải pháp ATTT', 'Kênh truyền'],
     '4651': ['vCPU', 'RAM (GB)', 'GPU (GB)', 'Disk / Block SSD (TB)', 'Disk / Block HDD (TB)', 'Disk / File Storage SSD (TB)', 'Disk / File Storage HDD (TB)', 'Disk / Object (TB)', 'Sizing 3 vùng', 'Sizing / DMZ', 'Sizing / DB', 'Sizing / APP', 'License thương mại', 'Kênh truyền', 'Giải pháp ATTT', 'Kế hoạch', 'Đặc thù', 'Hệ thống có trong danh mục theo các văn bản 278/2025/NĐ-CP; Nghị quyết 214/NQ-CP và Quyết định số 1132/QĐ-TTg', 'Ghi chú'],
@@ -68,4 +68,4 @@ function makeWorkspace() {
   };
 }
 
-module.exports = { makeWorkspace };
+window.C12DemoWorkspace = { create: makeWorkspace };

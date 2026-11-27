@@ -1,10 +1,10 @@
 # PRD — C12 / P4 - T1 Internal App
 
-Cập nhật 27/11/2026. Đây là tóm tắt mục tiêu sản phẩm. Nghiệp vụ chi tiết tại [SPEC.md](SPEC.md), quyền tại [PERMISSIONS.md](PERMISSIONS.md), kiến trúc đang chạy tại [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md), quy tắc UI tại [FRONTEND_RULES.md](FRONTEND_RULES.md).
+Cập nhật 27/11/2026. Đây là tóm tắt mục tiêu sản phẩm. Nghiệp vụ chi tiết tại [SPEC.md](SPEC.md), quy tắc role giao diện tại [PERMISSIONS.md](PERMISSIONS.md), runtime tại [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md), quy tắc UI tại [FRONTEND_RULES.md](FRONTEND_RULES.md).
 
 ## Mục tiêu
 
-Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục văn bản, dữ liệu tài nguyên, kiến thức chuyên môn và nhân sự tổ. Runtime hiện gồm SPA, API Node.js, MySQL và Socket.IO; giới hạn còn lại nằm trong `TECH_ARCHITECTURE.md`.
+Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục văn bản, dữ liệu tài nguyên, kiến thức chuyên môn và nhân sự tổ. Runtime hiện là SPA tĩnh với lưu trữ localStorage; không có backend/database.
 
 ## Phân hệ
 
@@ -16,6 +16,10 @@ Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục vă
 - **Cây sơ đồ tổ:** graph theo nhánh nhóm; kéo thả thành viên cập nhật nhóm hiện tại.
 - **Quản lý nhân sự:** Person, liên kết User, tài khoản và duyệt đăng ký.
 - **Thống kê:** tổng hợp task theo phạm vi người dùng; một số widget hoạt động/lịch là fixture, không phải dữ liệu trực tiếp.
+- **Đăng nhập demo/tài khoản:** lần đầu có thể tự đăng nhập User demo; đăng ký tạo yêu cầu pending để admin duyệt, quản lý profile và chuyển role là mô phỏng cục bộ, chưa xác minh mật khẩu.
+- **Tìm kiếm/thông báo:** tìm kiếm toàn cục hiện chỉ tìm task theo title/mã/mô tả/aliases; các màn hình khác có filter/search riêng. Notification được sinh chủ yếu khi tạo task hoặc thêm assignee, có trạng thái đã đọc/chưa đọc và mở task liên quan.
+- **Chủ đề cá nhân:** đổi LIGHT/DARK, preset/màu chữ, accent, gradient/ảnh nền; tùy chọn lưu cục bộ theo trình duyệt và user demo.
+- **Nhập phụ lục task:** DOCX/XLSX có bước trích xuất, preview/chỉnh sửa và xác nhận; kết quả chỉ được ghi khi lưu task. Resource V7 không dùng luồng import cũ làm thao tác nhập resource độc lập.
 
 ## Nguyên tắc sản phẩm
 
@@ -30,4 +34,6 @@ Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục vă
 
 ## Giới hạn hiện tại
 
-Snapshot workspace lưu MySQL; Socket.IO thông báo thay đổi sau transaction commit. State localStorage cũ không được import; theme vẫn lưu cục bộ. API mutation hiện dùng snapshot endpoint nên cần tiếp tục tách theo use-case trước khi tối ưu scale. XLSX/Mammoth và một số font/CDN phụ thuộc môi trường tải. Export tài nguyên cần được rà soát với workbook nếu cần tương đương hoàn toàn về merge cells/appendix nhiều dòng.
+Workspace lưu cục bộ trong trình duyệt; không đồng bộ nhiều user hoặc nhiều thiết bị. Vai trò demo phía client không phải cơ chế bảo mật. XLSX/Mammoth và một số font/CDN phụ thuộc môi trường tải. Resource export hiện dựng file XLSX từ tập dữ liệu đang lọc, gồm header nhóm/cột con, merge ô định danh và các dòng phụ lục chung/riêng; việc khẳng định khớp hoàn toàn một workbook tham chiếu vẫn cần đối chiếu trực quan.
+
+Đăng nhập hiện không kiểm tra mật khẩu, đăng ký không lưu mật khẩu và checkbox “Ghi nhớ đăng nhập” chưa có tác dụng thực tế. Activity/lịch Thống kê là fixture tĩnh tháng 11/2026, không phải audit feed live. CRUD quyền User thường cho Danh mục văn bản/Kiến thức chưa được chốt thống nhất; xem [PERMISSIONS.md](PERMISSIONS.md) và mục điểm cần xác nhận trong [SPEC.md](SPEC.md).

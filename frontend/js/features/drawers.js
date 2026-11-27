@@ -7,6 +7,7 @@ function auth(register = false) {
           <div>
             <h2>${register ? 'Đăng ký' : 'Đăng nhập'}</h2>
             <p class="auth-subtitle">${register ? 'Gửi yêu cầu để quản trị viên phê duyệt.' : 'Chào mừng bạn trở lại không gian làm việc.'}</p>
+            ${!register ? '<p class="small muted">Bản chạy cục bộ: đăng nhập demo chỉ mô phỏng vai trò, không xác thực mật khẩu máy chủ.</p>' : ''}
           </div>
           <label class="auth-input-wrap"><span class="sr-only">${register ? 'Họ và tên' : 'Tên đăng nhập'}</span>${icon('users')}<input name="${register ? 'name' : 'username'}" type="text" autocomplete="${register ? 'name' : 'username'}" placeholder="${register ? 'Họ và tên' : 'User Name'}" aria-label="${register ? 'Họ và tên' : 'Tên đăng nhập'}" required></label>
           ${register ? `<label class="auth-input-wrap"><span class="sr-only">Email</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 4H4a2 2 0 0 0-2 2v.4l10 6.25L22 6.4V6a2 2 0 0 0-2-2ZM2 8.75V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8.75l-9.47 5.92a1 1 0 0 1-1.06 0L2 8.75Z"/></svg><input name="email" type="email" autocomplete="email" placeholder="Email" aria-label="Email" required></label>` : ''}
@@ -20,7 +21,6 @@ function auth(register = false) {
       </section>
     </div>
   </div>`;
-  if (window.C12Api?.error) $('#authError').textContent = window.C12Api.error;
 
   document.onclick = e => {
     let a = e.target.closest('[data-action]')?.dataset.action;
@@ -43,13 +43,6 @@ function auth(register = false) {
   $('#authForm').onsubmit = e => {
     e.preventDefault();
     let d = Object.fromEntries(new FormData(e.target));
-    if (window.C12Api) {
-      const error = $('#authError');
-      error.textContent = '';
-      (register ? window.C12Api.register(d) : window.C12Api.loginCredentials(d.username, d.password))
-        .catch(err => { if (error) error.textContent = err.message || 'Không thể xác thực.' });
-      return;
-    }
     if (register) {
       if (state.users.some(u => u.email.toLowerCase() === d.email.toLowerCase())) return $('#authError').textContent = 'Email đã tồn tại.';
       state.users.push({ id: uid(), name: d.name, email: d.email, role: 'user', status: 'pending', personId: '' });
@@ -64,8 +57,7 @@ function auth(register = false) {
 }
 
 function login(id) {
-  if (window.C12Api) return window.C12Api.loginDemo(id === 'admin' ? 'admin' : 'user');
-  session = id;
+  setLocalSession(id);
   page = 'home';
   render();
 }
@@ -346,10 +338,9 @@ function personForm(id) {
 
 function userForm() {
   if (!admin()) return;
-  modal('Tạo tài khoản trực tiếp', `${field('Họ và tên', 'name', '', 'text', true)}${field('Email', 'email', '', 'email', true)}${field('Mật khẩu tạm thời (tối thiểu 8 ký tự)', 'password', '', 'password', true)}<label class="field"><span>Vai trò</span><select name="role"><option value="user">User</option><option value="admin">Admin</option></select></label><label class="field"><span>Liên kết hồ sơ</span><select name="personId"><option value="">Chưa liên kết</option>${state.people.filter(p => !state.users.some(u => u.personId === p.id)).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>`, async d => {
+  modal('Tạo tài khoản demo', `<div class="notice">Tài khoản chỉ tồn tại trong trình duyệt này; chế độ cục bộ không xác thực mật khẩu máy chủ.</div>${field('Họ và tên', 'name', '', 'text', true)}${field('Email', 'email', '', 'email', true)}<label class="field"><span>Vai trò</span><select name="role"><option value="user">User</option><option value="admin">Admin</option></select></label><label class="field"><span>Liên kết hồ sơ</span><select name="personId"><option value="">Chưa liên kết</option>${state.people.filter(p => !state.users.some(u => u.personId === p.id)).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>`, async d => {
     if (state.users.some(u => u.email.toLowerCase() === d.email.toLowerCase())) throw Error('Email đã tồn tại.');
     const user = { id: uid(), name: d.name, email: d.email, role: d.role, personId: d.personId, status: 'approved' };
-    if (window.C12Api) await window.C12Api.createAccount(user, d.password);
     state.users.push(user);
     done('Đã tạo tài khoản');
   });

@@ -50,10 +50,6 @@ function renderHeader() {
 }
 
 function render() {
-  if (window.C12Api && !window.C12Api.ready) {
-    $('#app').innerHTML = '<div class="app-loading" role="status">Đang kết nối không gian làm việc…</div>';
-    return;
-  }
   if (!me()) return auth();
   if (['personnel', 'accounts'].includes(page) && !admin()) page = 'home';
   applyContrastEngine();

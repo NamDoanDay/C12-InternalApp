@@ -1,64 +1,43 @@
 # Kiến trúc kỹ thuật
 
-Cập nhật 27/11/2026. Mô tả code triển khai hiện tại. Nghiệp vụ chuẩn nằm ở [SPEC.md](SPEC.md); quyền chi tiết ở [PERMISSIONS.md](PERMISSIONS.md).
+Cập nhật 27/11/2026. Runtime hiện tại là SPA tĩnh chạy trên trình duyệt. Backend Node.js, MySQL, Socket.IO, Docker Compose và Nginx đã được gỡ khỏi source tree theo yêu cầu. Nghiệp vụ chuẩn vẫn ở [SPEC.md](SPEC.md); quy tắc quyền giao diện ở [PERMISSIONS.md](PERMISSIONS.md).
 
-## Cấu trúc repository
+## Cấu trúc và runtime
 
-```text
-C12-InternalApp/
-├── frontend/                 # SPA HTML/CSS/JS, Nginx phục vụ nguyên cây
-│   ├── index.html            # Entry point, giữ nguyên link tương đối
-│   ├── assets/app.css        # Bundle CSS từ css/app.css
-│   ├── css/                  # Tailwind entry, glass, workspace, auth, overrides
-│   └── js/{core,pages,components,features,data}/
-├── backend/                  # Express API + Socket.IO
-│   ├── Dockerfile
-│   ├── package.json
-│   └── src/{auth,config,db,middleware,modules,sockets}/
-├── database/{migrations,seeds}/
-├── deploy/{docker-compose.yml,nginx/}
-├── docs/ design/ reference/ tests/ .agents/
-├── index.html                # Preview tài liệu tại root, không phải app entry
-├── AGENTS.md README.md .env.example
-└── package.json              # Tailwind CLI
-```
+- `frontend/index.html` là entry point. CSS/JavaScript được nạp bằng đường dẫn tương đối; có thể phục vụ thư mục `frontend/` bằng static web server.
+- `frontend/js/data/demo-workspace.js` tạo bộ dữ liệu demo trong trình duyệt.
+- `frontend/js/core/foundation.js` khởi tạo state, session demo và lưu workspace vào `localStorage` với khóa `c12-workspace-v7`.
+- `frontend/js/core/model.js`, `frontend/js/pages/` và `frontend/js/features/` giữ model, render và tương tác nghiệp vụ phía client.
+- `frontend/js/features/rework-v7.js` là implementation đang dùng cho bảng resource/catalog V7; file feature cũ vẫn được tải và một số hàm bị override theo thứ tự script. Xác định hàm cuối cùng sau toàn bộ script trước khi mô tả hoặc sửa một luồng.
+- `frontend/assets/app.css` là bundle hiện hành; root `package.json` chỉ giữ Tailwind CLI để build CSS.
+- Root `index.html` là preview tài liệu, không phải entry ứng dụng.
 
-## Runtime và dữ liệu
+## Lưu trữ, phiên và giới hạn bảo mật
 
-- Frontend là SPA HTML + Tailwind CSS v4 + JavaScript thuần. Nginx copy nội dung `frontend/` vào document root nên các URL `assets/...` và `js/...` vẫn hợp lệ.
-- `frontend/js/core/api-client.js` là adapter tương thích cho state V7 hiện tại. App tải workspace qua `GET /api/v1/workspace` và ghi qua `PUT /api/v1/workspace`. Không nhập hoặc ghi dữ liệu nghiệp vụ localStorage cũ; localStorage chỉ giữ theme/palette và cờ lần đầu đăng nhập demo, bearer token nằm trong sessionStorage.
-- MySQL là nguồn dữ liệu chuẩn. `workspace_state` giữ snapshot JSON có revision để tương thích renderer/form hiện tại. Các collection được phản chiếu vào `tasks`, `resources`, `documents`, `task_groups`, `people`, `knowledge_items`; JSON payload giữ phụ lục, trường động và revisions. `resource_task_links` và `resource_document_links` phản chiếu liên kết resource–task/văn bản, còn `auth_sessions` lưu phiên đăng nhập.
-- Backend dùng Express, `mysql2/promise`, bcryptjs và JWT. Auth gồm đăng nhập, đăng ký chờ duyệt, demo login cấu hình được, tạo tài khoản. `accounts.status` được kiểm tra trên từng request có xác thực.
-- Module API đọc: `/api/v1/tasks`, `/resources`, `/documents`, `/stats`, `/history`. Các mutation UI hiện đi qua snapshot workspace; transaction khóa hàng `FOR UPDATE`, kiểm tra revision, ghi snapshot và mirror records. Khi transaction thành công, API mới phát `workspace.updated` qua Socket.IO. Tạo credential tài khoản cũng phát `account.created` sau khi insert MySQL thành công.
-- Socket.IO xác thực JWT handshake, hỗ trợ WebSocket và polling. Nginx proxy `/socket.io/` với Upgrade headers, timeout dài và buffering tắt.
-- MySQL container publish cổng `3307` chỉ trên loopback (`127.0.0.1`) để DBMS client trên máy host kết nối; bên trong Docker backend vẫn kết nối qua host `mysql:3306`.
-- `audit_events` ghi actor/revision cho lần lưu; chi tiết lịch sử task/resource vẫn nằm trong `revisions` của workspace và được đọc qua history API. Dữ liệu seed chỉ được nạp khi chưa có snapshot; reset seed là thao tác riêng dành cho admin và không thay đổi localStorage.
+- State workspace được lưu trên trình duyệt hiện tại. Workspace seed mới dùng khi chưa có `c12-workspace-v7`; ngoài ra có augmentation/migration demo một lần theo phiên bản state như mô tả bên dưới. Các khóa localStorage legacy không bị xóa hoặc nhập tự động.
+- Session demo lưu ở `c12-local-session`. Các nút User demo/Admin demo chỉ mô phỏng vai trò trong UI.
+- Nếu không có session key, foundation khởi tạo phiên bằng User demo `demo-u-g-HT` hoặc User đầu tiên; vì thế lần đầu có thể vào thẳng ứng dụng. Đăng xuất mới đưa về form đăng nhập. Form đăng nhập chỉ dò email/tên user approved, không kiểm tra password; form đăng ký hiện bỏ qua password và chỉ tạo user pending. Không dùng hai form này làm mẫu auth production.
+- Tùy chọn giao diện có các key riêng `c12-dark`, `c12-text-palette`, `c12-style`; accent/background cá nhân lưu trong `state.themeByUser`. Nền ảnh upload có thể lưu dạng data URL trong workspace localStorage và làm tăng dung lượng sử dụng.
+- Không có xác thực máy chủ, phân quyền an toàn, đồng bộ đa thiết bị, API hoặc cập nhật realtime. Dữ liệu và role phía client có thể bị người dùng sửa; không dùng cho dữ liệu nhạy cảm hoặc triển khai production.
+- `save()` ghi toàn bộ state JSON. Khi trình duyệt hết quota hoặc chặn storage, giao diện báo lỗi lưu. Tệp đính kèm lớn có thể vượt giới hạn localStorage.
+- `docs/PERMISSIONS.md` mô tả quy tắc UI nghiệp vụ; đây không còn là kiểm soát bảo mật phía server.
 
-## Migration và seed
+## Dữ liệu demo và migration
 
-- SQL migration ở `database/migrations/*.sql`, chạy theo thứ tự tên và ghi vào `schema_migrations`. Migration mới đặt số tiếp theo (ví dụ `002_add_field.sql`); không sửa schema trực tiếp trên môi trường đã chạy.
-- `database/seeds/seed-workspace.js` tạo dữ liệu mới cho MySQL: đủ loại văn bản, sáu nhóm, ít nhất hai thành viên mỗi nhóm, task xử lý văn bản/task tài nguyên/task thường, resource liên kết, kiến thức. Backend seed khi chưa có `workspace_state`.
-- Mật khẩu seed được hash bcrypt; `DEMO_ADMIN_PASSWORD` và `DEMO_USER_PASSWORD` trong `.env` cấu hình mật khẩu. Các tài khoản seed user khác dùng mật khẩu user demo.
-- Không nhập `c12-prototype-v*` từ browser. LocalStorage cũ được giữ nguyên như bản legacy, nhưng không còn là nguồn dữ liệu ứng dụng.
+- `demo-workspace.js` tạo bộ seed cho workspace rỗng. Ngoài seed ban đầu, `seedTaskDemo()` trong `pages/workspace.js` có one-time augmentation cho state cũ khi `demoSeedVersion < 2`: thêm/đồng bộ một số văn bản, nhóm/người, task, resource và knowledge; không chỉ khởi tạo khi thiếu workspace key.
+- **Rủi ro dữ liệu:** augmentation thay resource trùng ID `demo-resource-{mã nhóm}` bằng fixture; chỉnh sửa của người dùng trên đúng record đó có thể bị mất. Mở trang resource có thể chạy migration V7 cho schema/cột và mật độ dữ liệu demo; migration có thể loại cột demo cũ, giảm còn tối đa 12 resource seed chưa có dấu vết tùy chỉnh, và giữ record có task/revision/file/custom field/phụ lục riêng. Sao lưu workspace cũ trước khi nâng code qua migration; hiện không có rollback tự động.
+- `demo-workspace.js` và các bước augmentation/migration client độc lập với các database/volume Docker MySQL đã từng tồn tại.
+- `M.migrate()` là chuyển đổi định dạng V5 cũ, không gọi trong khởi động thường xuyên để tránh làm mất dữ liệu V7. Hãy thêm migration tường minh, có kiểm tra phiên bản và sao lưu state trước khi đổi schema.
+- Không tự xóa/reset localStorage. Khôi phục bộ dữ liệu mẫu qua giao diện là hành động thay thế workspace cục bộ và cần xác nhận.
 
 ## Chạy và build
 
+Có thể mở `frontend/index.html` trực tiếp nếu trình duyệt cho phép các tài nguyên cục bộ, hoặc phục vụ thư mục `frontend/` bằng static server. Ví dụ từ root:
+
 ```powershell
-Copy-Item .env.example .env
-# đặt mật khẩu DB, JWT_SECRET và mật khẩu demo trong .env
-docker compose -f deploy/docker-compose.yml up --build
+python -m http.server 8080 --directory frontend --bind 127.0.0.1
 ```
 
-Mở `http://localhost:8080` (hoặc `WEB_PORT`). Demo identities: `admin@c12.demo` và `user@c12.demo`; mật khẩu là giá trị trong `.env`. Lần đầu mở app tự đăng nhập User demo nếu demo login được bật; các lần sau dùng phiên đăng nhập hiện tại hoặc màn login. Chạy backend độc lập: từ `backend/` chạy `npm install`, cấu hình root `.env`, chuẩn bị MySQL rồi chạy `npm start`. SPA cần được phục vụ cùng origin để `/api/` và `/socket.io/` hoạt động.
+Mở `http://127.0.0.1:8080`. Build CSS tại root bằng `npm run build:css`; theo dõi CSS bằng `npm run watch:css`.
 
-Kết nối từ DBeaver/MySQL Workbench: host `127.0.0.1`, port `3307`, database `MYSQL_DATABASE`, user `MYSQL_USER`, password `MYSQL_PASSWORD` trong `.env`. Dùng tài khoản ứng dụng `c12_app`; không cần root. Nếu port `3307` đang bị chiếm, đổi port mapping trong `deploy/docker-compose.yml` rồi khởi chạy lại stack.
-
-Tailwind: tại root chạy `npm run build:css` để build `frontend/assets/app.css`, hoặc `npm run watch:css`. XLSX/Mammoth hiện được nạp qua CDN.
-
-## Ranh giới hiện tại
-
-- Snapshot adapter giữ nguyên nhiều nghiệp vụ client-side; API module hiện cung cấp route đọc, chưa tách mutation thành endpoint use-case riêng. Mọi lần ghi vẫn đi qua transaction và chỉ phát realtime sau commit.
-- Bảng entity là mirror để truy vấn theo domain; snapshot vẫn là nguồn render chính. Khi bỏ snapshot, cần migration có kiểm soát.
-- API kiểm tra role và quyền Task/Resource cơ bản. Vì client gửi workspace snapshot, mọi thay đổi quyền phải đồng bộ `backend/src/modules/permissions.js` trước khi mở UI tương ứng.
-- Reset seed chỉ dành admin, thay thế snapshot MySQL và không chạm localStorage.
-- Root `index.html` là preview tài liệu; deployment phục vụ `frontend/index.html`.
+Các thư viện XLSX/Mammoth và font được nạp qua CDN; tính năng tương ứng cần mạng và phải xử lý trường hợp thư viện không sẵn có.

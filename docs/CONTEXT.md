@@ -1,6 +1,6 @@
 # Bối cảnh dự án và thuật ngữ
 
-Cập nhật 27/11/2026. Đây là workspace quản trị nội bộ C12/P4-T1: SPA trên frontend, Node.js/Express + Socket.IO, MySQL và Nginx. Dữ liệu nghiệp vụ chạy từ MySQL; localStorage cũ không được import hoặc sửa.
+Cập nhật 27/11/2026. Đây là workspace quản trị nội bộ C12/P4-T1 dạng SPA tĩnh. Runtime hiện không có backend, Socket.IO, MySQL hoặc Nginx; dữ liệu nghiệp vụ của bản demo được lưu trong localStorage của trình duyệt.
 
 ## Thuật ngữ
 
@@ -26,10 +26,12 @@ Các quyết định quan trọng nhất: ba loại task (xử lý văn bản, q
 
 ## Giới hạn triển khai hiện tại
 
-- Snapshot JSON trong `workspace_state` là nguồn render hiện tại; entity có bảng MySQL mirror với JSON payload.
-- Frontend lưu JWT theo tab trong sessionStorage; theme/palette vẫn lưu localStorage.
-- API module có route đọc theo domain; UI hiện ghi qua endpoint workspace snapshot, chưa tách đầy đủ mutation endpoint theo use-case.
-- Socket.IO đồng bộ event sau commit; API có kiểm tra auth/role và một phần quyền Task/Resource.
+- Workspace JSON lưu ở localStorage với khóa `c12-workspace-v7`; bộ seed mới nằm trong `frontend/js/data/demo-workspace.js`.
+- `seedTaskDemo()` có thể bổ sung một lần vào workspace cũ theo `demoSeedVersion`; migration Resource V7 cũng có thể chuẩn hóa schema và giảm bộ resource demo theo quy tắc giữ dữ liệu có dấu vết chỉnh sửa. Đây không phải runtime chỉ đọc seed khi kho trống.
+- Phiên user/admin là mô phỏng cục bộ, không có mật khẩu máy chủ và không bảo đảm quyền truy cập an toàn.
+- Lần chạy đầu có thể tự chọn User demo; form đăng nhập không xác minh password và form đăng ký hiện không lưu password. Đừng hiểu các form này là auth hoàn chỉnh.
+- Không có API, đồng bộ nhiều trình duyệt, realtime hoặc database. Dữ liệu khác profile/trình duyệt không được chia sẻ.
+- Tìm kiếm header hiện chỉ truy vấn task; các entity như resource/catalog/person/knowledge được tìm qua từng view. Activity và lịch ở Thống kê là fixture tháng 11/2026.
 - Các dữ liệu seed/demo và fixture phải được phân biệt với dữ liệu live.
 - Không giả định các thư viện CDN luôn sẵn có; luồng phụ thuộc thư viện cần báo lỗi có thể xử lý được.
 
