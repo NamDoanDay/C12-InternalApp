@@ -47,77 +47,25 @@ const schemas = {
 
 const workbookSeed = { "A1": "STT", "B1": "Tên đơn vị", "C1": "Cơ quan quản lý", "D1": "Hệ thống", "E1": "Công văn đăng ký", "F1": "952", "N1": "4651", "F2": "vCPU", "G2": "RAM (GB)", "H2": "Disk (TB)", "K2": "License", "L2": "Giải pháp ATTT", "M2": "Kênh truyền", "N2": "vCPU", "O2": "RAM (GB)", "P2": "GPU (GB)", "Q2": "Disk (TB)", "V2": "Sizing 3 vùng", "W2": "Đã chia sizing 3 vùng", "Z2": "License thương mại", "AA2": "Kênh truyền ", "AB2": "Giải pháp ATTT", "AC2": "Kế hoạch", "AD2": "Thời gian đề nghị cấp tài nguyên theo 4267", "AE2": "Đặc thù", "AF2": "Hệ thống có trong danh mục theo các văn bản 278/2025/NĐ-CP; Nghị quyết 214/NQ-CP và Quyết định số 1132/QĐ-TTg", "AG2": "Ghi chú", "Q3": "Block Storage ", "S3": "File Storage", "U3": "Object Storage", "W3": "DMZ", "X3": "DB", "Y3": "APP", "H4": "Block Storage \t", "I4": "File Storage", "J4": "Object Storage", "Q4": "SSD", "R4": "HDD", "S4": "SSD", "T4": "HDD", "A5": "1", "B5": "Cà Mau\n(01 hệ thống)", "C5": "Trung tâm giải quyết TTHC", "D5": "HTTT giải quyết thủ tục hành chính", "E5": "952 và 4651", "F5": "272", "G5": "384", "H5": "0", "I5": "8", "J5": "0", "K5": "Linux; Oracle Database; Kaspersky Enpoint Security, License, 10 License, hết hạn ngày 04/4/2026; DLP, thời hạn License 08/10/2027; WAF; Imperva SecureSphere DBF (VM), số lượng: 04 license\nLicense giám sát Oracle & MS SQL, hạn 31/8/2027 ", "L5": "Giải pháp log tập trung hiện tại: Splunk\nGiải pháp giám sát hiện tại: SOC\nNguồn log thu thập: Firewall; Anti-DDoS; IPS; Ứng dụng", "M5": "- Internet trong nước 200 Mbps\n- Internet quốc tế 10Mbps\n- Băng thông WAN: 200Mbps", "N5": "608", "O5": "740", "Q5": "23", "T5": "0", "U5": "0", "V5": "x", "W5": "-", "X5": "x", "Y5": "x", "Z5": "Linux; Oracle; DLP, Imperva", "AB5": "Có đăng ký license về: Firewall; DLP; IDS/IPS", "AC5": "Theo lộ trình C12", "AG5": "Rút", "A6": "2", "B6": "Cà Mau\n(01 hệ thống)", "C6": "VP UBND tỉnh", "D6": "Hệ thống quản lý văn bản và điều hành", "E6": "952 và 4651", "F6": "900", "G6": "1600", "H6": "0", "I6": "8", "J6": "0", "K6": "Windows Server 2019; MySQL; Kaspersky Enpoint Security, License, 3 License, hết hạn ngày 04/4/2026; DLP, thời hạn License 08/10/2027; WAF; Imperva SecureSphere DBF (VM), số lượng: 02 license\nLicense giám sát Oracle & MS SQL, hạn 30/09/2026", "L6": "Giải pháp log tập trung hiện tại: Splunk\nGiải pháp giám sát hiện tại: SOC\nNguồn log thu thập: Firewall; Anti-DDoS; IPS; Ứng dụng", "M6": "- Internet trong nước 200 Mbps\n- Internet quốc tế 10Mbps\n- Băng thông WAN: 200Mbps", "N6": "576", "O6": "1536", "Q6": "24", "T6": "0", "U6": "0", "V6": "x", "W6": "-", "X6": "x", "Y6": "x", "Z6": "Window; Orcle; PostgreSQL; DLP; Imperva", "AB6": "Có đăng ký license về: Firewall; DLP; IDS/IPS", "AC6": "Theo lộ trình C12", "AG6": "Tạm rút", "A7": "3", "B7": "Cà Mau\n(01 hệ thống)", "C7": "Sở KHCN", "D7": "Hệ thống thư điện tử công vụ tỉnh Cà Mau", "E7": "952 và 4651 rút", "F7": "112", "G7": "192", "H7": "0", "I7": "8", "J7": "0", "K7": "Windows Server 2019; MySQL; Kaspersky Enpoint Security, License, 3 License, hết hạn ngày 04/4/2026; DLP, thời hạn License 08/10/2027; WAF; Imperva SecureSphere DBF (VM), số lượng: 02 license\nLicense giám sát Oracle & MS SQL, hạn 30/09/2026", "L7": "Giải pháp log tập trung hiện tại: Splunk\nGiải pháp giám sát hiện tại: SOC\nNguồn log thu thập: Firewall; Anti-DDoS; IPS; Ứng dụng", "M7": "- Internet trong nước 200 Mbps\n- Internet quốc tế 10Mbps\n- Băng thông WAN: 200Mbps", "AG7": "Xin rút", "A8": "4", "B8": "Cà Mau\n(01 hệ thống)", "C8": "Trung tâm CĐS", "D8": "Hệ thống thông tin báo cáo cấp tỉnh   ", "E8": "952 và 4651", "F8": "48", "G8": "96", "H8": "0", "I8": "8", "J8": "0", "K8": "Linux; Microsoft SQL Server Standard; Kaspersky Enpoint Security, License, 5 License, hết hạn ngày 04/4/2026; DLP, thời hạn License 08/10/2027; WAF; Imperva SecureSphere DBF (VM), số lượng: 02 license\nLicense giám sát Oracle & MS SQL, hạn 30/09/2026", "L8": "Giải pháp log tập trung hiện tại: Splunk\nGiải pháp giám sát hiện tại: SOC\nNguồn log thu thập: Firewall; Anti-DDoS; IPS; Ứng dụng", "M8": "- Internet trong nước 200 Mbps\n- Internet quốc tế 10Mbps\n- Băng thông WAN: 200Mbps", "N8": "48", "O8": "96", "Q8": "1.5", "T8": "0", "U8": "0", "V8": "x", "W8": "-", "X8": "x", "Y8": "x", "Z8": "Window; PostgreSQL; DLP; Imperva", "AB8": "Có đăng ký license về: Firewall; DLP; IDS/IPS", "AC8": "Theo lộ trình C12", "AG8": "Tạm rút", "A9": "5", "B9": "Cà Mau\n(01 hệ thống)", "C9": "UBND", "D9": "Hệ thống iCaMau", "E9": "4267", "N9": "128", "O9": "256", "Q9": "1", "AD9": "Quý II/2027" };
 
-function seedWorkbookRows(stamp) {
-  let result = [];
-  for (let n = 5; n <= 8; n++) {
-    let get = c => workbookSeed[c + n] ?? '',
-      unit = String(get('B')).replace(/\s*\([^)]*hệ thống[^)]*\)/i, '').trim(),
-      agency = get('C'),
-      system = String(get('D')).trim(),
-      docs = String(get('E')).match(/\d+/g) || [],
-      snapshots = [];
-    for (let doc of docs) {
-      let values = {}, start = doc === '952' ? 5 : doc === '4651' ? 13 : null, labels = schemas[doc];
-      if (start !== null && labels) {
-        labels.forEach((label, j) => {
-          let idx = start + j + 1, col = '';
-          while (idx) { let c = (idx - 1) % 26; col = String.fromCharCode(65 + c) + col; idx = Math.floor((idx - 1) / 26) }
-          let v = get(col); if (v !== '') values[label] = v
-        });
-      }
-      snapshots.push({ id: uid(), doc, documentDate: doc === '952' ? '2025-03-15' : '2025-09-20', uploadedAt: stamp(doc === '952' ? 5 : 1), confirmedAt: stamp(doc === '952' ? 5 : 1), filename: 'test.xlsx', values, fields: [] });
-    }
-    result.push({ id: uid(), unit, agency, system, level: 'Địa phương', custom: {}, snapshots });
-  }
-  return result;
-}
-
 function seed() {
-  let now = new Date(), stamp = n => new Date(now.getFullYear(), now.getMonth(), Math.max(1, now.getDate() - n), 9, 30, 20).toISOString();
   return {
-    version: 4,
+    version: 7,
     schemas: { ...structuredClone(schemas) },
     columns: [],
-    rows: seedWorkbookRows(stamp),
-    docs: [
-      { id: uid(), no: '952', date: '2025-03-15', summary: 'Đăng ký nhu cầu tài nguyên hạ tầng điện toán đám mây', documentType: 'Công văn', type: 'Công văn', agency: 'Cục C12', note: '', files: [] },
-      { id: uid(), no: '4651', date: '2025-09-20', summary: 'Rà soát, bổ sung nhu cầu tài nguyên và phương án bảo đảm an toàn thông tin', documentType: 'Công văn', type: 'Công văn', agency: 'Cục C12', note: '', files: [] }
-    ],
-    get documents() { return this.docs; },
-    set documents(v) { this.docs = v; },
-    get officials() { return this.docs; },
-    set officials(v) { this.docs = v; },
-    knowledge: [
-      { id: uid(), title: 'Luật Chuyển đổi số 148/2025/QH15', type: 'Luật', summary: 'Quy định nguyên tắc, chính sách, điều phối quốc gia, biện pháp bảo đảm chuyển đổi số.', note: 'Tài liệu tham khảo', files: [] },
-      { id: uid(), title: 'Hướng dẫn quản lý nhu cầu tài nguyên', type: 'Hướng dẫn', summary: 'Quy trình đăng ký, rà soát và đối chiếu nhu cầu hạ tầng cho các hệ thống thông tin.', note: 'Tài liệu nghiệp vụ', files: [] },
-      { id: uid(), title: 'Quy trình phối hợp chuyên môn tổ', type: 'Quy trình', summary: 'Tiếp nhận hồ sơ, phân công xử lý và cập nhật kết quả trong không gian làm việc của tổ.', note: 'Quy trình nội bộ', files: [] }
-    ],
-    people: [
-      ['Nguyễn Minh An', 'Lãnh đạo quản lý, phụ trách', 0],
-      ['Trần Quốc Bình', 'Chỉ huy tổ', 1],
-      ['Lê Hoàng Chi', 'Phó chỉ huy', 2],
-      ['Phạm Gia Dũng', 'Phó chỉ huy', 2],
-      ['Vũ Thanh Hà', 'Cán bộ', 3],
-      ['Đỗ Minh Khôi', 'Hợp đồng', 3]
-    ].map((p, i) => ({ id: 'p' + i, name: p[0], position: p[1], rank: p[2], email: '', phone: '', type: i === 5 ? 'Hợp đồng' : 'Cán bộ', note: 'Hồ sơ minh họa' })),
-    users: [
-      { id: 'admin', name: 'Quản trị viên', email: 'admin@c12.demo', role: 'admin', status: 'approved', personId: '' },
-      { id: 'user', name: 'Thành viên tổ', email: 'user@c12.demo', role: 'user', status: 'approved', personId: '' },
-      { id: uid(), name: 'Người đăng ký mẫu', email: 'new@c12.demo', role: 'user', status: 'pending', personId: '' }
-    ]
+    rows: [], docs: [], knowledge: [], people: [], users: [], taskGroups: [], tasks: [],
+    resourceRecords: [], notifications: [], files: {}, counters: {}, resourceAppendixSchemas: {}
   };
 }
 
-let state;
-try { state = JSON.parse(localStorage.getItem('c12-prototype-v4')) } catch { }
-if (state?.version !== 4) state = seed();
+// App data comes from the API seed; leave any legacy localStorage records untouched.
+let state = seed();
 if (state) {
   state.documents ||= state.docs || [];
   state.officials ||= state.documents;
   state.docs ||= state.documents;
 }
 
-let session = sessionStorage.getItem('c12-v5-session') || localStorage.getItem('c12-session') || 'demo-u-g-HT',
+let session = '',
   page = location.hash.slice(1) || 'home',
   q = '',
   collapsed = false,
@@ -129,11 +77,10 @@ let session = sessionStorage.getItem('c12-v5-session') || localStorage.getItem('
   returnFocus = null;
 
 const save = () => {
-  if (window.C12SaveV5) return window.C12SaveV5();
-  try { localStorage.setItem('c12-prototype-v4', JSON.stringify(state)) } catch { toast('Bộ nhớ đã đầy. Hãy giảm tệp đính kèm.') }
+  return window.C12Api?.ready ? window.C12Api.persist(state) : undefined;
 };
 
-const me = () => state.users.find(u => u.id === session) || state.users.find(u => u.role === 'user') || state.users[0];
+const me = () => window.C12Api?.ready && !session ? null : state.users.find(u => u.id === session) || state.users.find(u => u.role === 'user') || state.users[0];
 const admin = () => me()?.role === 'admin';
 const key = r => [r.unit, r.agency, r.system].map(x => String(x).trim().toLocaleLowerCase('vi')).join('|');
 const latest = (r, d) => r.snapshots.filter(s => s.doc === d).sort((a, b) => new Date(b.confirmedAt) - new Date(a.confirmedAt))[0];

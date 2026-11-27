@@ -1,73 +1,64 @@
-# Kiến trúc Front-end hiện tại
+# Kiến trúc kỹ thuật
 
-Rà soát 26/11/2026. Đây là mô tả code hiện có, không phải kiến trúc backend mục tiêu.
+Cập nhật 27/11/2026. Mô tả code triển khai hiện tại. Nghiệp vụ chuẩn nằm ở [SPEC.md](SPEC.md); quyền chi tiết ở [PERMISSIONS.md](PERMISSIONS.md).
 
-## Stack và build
+## Cấu trúc repository
 
-- SPA tĩnh: HTML + Tailwind CSS v4 CLI + JavaScript thuần; không React/Vue.
-- `frontend/index.html` là entry point ứng dụng.
-- Package scripts: `npm run build:css` (compile/minify) và `npm run watch:css`.
-- Tailwind source: `frontend/css/app.css`; bundle được nạp là `frontend/assets/app.css`.
-- Local preview: `python -m http.server 8002 --bind 127.0.0.1`, sau đó `/frontend/`.
-- XLSX và Mammoth được nạp qua CDN; mất mạng/thất bại CDN ảnh hưởng tính năng phụ thuộc.
+```text
+C12-InternalApp/
+├── frontend/                 # SPA HTML/CSS/JS, Nginx phục vụ nguyên cây
+│   ├── index.html            # Entry point, giữ nguyên link tương đối
+│   ├── assets/app.css        # Bundle CSS từ css/app.css
+│   ├── css/                  # Tailwind entry, glass, workspace, auth, overrides
+│   └── js/{core,pages,components,features,data}/
+├── backend/                  # Express API + Socket.IO
+│   ├── Dockerfile
+│   ├── package.json
+│   └── src/{auth,config,db,middleware,modules,sockets}/
+├── database/{migrations,seeds}/
+├── deploy/{docker-compose.yml,nginx/}
+├── docs/ design/ reference/ tests/ .agents/
+├── index.html                # Preview tài liệu tại root, không phải app entry
+├── AGENTS.md README.md .env.example
+└── package.json              # Tailwind CLI
+```
 
-## Cấu trúc thư mục
+## Runtime và dữ liệu
 
-| Path | Trách nhiệm |
-|---|---|
-| `frontend/index.html` | DOM shell và thứ tự nạp assets/scripts |
-| `frontend/css/app.css` | Tailwind entry/import chain |
-| `frontend/css/legacy.css` | CSS nền cũ và nhiều theme token |
-| `frontend/css/workspace.css` | layout workspace/views |
-| `frontend/css/glass.css` | surfaces/glass styling |
-| `frontend/css/pages/auth.css` | auth view |
-| `frontend/css/rework-v7.css`, `ui-polish.css` | overrides/điều chỉnh mới hơn |
-| `frontend/js/core/foundation.js` | namespace, session/state nền và helpers |
-| `frontend/js/data/local_demand.js` | seed dataset tài nguyên |
-| `frontend/js/pages/app-shell.js` | navigation, header, shell và render routing |
-| `frontend/js/components/dialogs.js` | dialog/modal utilities và scroll lock |
-| `frontend/js/features/drawers.js` | drawer views |
-| `frontend/js/features/imports.js` | import flows |
-| `frontend/js/core/model.js` | nghiệp vụ task, quyền, trạng thái, danh mục |
-| `frontend/js/pages/workspace.js` | page renderers/state hydration |
-| `frontend/js/features/task-forms.js` | form tạo/sửa task |
-| `frontend/js/features/details.js` | chi tiết task/person/document |
-| `frontend/js/features/org-theme.js` | graph tổ và theme cá nhân |
-| `frontend/js/features/import-export.js` | import/export hooks |
-| `frontend/js/features/resource-table.js` | resource UI/base helpers |
-| `frontend/js/core/ui-repair.js` | UI repair compatibility |
-| `frontend/js/features/rework-v7.js` | V7 resource/catalog override và migration |
+- Frontend là SPA HTML + Tailwind CSS v4 + JavaScript thuần. Nginx copy nội dung `frontend/` vào document root nên các URL `assets/...` và `js/...` vẫn hợp lệ.
+- `frontend/js/core/api-client.js` là adapter tương thích cho state V7 hiện tại. App tải workspace qua `GET /api/v1/workspace` và ghi qua `PUT /api/v1/workspace`. Không nhập hoặc ghi dữ liệu nghiệp vụ localStorage cũ; localStorage chỉ giữ theme/palette và cờ lần đầu đăng nhập demo, bearer token nằm trong sessionStorage.
+- MySQL là nguồn dữ liệu chuẩn. `workspace_state` giữ snapshot JSON có revision để tương thích renderer/form hiện tại. Các collection được phản chiếu vào `tasks`, `resources`, `documents`, `task_groups`, `people`, `knowledge_items`; JSON payload giữ phụ lục, trường động và revisions. `resource_task_links` và `resource_document_links` phản chiếu liên kết resource–task/văn bản, còn `auth_sessions` lưu phiên đăng nhập.
+- Backend dùng Express, `mysql2/promise`, bcryptjs và JWT. Auth gồm đăng nhập, đăng ký chờ duyệt, demo login cấu hình được, tạo tài khoản. `accounts.status` được kiểm tra trên từng request có xác thực.
+- Module API đọc: `/api/v1/tasks`, `/resources`, `/documents`, `/stats`, `/history`. Các mutation UI hiện đi qua snapshot workspace; transaction khóa hàng `FOR UPDATE`, kiểm tra revision, ghi snapshot và mirror records. Khi transaction thành công, API mới phát `workspace.updated` qua Socket.IO. Tạo credential tài khoản cũng phát `account.created` sau khi insert MySQL thành công.
+- Socket.IO xác thực JWT handshake, hỗ trợ WebSocket và polling. Nginx proxy `/socket.io/` với Upgrade headers, timeout dài và buffering tắt.
+- MySQL container publish cổng `3307` chỉ trên loopback (`127.0.0.1`) để DBMS client trên máy host kết nối; bên trong Docker backend vẫn kết nối qua host `mysql:3306`.
+- `audit_events` ghi actor/revision cho lần lưu; chi tiết lịch sử task/resource vẫn nằm trong `revisions` của workspace và được đọc qua history API. Dữ liệu seed chỉ được nạp khi chưa có snapshot; reset seed là thao tác riêng dành cho admin và không thay đổi localStorage.
 
-> Danh sách trên là trách nhiệm cấp cao. Thứ tự load trong HTML quyết định implementation override cuối cùng; kiểm tra code trước khi sửa hàm trùng tên.
+## Migration và seed
 
-## Thứ tự script hiện tại
+- SQL migration ở `database/migrations/*.sql`, chạy theo thứ tự tên và ghi vào `schema_migrations`. Migration mới đặt số tiếp theo (ví dụ `002_add_field.sql`); không sửa schema trực tiếp trên môi trường đã chạy.
+- `database/seeds/seed-workspace.js` tạo dữ liệu mới cho MySQL: đủ loại văn bản, sáu nhóm, ít nhất hai thành viên mỗi nhóm, task xử lý văn bản/task tài nguyên/task thường, resource liên kết, kiến thức. Backend seed khi chưa có `workspace_state`.
+- Mật khẩu seed được hash bcrypt; `DEMO_ADMIN_PASSWORD` và `DEMO_USER_PASSWORD` trong `.env` cấu hình mật khẩu. Các tài khoản seed user khác dùng mật khẩu user demo.
+- Không nhập `c12-prototype-v*` từ browser. LocalStorage cũ được giữ nguyên như bản legacy, nhưng không còn là nguồn dữ liệu ứng dụng.
 
-`foundation.js` → `local_demand.js` → `app-shell.js` → `dialogs.js` → `drawers.js` → `imports.js` → `model.js` → `workspace.js` → `task-forms.js` → `details.js` → `org-theme.js` → `import-export.js` → `resource-table.js` → `ui-repair.js` → `rework-v7.js`.
+## Chạy và build
 
-## State, session, migration
+```powershell
+Copy-Item .env.example .env
+# đặt mật khẩu DB, JWT_SECRET và mật khẩu demo trong .env
+docker compose -f deploy/docker-compose.yml up --build
+```
 
-- Prototype state JSON lưu trong localStorage. Các khóa quan trọng gồm `c12-prototype-v7`; loader đọc/upgrade các cấu trúc phiên bản trước và backup dữ liệu cũ khi phù hợp.
-- Danh tính từng tab lưu trong sessionStorage (khóa hiện hành `c12-v5-session`, có fallback tương thích). Demo user mặc định `demo-u-g-HT`.
-- Theme có khóa mode/style/text palette và state theme theo user; xem [FRONTEND_RULES.md](FRONTEND_RULES.md).
-- BroadcastChannel `c12-v7` và browser `storage` event báo thay đổi giữa các tab cùng origin.
-- Không có server persistence, multi-device sync, API, auth provider hoặc server-side authorization.
-- Trước migration phải giữ nguyên backup; không xóa/reset storage để “sửa” schema.
+Mở `http://localhost:8080` (hoặc `WEB_PORT`). Demo identities: `admin@c12.demo` và `user@c12.demo`; mật khẩu là giá trị trong `.env`. Lần đầu mở app tự đăng nhập User demo nếu demo login được bật; các lần sau dùng phiên đăng nhập hiện tại hoặc màn login. Chạy backend độc lập: từ `backend/` chạy `npm install`, cấu hình root `.env`, chuẩn bị MySQL rồi chạy `npm start`. SPA cần được phục vụ cùng origin để `/api/` và `/socket.io/` hoạt động.
 
-## Runtime data paths cần nhớ
+Kết nối từ DBeaver/MySQL Workbench: host `127.0.0.1`, port `3307`, database `MYSQL_DATABASE`, user `MYSQL_USER`, password `MYSQL_PASSWORD` trong `.env`. Dùng tài khoản ứng dụng `c12_app`; không cần root. Nếu port `3307` đang bị chiếm, đổi port mapping trong `deploy/docker-compose.yml` rồi khởi chạy lại stack.
 
-- Tasks, catalog documents, groups, people, account, comments/revisions và notifications nằm trong state prototype.
-- V7 resource records là collection độc lập nhưng liên kết nhiều-nhiều ở phía resource (`taskIds`) với task resource có một `resourceId`; resource task chỉ giữ đúng một resource. `resourceData`, attachments và custom fields được đồng bộ snapshot trong các bản ghi liên kết. Khi tạo resource kèm task, V7 dùng snapshot state để rollback nếu lưu lỗi; không có transaction backend.
-- Resource được tìm/gộp theo khóa đã chuẩn hóa Tên đơn vị + Cơ quan quản lý + Hệ thống khi lưu; task resource mới liên kết resource theo `resourceId` hiện tại hoặc cùng khóa nghiệp vụ, nếu không có thì tạo resource.
-- Schema cột appendix theo Công văn: `resourcesWorkspace()` lấy mọi `state.documents` active có type `Công văn` để dựng header. `resourceDocColumnsV7()` chọn schema tùy chỉnh ở `state.resourceAppendixSchemas`, schema đặc thù 952/4651, hoặc sáu cột mặc định; cột appendix đã lưu theo resource cũng được hợp nhất. Do đó Công văn mới tạo header nhóm ở lần render workspace tài nguyên, nhưng không tự tạo resource hay liên kết vào resource. Schema/cột được sửa là client-side state.
-- Resource lưu liên kết Công văn ở `registeredDocumentIds`, Văn bản cấp tài nguyên ở `assetDocumentIds` (alias cũ `exchangeDocumentIds`), phụ lục theo `documentAppendices[documentId]`; cột Task trong bảng lấy mã từ quan hệ task. Task Xử lý văn bản lưu `documentId` đến catalog item chính. Các liên kết này không tự suy ra lẫn nhau.
-- Catalog dùng `state.documents`; alias cũ `officials`/`docs` phục vụ migration/tương thích. Loại danh mục khai báo ở `DOCUMENT_TYPES` trong `frontend/js/core/model.js`, gồm cả “Văn bản cấp tài nguyên”.
-- Văn bản được archive nếu đang được task/resource tham chiếu; hard-delete chỉ áp dụng văn bản chưa liên kết. Renderer tài nguyên chỉ dựng appendix groups cho văn bản active, vì vậy archived doc có thể còn link/data nhưng không còn xuất hiện thành nhóm cột trên bảng/export.
-- Stats page có một số fixture; không coi mọi widget là live data.
+Tailwind: tại root chạy `npm run build:css` để build `frontend/assets/app.css`, hoặc `npm run watch:css`. XLSX/Mammoth hiện được nạp qua CDN.
 
-## Giới hạn và an toàn thay đổi
+## Ranh giới hiện tại
 
-- localStorage/sessionStorage không phải database hoặc bảo mật; không đưa dữ liệu nhạy cảm thật vào prototype.
-- Không sửa build bundle trực tiếp nếu source CSS có thể sửa; không bỏ legacy module trước khi kiểm tra load order và side effects.
-- Không chạy kiểm thử/build nếu người dùng không yêu cầu. Hiện package không khai báo test script; `tests/` chứa các script riêng có thể tham khảo.
-- Có script kiểm tra lịch sử trong `tests/` còn kỳ vọng decision log tách riêng; sau khi log được gộp vào SPEC, script đó cần được cập nhật trước khi dùng như validator tài liệu. Không chạy script này như bằng chứng nghiệm thu hiện tại.
-- Khi mô tả tính năng, phân biệt UI, client-side behavior và server-side guarantee (hiện chưa có).
+- Snapshot adapter giữ nguyên nhiều nghiệp vụ client-side; API module hiện cung cấp route đọc, chưa tách mutation thành endpoint use-case riêng. Mọi lần ghi vẫn đi qua transaction và chỉ phát realtime sau commit.
+- Bảng entity là mirror để truy vấn theo domain; snapshot vẫn là nguồn render chính. Khi bỏ snapshot, cần migration có kiểm soát.
+- API kiểm tra role và quyền Task/Resource cơ bản. Vì client gửi workspace snapshot, mọi thay đổi quyền phải đồng bộ `backend/src/modules/permissions.js` trước khi mở UI tương ứng.
+- Reset seed chỉ dành admin, thay thế snapshot MySQL và không chạm localStorage.
+- Root `index.html` là preview tài liệu; deployment phục vụ `frontend/index.html`.

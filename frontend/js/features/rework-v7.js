@@ -15,10 +15,8 @@ const catalogTypesV7 = V7.DOCUMENT_TYPES;
 const normV7 = value => String(value || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('vi');
 const resourceCellV7 = (value, label = '') => `<span class="resource-cell-value"${label ? ` title="${esc(label)}"` : ''}>${esc(value || '—')}</span>`;
 const resourceRowsV7 = record => record.hardwareRows?.length ? record.hardwareRows : [{ STT: '1' }];
-const resourceDisplayRowsV7 = (record, docIds) => {
-  const sharedCount = Math.max(resourceRowsV7(record).length, record.sharedHardwareRowCount || 0, ...docIds.map(id => record.documentAppendices?.[id]?.rows?.length || 0), 1);
-  return [...Array.from({ length: sharedCount }, (_, i) => ({ i, kind: 'shared' })), ...docIds.flatMap(id => (record.documentAppendices?.[id]?.privateRows || []).map((_, i) => ({ i, kind: 'private', docId: id })))];
-};
+const resourceSharedRowCountV7 = record => Math.max(resourceRowsV7(record).length, record.sharedHardwareRowCount || 0, ...(record.registeredDocumentIds || []).map(id => record.documentAppendices?.[id]?.rows?.length || 0), 1);
+const resourceDisplayRowsV7 = (record, docIds) => [...Array.from({ length: resourceSharedRowCountV7(record) }, (_, i) => ({ i, kind: 'shared' })), ...docIds.flatMap(id => (record.documentAppendices?.[id]?.privateRows || []).map((data, privateIndex) => ({ i: privateIndex, privateIndex, data, kind: 'private', docId: id })))];
 const linkedResourceTasksV7 = record => state.tasks.filter(task => (record.taskIds || []).includes(task.id) || task.resourceId === record.id);
 const canEditResourceV7 = record => admin() || record.createdBy === session || linkedResourceTasksV7(record).some(task => task.creatorId === session || (task.assigneeIds || []).includes(session));
 const resourceDocumentIdsV7 = record => record.assetDocumentIds || record.exchangeDocumentIds || [];
@@ -166,6 +164,7 @@ function saveTaskResourceV7(task) {
 }
 
 function migrateResourceColumnsV7() {
+  let changed = false;
   if (typeof state !== 'undefined' && state) {
     state.documents ||= state.docs || [];
     state.officials ||= state.documents;
@@ -179,11 +178,13 @@ function migrateResourceColumnsV7() {
   if (!doc952) {
     doc952 = { id: uid(), no: '952', date: '2025-03-15', summary: 'Đăng ký nhu cầu tài nguyên hạ tầng điện toán đám mây', documentType: 'Công văn', type: 'Công văn', agency: 'Cục C12', files: [] };
     state.documents.push(doc952);
+    changed = true;
   }
   let doc4651 = state.documents.find(d => normV7(d.no) === '4651');
   if (!doc4651) {
     doc4651 = { id: uid(), no: '4651', date: '2025-09-20', summary: 'Rà soát, bổ sung nhu cầu tài nguyên và phương án bảo đảm an toàn thông tin', documentType: 'Công văn', type: 'Công văn', agency: 'Cục C12', files: [] };
     state.documents.push(doc4651);
+    changed = true;
   }
 
   delete state.schemas?.['4267'];
@@ -199,8 +200,8 @@ function migrateResourceColumnsV7() {
     isResourceDirectColumnV7(c)
   );
 
-  // Seed full dataset from LOCAL_DEMAND_DATA if resourceRecords has <= 5 mock items
-  if (typeof LOCAL_DEMAND_DATA !== 'undefined' && LOCAL_DEMAND_DATA.length && (!state.resourceRecords || state.resourceRecords.length <= 5)) {
+  // Import the workbook seed once for fresh V7 demo scenarios as well as empty legacy state.
+  if (typeof LOCAL_DEMAND_DATA !== 'undefined' && LOCAL_DEMAND_DATA.length && (!state.resourceRecords || state.resourceRecords.length <= 5 || (state.demoSeedVersion >= 2 && !state.localDemandSeeded))) {
     const priorRecords = state.resourceRecords || [];
     const byKey = new Map();
     priorRecords.forEach(r => byKey.set([r.unit, r.agency, r.system].map(normV7).join('|'), r));
@@ -251,6 +252,8 @@ function migrateResourceColumnsV7() {
         updatedAt: existing?.updatedAt || V7.now?.() || new Date().toISOString()
       };
     }).concat(priorRecords.filter(record => !seedKeys.has([record.unit, record.agency, record.system].map(normV7).join('|'))));
+    state.localDemandSeeded = true;
+    changed = true;
   }
 
   // Sanitize any remaining records
@@ -268,12 +271,25 @@ function migrateResourceColumnsV7() {
     }
     r.registeredDocumentIds = [...new Set((r.registeredDocumentIds || []).filter(did => state.documents.some(doc => doc.id === did)))];
   }
+
+  if (state.demoSeedVersion >= 2 && !state.resourceDemoDensityV2 && typeof LOCAL_DEMAND_DATA !== 'undefined') {
+    const keyOf = item => [item.unit, item.agency, item.system].map(normV7).join('|'),
+      demoRows = new Map(LOCAL_DEMAND_DATA.map(item => [keyOf(item), item])),
+      keepKeys = new Set(LOCAL_DEMAND_DATA.slice(0, 12).map(keyOf)),
+      hasUserChanges = record => (record.taskIds || []).length || (record.revisions || []).length || (record.attachments || []).length ||
+        (record.customFields || []).length || (record.sharedHardwareRowCount || 1) > 1 ||
+        Object.values(record.documentAppendices || {}).some(appendix => (appendix.privateRows || []).length > 0);
+    state.resourceRecords = state.resourceRecords.filter(record => !demoRows.has(keyOf(record)) || keepKeys.has(keyOf(record)) || hasUserChanges(record));
+    state.resourceDemoDensityV2 = true;
+    changed = true;
+  }
+  return changed;
 }
 
 // The prior task-linked projection is replaced by records owned by the resource workspace.
 resourcesWorkspace = function () {
   state.resourceRecords ||= [];
-  migrateResourceColumnsV7();
+  if (migrateResourceColumnsV7()) window.C12SaveV5?.();
   const filterDocs = state.documents.filter(doc => !doc.archived && (doc.documentType || doc.type) === 'Công văn');
 
   let records = state.resourceRecords.filter(record => {
@@ -293,27 +309,46 @@ resourcesWorkspace = function () {
   });
 
   const flatRows = records.flatMap((record, ri) => {
-    const sharedCount = Math.max(record.sharedHardwareRowCount || 1, 1);
-    return Array.from({ length: sharedCount }, (_, i) => ({ record, ri, i, kind: 'shared', unit: record.unit, agency: record.agency, system: record.system, stt: record.stt }));
+    const sharedCount = resourceSharedRowCountV7(record);
+    const shared = Array.from({ length: sharedCount }, (_, i) => ({ record, ri, i, kind: 'shared', unit: record.unit, agency: record.agency, system: record.system, stt: record.stt }));
+    const privateRows = appendixGroups.flatMap(({ doc }) => {
+      if (!(record.registeredDocumentIds || []).includes(doc.id)) return [];
+      return (record.documentAppendices?.[doc.id]?.privateRows || []).map((data, privateIndex) => ({
+        record, ri, kind: 'private', docId: doc.id, privateIndex, data,
+        unit: data.unit || '', agency: data.agency || '', system: data.system || '', stt: record.stt
+      }));
+    });
+    return [...shared, ...privateRows];
   });
 
   const getUnitSpan = at => {
     const cur = flatRows[at];
-    if (at > 0 && normV7(flatRows[at - 1].unit) === normV7(cur.unit)) return 0;
+    if (cur.kind === 'private') return 1;
+    if (at > 0 && flatRows[at - 1].kind === 'shared' && normV7(flatRows[at - 1].unit) === normV7(cur.unit)) return 0;
     let span = 1;
-    while (at + span < flatRows.length && normV7(flatRows[at + span].unit) === normV7(cur.unit)) span++;
+    while (at + span < flatRows.length && flatRows[at + span].kind === 'shared' && normV7(flatRows[at + span].unit) === normV7(cur.unit)) span++;
     return span;
   };
 
   const getAgencySpan = at => {
     const cur = flatRows[at];
-    if (at > 0 && normV7(flatRows[at - 1].unit) === normV7(cur.unit) && normV7(flatRows[at - 1].agency) === normV7(cur.agency)) return 0;
+    if (cur.kind === 'private') return 1;
+    if (at > 0 && flatRows[at - 1].kind === 'shared' && normV7(flatRows[at - 1].unit) === normV7(cur.unit) && normV7(flatRows[at - 1].agency) === normV7(cur.agency)) return 0;
     let span = 1;
-    while (at + span < flatRows.length && normV7(flatRows[at + span].unit) === normV7(cur.unit) && normV7(flatRows[at + span].agency) === normV7(cur.agency)) span++;
+    while (at + span < flatRows.length && flatRows[at + span].kind === 'shared' && normV7(flatRows[at + span].unit) === normV7(cur.unit) && normV7(flatRows[at + span].agency) === normV7(cur.agency)) span++;
     return span;
   };
 
   const getSystemSpan = at => {
+    const cur = flatRows[at];
+    if (cur.kind === 'private') return 1;
+    if (at > 0 && flatRows[at - 1].record.id === cur.record.id) return 0;
+    let span = 1;
+    while (at + span < flatRows.length && flatRows[at + span].kind === 'shared' && flatRows[at + span].record.id === cur.record.id) span++;
+    return span;
+  };
+
+  const getRecordSpan = at => {
     const cur = flatRows[at];
     if (at > 0 && flatRows[at - 1].record.id === cur.record.id) return 0;
     let span = 1;
@@ -337,10 +372,11 @@ resourcesWorkspace = function () {
       </div>
       <div class="table-scroll"><table class="data-table resource-v7-table"><thead><tr><th rowspan="2" class="col-action">Thao tác</th><th rowspan="2" class="col-stt">STT</th><th rowspan="2" class="col-unit">Tên đơn vị</th><th rowspan="2" class="col-agency">Cơ quan quản lý</th><th rowspan="2" class="col-system">Hệ thống</th><th rowspan="2" class="col-docs">Công văn đăng ký</th><th rowspan="2" class="col-asset-docs">Văn bản cấp tài nguyên</th><th rowspan="2" class="col-task-links">Công việc (Task)</th>${appendixGroups.filter(group => group.columns.length).map(({ doc, columns }) => `<th colspan="${columns.length}" class="th-doc-group ${doc.no === '952' ? 'th-doc-952' : doc.no === '4651' ? 'th-doc-4651' : 'th-doc-other'}">${esc(doc.documentType || 'Văn bản')} ${esc(doc.no || '')}</th>`).join('')}</tr><tr>${appendixGroups.flatMap(({ doc, columns, canManageSchema }) => columns.map(c => `<th class="th-sub ${doc.no === '952' ? 'th-sub-952' : doc.no === '4651' ? 'th-sub-4651' : 'th-sub-other'}" title="${esc(c)}"><span class="resource-v7-column-heading">${esc(formatShortHeader(c))}${canManageSchema ? `<button type="button" class="resource-v7-delete-column" data-resource-delete-col-v7="${esc(doc.id)}" data-resource-delete-col-name-v7="${esc(c)}" aria-label="Xóa cột ${esc(c)} khỏi ${esc(doc.no || doc.documentType)}" title="Xóa cột này">${icon('close')}</button>` : ''}</span></th>`)).join('')}</tr></thead><tbody>
         ${flatRows.map((entry, at) => {
-      const { record, ri, i, unit, agency, system, stt } = entry;
+      const { record, ri, i, kind, docId, privateIndex, unit, agency, system, stt } = entry;
       const unitSpan = getUnitSpan(at);
       const agencySpan = getAgencySpan(at);
       const systemSpan = getSystemSpan(at);
+      const recordSpan = getRecordSpan(at);
       const docsBadge = (record.registeredDocumentIds || []).map(id => {
         const d = state.documents.find(x => x.id === id);
         return d ? `<span class="chip active">${esc(d.no || d.documentType)}</span>` : '';
@@ -349,22 +385,25 @@ resourcesWorkspace = function () {
       const taskCodes = resourceTaskIdsV7(record).map(id => state.tasks.find(task => task.id === id)?.code).filter(Boolean).join(', ') || '—';
 
       let rowHtml = `<tr data-resource-v7="${record.id}">`;
-      if (systemSpan > 0) rowHtml += `<td class="col-action" rowspan="${systemSpan}"><button class="icon-btn-sm" type="button" data-resource-v7-detail="${record.id}" aria-label="Xem chi tiết tài nguyên"><span class="sr-only">Xem chi tiết</span>${icon('eye')}</button></td>`;
-      if (unitSpan > 0) {
+      if (recordSpan > 0) rowHtml += `<td class="col-action" rowspan="${recordSpan}"><button class="icon-btn-sm" type="button" data-resource-v7-detail="${record.id}" aria-label="Xem chi tiết tài nguyên"><span class="sr-only">Xem chi tiết</span>${icon('eye')}</button></td>`;
+      if (kind === 'private') {
+        rowHtml += `<td class="col-stt">${esc(stt || (ri + 1))}</td><td class="col-unit"><strong>${resourceCellV7(unit)}</strong></td><td class="col-agency">${resourceCellV7(agency)}</td><td class="col-system"><strong>${resourceCellV7(system)}</strong></td>`;
+      } else if (unitSpan > 0) {
         rowHtml += `<td class="col-stt" rowspan="${unitSpan}">${esc(stt || (ri + 1))}</td>`;
         rowHtml += `<td class="col-unit" rowspan="${unitSpan}"><strong>${resourceCellV7(unit)}</strong></td>`;
       }
-      if (agencySpan > 0) {
+      if (kind === 'shared' && agencySpan > 0) {
         rowHtml += `<td class="col-agency" rowspan="${agencySpan}">${resourceCellV7(agency)}</td>`;
       }
-      if (systemSpan > 0) {
+      if (kind === 'shared' && systemSpan > 0) {
         rowHtml += `<td class="col-system" rowspan="${systemSpan}"><strong>${resourceCellV7(system)}</strong></td>`;
-        rowHtml += `<td class="col-docs" rowspan="${systemSpan}"><button type="button" class="link-button resource-editable-link" data-resource-link-edit-v7="registered" data-resource-link-record-v7="${record.id}">${docsBadge}<span class="resource-edit-indicator" aria-hidden="true">${icon('edit')}</span></button></td><td class="col-asset-docs" rowspan="${systemSpan}"><button type="button" class="link-button resource-editable-link" data-resource-link-edit-v7="asset" data-resource-link-record-v7="${record.id}">${resourceCellV7(assetDocuments)}<span class="resource-edit-indicator" aria-hidden="true">${icon('edit')}</span></button></td><td class="col-task-links" rowspan="${systemSpan}"><button type="button" class="link-button resource-editable-link" data-resource-link-edit-v7="tasks" data-resource-link-record-v7="${record.id}">${resourceCellV7(taskCodes)}<span class="resource-edit-indicator" aria-hidden="true">${icon('edit')}</span></button></td>`;
       }
+      if (recordSpan > 0) rowHtml += `<td class="col-docs" rowspan="${recordSpan}"><button type="button" class="link-button resource-editable-link" data-resource-link-edit-v7="registered" data-resource-link-record-v7="${record.id}">${docsBadge}<span class="resource-edit-indicator" aria-hidden="true">${icon('edit')}</span></button></td><td class="col-asset-docs" rowspan="${recordSpan}"><button type="button" class="link-button resource-editable-link" data-resource-link-edit-v7="asset" data-resource-link-record-v7="${record.id}">${resourceCellV7(assetDocuments)}<span class="resource-edit-indicator" aria-hidden="true">${icon('edit')}</span></button></td><td class="col-task-links" rowspan="${recordSpan}"><button type="button" class="link-button resource-editable-link" data-resource-link-edit-v7="tasks" data-resource-link-record-v7="${record.id}">${resourceCellV7(taskCodes)}<span class="resource-edit-indicator" aria-hidden="true">${icon('edit')}</span></button></td>`;
       rowHtml += appendixGroups.map(({ doc, columns }) => {
-        if (!(record.registeredDocumentIds || []).includes(doc.id)) return columns.map(() => '<td class="resource-doc-cell">—</td>').join('');
-        const values = record.documentAppendices?.[doc.id]?.rows?.[i] || {};
-        return columns.map(c => { const val = values[c] ?? ''; const tone = doc.no === '952' ? 'cell-952' : doc.no === '4651' ? 'cell-4651' : 'cell-other'; return `<td class="resource-edit-cell resource-doc-cell ${tone}" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${i}" data-resource-kind-edit-v7="shared" data-resource-doc-edit-v7="${doc.id}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${resourceCellV7(val, c)}<span class="resource-edit-indicator" aria-hidden="true">${icon('edit')}</span></td>` }).join('');
+        if (!(record.registeredDocumentIds || []).includes(doc.id) || (kind === 'private' && doc.id !== docId)) return columns.map(() => '<td class="resource-doc-cell">—</td>').join('');
+        const values = kind === 'private' ? (record.documentAppendices?.[doc.id]?.privateRows?.[privateIndex] || {}) : (record.documentAppendices?.[doc.id]?.rows?.[i] || {});
+        const editKind = kind === 'private' ? 'private' : 'shared', editIndex = kind === 'private' ? privateIndex : i;
+        return columns.map(c => { const val = values[c] ?? ''; const tone = doc.no === '952' ? 'cell-952' : doc.no === '4651' ? 'cell-4651' : 'cell-other'; return `<td class="resource-edit-cell resource-doc-cell ${tone}" tabindex="0" data-resource-cell-edit-v7="${record.id}" data-resource-row-edit-v7="${editIndex}" data-resource-kind-edit-v7="${editKind}" data-resource-doc-edit-v7="${doc.id}" data-resource-column-edit-v7="${esc(c)}" title="${esc(c)}: ${esc(val)}">${resourceCellV7(val, c)}<span class="resource-edit-indicator" aria-hidden="true">${icon('edit')}</span></td>` }).join('');
       }).join('');
       rowHtml += `</tr>`;
       return rowHtml;
@@ -410,29 +449,45 @@ function exportResourceExcelV7(records) {
   let colOffset = fixed.length;
   for (const group of groups) { if (group.columns.length > 1) merges.push({ s: { r: 0, c: colOffset }, e: { r: 0, c: colOffset + group.columns.length - 1 } }); colOffset += group.columns.length }
 
-  records.forEach((record, idx) => {
-    const docsStr = (record.registeredDocumentIds || [])
+  // Export one worksheet row for each row shown in the table, including private
+  // appendix rows. A private row belongs only to its selected document group.
+  const flatRows = records.flatMap((record, recordIndex) => {
+    const shared = Array.from({ length: resourceSharedRowCountV7(record) }, (_, rowIndex) => ({ record, recordIndex, rowIndex, kind: 'shared' }));
+    const privateRows = groups.flatMap(({ doc }) => (record.registeredDocumentIds || []).includes(doc.id)
+      ? (record.documentAppendices?.[doc.id]?.privateRows || []).map((row, privateIndex) => ({ record, recordIndex, rowIndex: privateIndex, privateIndex, privateData: row, docId: doc.id, kind: 'private' }))
+      : []);
+    return [...shared, ...privateRows];
+  });
+  flatRows.forEach(({ record, recordIndex, rowIndex, kind, privateData, docId }, flatIndex) => {
+    const previous = flatRows[flatIndex - 1];
+    const firstForRecord = !previous || previous.record.id !== record.id;
+    const firstForUnit = kind === 'private' || !previous || previous.kind !== 'shared' || normV7(previous.record.unit) !== normV7(record.unit);
+    const firstForAgency = kind === 'private' || firstForUnit || normV7(previous.record.agency) !== normV7(record.agency);
+    const docsStr = firstForRecord ? (record.registeredDocumentIds || [])
       .map(id => state.documents.find(d => d.id === id)?.no || '')
-      .filter(Boolean).join(', ');
-    const assetDocsStr = resourceDocumentIdsV7(record).map(resourceDocNumberV7).filter(Boolean).join(', ');
-    const taskCodesStr = resourceTaskIdsV7(record).map(id => state.tasks.find(task => task.id === id)?.code).filter(Boolean).join(', ');
-
+      .filter(Boolean).join(', ') : '';
+    const assetDocsStr = firstForRecord ? resourceDocumentIdsV7(record).map(resourceDocNumberV7).filter(Boolean).join(', ') : '';
+    const taskCodesStr = firstForRecord ? resourceTaskIdsV7(record).map(id => state.tasks.find(task => task.id === id)?.code).filter(Boolean).join(', ') : '';
     data.push([
-      idx + 1,
-      record.unit || '',
-      record.agency || '',
-      record.system || '',
+      kind === 'private' ? (record.stt || recordIndex + 1) : firstForUnit ? (record.stt || recordIndex + 1) : '',
+      kind === 'private' ? (privateData.unit || '') : firstForUnit ? (record.unit || '') : '',
+      kind === 'private' ? (privateData.agency || '') : firstForAgency ? (record.agency || '') : '',
+      kind === 'private' ? (privateData.system || '') : firstForRecord ? (record.system || '') : '',
       docsStr,
       assetDocsStr,
       taskCodesStr,
-      ...groups.flatMap(({ doc, columns }) => columns.map(column => record.documentAppendices?.[doc.id]?.rows?.[0]?.[column] ?? ''))
+      ...groups.flatMap(({ doc, columns }) => {
+        if (!(record.registeredDocumentIds || []).includes(doc.id) || (kind === 'private' && doc.id !== docId)) return columns.map(() => '');
+        const values = kind === 'private' ? privateData : record.documentAppendices?.[doc.id]?.rows?.[rowIndex] || {};
+        return columns.map(column => values[column] ?? '');
+      })
     ].map(cleanExcelV7));
   });
 
   const firstData = 2;
-  for (let start = 0; start < records.length;) {
+  for (let start = 0; start < flatRows.length;) {
     let end = start + 1;
-    while (end < records.length && normV7(records[end].unit) === normV7(records[start].unit)) {
+    while (flatRows[start].kind === 'shared' && end < flatRows.length && flatRows[end].kind === 'shared' && normV7(flatRows[end].record.unit) === normV7(flatRows[start].record.unit)) {
       end++;
     }
     if (end - start > 1) {
@@ -442,7 +497,7 @@ function exportResourceExcelV7(records) {
     let a = start;
     while (a < end) {
       let b = a + 1;
-      while (b < end && normV7(records[b].agency) === normV7(records[a].agency)) {
+      while (b < end && normV7(flatRows[b].record.agency) === normV7(flatRows[a].record.agency)) {
         b++;
       }
       if (b - a > 1) {
@@ -451,6 +506,18 @@ function exportResourceExcelV7(records) {
       a = b;
     }
     start = end;
+  }
+  for (let start = 0; start < flatRows.length;) {
+    const record = flatRows[start].record;
+    let recordEnd = start + 1;
+    while (recordEnd < flatRows.length && flatRows[recordEnd].record.id === record.id) recordEnd++;
+    let sharedEnd = start;
+    while (sharedEnd < recordEnd && flatRows[sharedEnd].kind === 'shared') sharedEnd++;
+    if (sharedEnd - start > 1) merges.push({ s: { r: firstData + start, c: 3 }, e: { r: firstData + sharedEnd - 1, c: 3 } });
+    if (recordEnd - start > 1) {
+      for (const col of [4, 5, 6]) merges.push({ s: { r: firstData + start, c: col }, e: { r: firstData + recordEnd - 1, c: col } });
+    }
+    start = recordEnd;
   }
 
   const ws = window.XLSX.utils.aoa_to_sheet(data);
@@ -469,7 +536,7 @@ function exportResourceExcelV7(records) {
     window.XLSX.utils.book_append_sheet(wb, ws, 'Nhu cầu Địa phương');
     const now = new Date(), date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     window.XLSX.writeFile(wb, `Nhu_cau_Dia_phuong_${date}.xlsx`);
-    toast(`Đã xuất ${records.length} hệ thống tài nguyên.`);
+    toast(`Đã xuất ${flatRows.length} dòng từ ${records.length} hệ thống tài nguyên.`);
   } catch (error) {
     toast('Không thể tạo tệp Excel. Vui lòng thử tải lại trang.');
   }
@@ -498,7 +565,7 @@ function resourceTableActionV7(kind) {
     modal('Thêm hàng chung', `<label class="field"><span>Tên đơn vị <b class="required">*</b></span><select name="unit" id="resourceCommonUnitV7" required>${units.map(v => `<option>${esc(v)}</option>`).join('')}</select></label><label class="field"><span>Cơ quan quản lý <b class="required">*</b></span><select name="agency" id="resourceCommonAgencyV7" required>${agencies.map(v => `<option>${esc(v)}</option>`).join('')}</select></label><label class="field"><span>Hệ thống <b class="required">*</b></span><select name="system" id="resourceCommonSystemV7" required>${systems.map(v => `<option>${esc(v)}</option>`).join('')}</select></label><p class="small muted">Thêm một dòng trống vào hệ thống đã chọn và căn hàng giữa các nhóm văn bản đang đăng ký.</p>`, data => {
       const source = editable.find(r => r.unit === data.unit && r.agency === data.agency && r.system === data.system); if (!source) throw Error('Chọn đơn vị, cơ quan quản lý và hệ thống hiện có.'); const draft = V7.clone(source); draft.documentAppendices ||= {}; const count = Math.max(draft.sharedHardwareRowCount || 0, draft.hardwareRows?.length || 0, ...Object.values(draft.documentAppendices).map(app => app.rows?.length || 0)) + 1; draft.sharedHardwareRowCount = count;
       const row = {}; (draft.hardwareColumns || []).forEach((c, i) => row[c] = i === 0 ? String(count) : ''); draft.hardwareRows ||= []; while (draft.hardwareRows.length < count - 1) draft.hardwareRows.push({}); draft.hardwareRows.push(row);
-      (draft.registeredDocumentIds || []).forEach(id => { const app = draft.documentAppendices[id] ||= { columns: [], rows: [], privateRows: [] }; app.rows ||= []; while (app.rows.length < count) app.rows.push({}) }); saveResourceV7(draft);
+      (draft.registeredDocumentIds || []).forEach(id => { const app = draft.documentAppendices[id] ||= { columns: [], rows: [], privateRows: [] }; app.rows ||= []; while (app.rows.length < count) app.rows.push({}) }); return saveResourceV7(draft);
     }, false, 'Thêm hàng');
     const refreshSystems = () => { const unit = $('#resourceCommonUnitV7')?.value || '', agency = $('#resourceCommonAgencyV7')?.value || '', systemSelect = $('#resourceCommonSystemV7'); if (!systemSelect) return; const values = [...new Set(editable.filter(r => r.unit === unit && r.agency === agency).map(r => r.system))]; systemSelect.innerHTML = values.map(v => `<option>${esc(v)}</option>`).join('') };
     const refreshAgencies = () => { const unit = $('#resourceCommonUnitV7')?.value || '', agencySelect = $('#resourceCommonAgencyV7'); if (!agencySelect) return; const values = [...new Set(editable.filter(r => r.unit === unit).map(r => r.agency))]; agencySelect.innerHTML = values.map(v => `<option>${esc(v)}</option>`).join(''); refreshSystems() };
@@ -508,7 +575,7 @@ function resourceTableActionV7(kind) {
     if (!documents.length) return toast('Chưa có văn bản đăng ký cho tài nguyên.');
     modal('Thêm hàng riêng', `<label class="field"><span>Tài nguyên cha <b class="required">*</b></span><select name="resourceId" id="resourcePrivateParentV7" required>${resourceOptions}</select></label><label class="field"><span>Nhóm văn bản <b class="required">*</b></span><select name="docId" id="resourcePrivateDocV7" required>${documentOptions}</select></label>${field('Tên đơn vị *', 'unit', '', 'text', true)}${field('Cơ quan quản lý *', 'agency', '', 'text', true)}${field('Hệ thống *', 'system', '', 'text', true)}<p class="small muted">Dòng này chỉ xuất hiện trong nhóm văn bản đã chọn, không gộp vào các dòng chung.</p>`, data => {
       const draft = V7.clone(state.resourceRecords.find(r => r.id === data.resourceId)); if (!draft) throw Error('Chọn tài nguyên có thể chỉnh sửa.'); if (!(draft.registeredDocumentIds || []).includes(data.docId)) throw Error('Văn bản này chưa được đăng ký cho tài nguyên đã chọn.');
-      const app = draft.documentAppendices[data.docId] ||= { columns: [], rows: [], privateRows: [] }; app.privateRows ||= []; app.privateRows.push({ unit: data.unit.trim(), agency: data.agency.trim(), system: data.system.trim() }); saveResourceV7(draft);
+      const app = draft.documentAppendices[data.docId] ||= { columns: [], rows: [], privateRows: [] }; app.privateRows ||= []; app.privateRows.push({ unit: data.unit.trim(), agency: data.agency.trim(), system: data.system.trim() }); return saveResourceV7(draft);
     }, true, 'Thêm hàng riêng');
     $('#resourcePrivateParentV7')?.addEventListener('change', e => { const parent = state.resourceRecords.find(r => r.id === e.target.value); const select = $('#resourcePrivateDocV7'); if (!select) return; const ids = parent?.registeredDocumentIds || []; select.innerHTML = ids.map(id => state.documents.find(d => d.id === id)).filter(Boolean).map(d => `<option value="${esc(d.id)}">${esc(`${d.no || d.documentType} · ${d.documentType}`)}</option>`).join('') });
     $('#resourcePrivateParentV7')?.dispatchEvent(new Event('change'));
@@ -521,7 +588,8 @@ function resourceDeleteColumnV7(docId, column) {
   if (!doc || !resourceDocColumnsV7(docId).includes(column)) return;
   const linkedRecords = state.resourceRecords.filter(record => (record.registeredDocumentIds || []).includes(docId));
   if (!admin() && !linkedRecords.every(canEditResourceV7)) return toast('Bạn không có quyền quản lý cột của nhóm công văn này.');
-  modal('Xóa cột trong nhóm công văn', `<p>Bạn có chắc muốn xóa cột <strong>${esc(column)}</strong> khỏi công văn <strong>${esc(doc.no || doc.documentType)}</strong>?</p><p class="small muted">Giá trị của cột này trong các dòng phụ lục thuộc công văn sẽ bị xóa. Các nhóm công văn khác không bị ảnh hưởng.</p>`, () => {
+  modal('Xóa cột trong nhóm công văn', `<p>Bạn có chắc muốn xóa cột <strong>${esc(column)}</strong> khỏi công văn <strong>${esc(doc.no || doc.documentType)}</strong>?</p><p class="small muted">Giá trị của cột này trong các dòng phụ lục thuộc công văn sẽ bị xóa. Các nhóm công văn khác không bị ảnh hưởng.</p>`, async () => {
+    const backup = V7.clone(state);
     state.resourceAppendixSchemas ||= {};
     state.resourceAppendixSchemas[docId] = resourceDocColumnsV7(docId).filter(name => name !== column);
     state.resourceRecords.forEach(record => {
@@ -530,7 +598,8 @@ function resourceDeleteColumnV7(docId, column) {
       appendix.columns = (appendix.columns || []).filter(name => name !== column);
       [...(appendix.rows || []), ...(appendix.privateRows || [])].forEach(row => { delete row[column] });
     });
-    persist(); closeOverlay(); render(); toast(`Đã xóa cột “${column}” khỏi công văn ${doc.no || doc.documentType}.`);
+    if (!await persist()) { state = backup; throw Error('Không lưu được cấu trúc cột. Hãy thử lại.'); }
+    closeOverlay(); render(); toast(`Đã xóa cột “${column}” khỏi công văn ${doc.no || doc.documentType}.`);
   }, false, 'Xóa cột');
 }
 
@@ -543,7 +612,7 @@ function resourceCellEditV7(recordId, rowIndex, kind, docId, column) {
   const rows = docId ? (kind === 'private' ? app.privateRows : app.rows) : draft.hardwareRows;
   rows[rowIndex] ||= {};
   const initial = rows[rowIndex][column] ?? '';
-  modal(`Sửa ${column}`, `${field('Giá trị', 'value', initial)}`, data => { rows[rowIndex][column] = data.value; saveResourceV7(draft) }, false, 'Lưu giá trị');
+  modal(`Sửa ${column}`, `${field('Giá trị', 'value', initial)}`, data => { rows[rowIndex][column] = data.value; return saveResourceV7(draft) }, false, 'Lưu giá trị');
 }
 
 function resourceLinksEditV7(recordId, kind) {
@@ -554,13 +623,13 @@ function resourceLinksEditV7(recordId, kind) {
       const current = state.resourceRecords.find(item => item.id === recordId); if (!current) throw Error('Không tìm thấy tài nguyên.');
       const draft = V7.clone(current), selected = [...new Set([...$('#editForm').querySelectorAll('[name="documentIds"]')].filter(input => input.checked).map(input => input.value))];
       if (kind === 'asset') { draft.assetDocumentIds = selected; draft.exchangeDocumentIds = selected } else draft.registeredDocumentIds = selected;
-      saveResourceV7(draft);
+      return saveResourceV7(draft);
     });
     return;
   }
   const tasks = state.tasks.filter(task => task.type === 'resource');
   const linked = resourceTaskIdsV7(resource);
-  modal('Công việc liên kết', tasks.map(task => `<label class="resource-doc-choice"><input type="checkbox" name="taskIds" value="${esc(task.id)}" ${linked.includes(task.id) ? 'checked' : ''}> <strong>${esc(task.code || 'Chưa có mã')}</strong> · ${esc(task.title)}</label>`).join('') || '<p class="muted">Chưa có task loại Quản lý tài nguyên.</p>', () => {
+  modal('Công việc liên kết', tasks.map(task => `<label class="resource-doc-choice"><input type="checkbox" name="taskIds" value="${esc(task.id)}" ${linked.includes(task.id) ? 'checked' : ''}> <strong>${esc(task.code || 'Chưa có mã')}</strong> · ${esc(task.title)}</label>`).join('') || '<p class="muted">Chưa có task loại Quản lý tài nguyên.</p>', async () => {
     const backup = V7.clone(state);
     try {
     const current = state.resourceRecords.find(item => item.id === recordId); if (!current) throw Error('Không tìm thấy tài nguyên.');
@@ -581,7 +650,8 @@ function resourceLinksEditV7(recordId, kind) {
       task.resourceId = current.id; task.resourceData = V7.clone(current); task.attachments = V7.clone(current.attachments || []); task.customFields = V7.clone(current.customFields || []); saveTaskResourceV7(task);
     }
     current.taskIds = selected; current.revisions ||= []; current.revisions.push({ id: V7.id(), at, actorId: session, action: 'Cập nhật liên kết công việc', changes: [{ field: 'Công việc', old: currentLinks.map(id => state.tasks.find(task => task.id === id)?.code).join(', '), new: selected.map(id => state.tasks.find(task => task.id === id)?.code).join(', ') }], data: V7.clone(current) });
-    persist(); closeOverlay(); render(); toast('Đã cập nhật liên kết công việc.');
+    if (!await persist()) { state = backup; throw Error('Không lưu được liên kết công việc. Hãy thử lại.'); }
+    closeOverlay(); render(); toast('Đã cập nhật liên kết công việc.');
     } catch (error) { state = backup; throw error }
   });
 }
@@ -606,14 +676,16 @@ function catalogFormV7(id = '') {
       delete saved.catalogFile;
       if (id) Object.assign(doc, saved); else state.documents.push(saved);
       state.officials = state.documents; state.docs = state.documents;
-      persist();
-      done('Đã lưu văn bản vào danh mục');
+      await done('Đã lưu văn bản vào danh mục');
     });
-  $('#deleteCatalogV7')?.addEventListener('click', () => {
+  $('#deleteCatalogV7')?.addEventListener('click', async () => {
+    const backup = V7.clone(state);
     const linkedToResource = state.resourceRecords.some(record => [...(record.registeredDocumentIds || []), ...resourceDocumentIdsV7(record)].includes(id));
     const linked = linkedToResource || state.tasks.some(t => t.documentId === id || (t.documentIds || []).includes(id) || (t.officialIds || []).includes(id) || (t.resourceData?.registeredDocumentIds || []).includes(id) || (t.resourceData?.assetDocumentIds || t.resourceData?.exchangeDocumentIds || []).includes(id));
     if (linked) doc.archived = true; else state.documents = state.documents.filter(d => d.id !== id);
-    state.officials = state.documents; state.docs = state.documents; persist(); render();
+    state.officials = state.documents; state.docs = state.documents;
+    if (!await persist()) { state = backup; return; }
+    closeOverlay(); render();
     toast(linked ? 'Văn bản đã được lưu trữ; liên kết task được giữ.' : 'Đã xóa văn bản.');
   });
 }
@@ -716,7 +788,7 @@ function drawResourceFormV7() {
   };
 
   form.oninput = capture; form.onchange = e => { capture(); if (e.target.matches('[data-resource-doc], [name="createTaskV7"]')) { if (e.target.name === 'createTaskV7') r.createTask = e.target.checked; drawResourceFormV7() } };
-  form.onsubmit = e => { e.preventDefault(); capture(); try { saveResourceWithTaskV7(r) } catch (err) { $('#resourceErrorV7').textContent = err.message } };
+  form.onsubmit = async e => { e.preventDefault(); capture(); try { await saveResourceWithTaskV7(r) } catch (err) { $('#resourceErrorV7').textContent = err.message } };
   $('#resourceCancelV7').onclick = closeOverlay;
   $('#resourceFilesV7')?.addEventListener('change', async e => { try { r.attachments.push(...await storeFiles(e.target.files)); drawResourceFormV7() } catch (err) { $('#resourceErrorV7').textContent = err.message } });
   $('#resourceAddFieldV7').onclick = () => { capture(); r.customFields.push({ name: '', value: '' }); drawResourceFormV7() };
@@ -735,7 +807,9 @@ function drawResourceFormV7() {
   $$('[data-resource-custom-del-v7]').forEach(b => b.onclick = () => { capture(); r.customFields.splice(+b.dataset.resourceCustomDelV7, 1); drawResourceFormV7() });
 }
 
-function saveResourceV7(draft, { defer = false, allowTaskCreator = false } = {}) {
+async function saveResourceV7(draft, { defer = false, allowTaskCreator = false } = {}) {
+  const stateBackup = defer ? null : V7.clone(state);
+  const stagedFiles = { ...taskDraftFiles }, stagedDocuments = V7.clone(taskDraftDocuments);
   const pendingAssetDocument = draft.pendingAssetDocument;
   draft = V7.clone(draft);
   delete draft.createTask; delete draft.taskDraft; delete draft.pendingAssetDocument;
@@ -779,12 +853,21 @@ function saveResourceV7(draft, { defer = false, allowTaskCreator = false } = {})
     if (previous !== JSON.stringify({ attachments: linked.attachments, customFields: linked.customFields, resourceData: linked.resourceData })) M.revision(linked, actor, 'Cập nhật thông tin dùng chung tài nguyên', [{ field: 'Thông tin tài nguyên / tệp / trường tùy chỉnh', old: JSON.parse(previous), new: { attachments: linked.attachments, customFields: linked.customFields, resourceData: linked.resourceData } }], at);
   }
   if (defer) return target;
-  persist(); resourceDraftV7 = null; closeOverlay(); render(); toast(existing ? 'Đã gộp thông tin vào hệ thống cùng đơn vị và cơ quan quản lý.' : 'Đã lưu tài nguyên.');
+  commitTaskAttachments();
+  const saved = await persist();
+  if (saved === false) {
+    state = stateBackup;
+    Object.assign(taskDraftFiles, stagedFiles);
+    Object.assign(taskDraftDocuments, stagedDocuments);
+    throw Error('Không lưu được tài nguyên. Hãy kiểm tra kết nối rồi thử lưu lại.');
+  }
+  resourceDraftV7 = null; closeOverlay(); render(); toast(existing ? 'Đã gộp thông tin vào hệ thống cùng đơn vị và cơ quan quản lý.' : 'Đã lưu tài nguyên.');
   return target;
 }
 
-function saveResourceWithTaskV7(draft) {
+async function saveResourceWithTaskV7(draft) {
   const backup = V7.clone(state);
+  const stagedFiles = { ...taskDraftFiles }, stagedDocuments = V7.clone(taskDraftDocuments);
   try {
     if (!draft.createTask) return saveResourceV7(draft);
     captureEmbeddedResourceTaskV7(draft);
@@ -792,20 +875,29 @@ function saveResourceWithTaskV7(draft) {
     if (!task?.title?.trim()) throw Error('Nhập tiêu đề công việc đi kèm.');
     if (!task.managementGroupId) throw Error('Chọn nhóm quản lý cho công việc đi kèm.');
     task.type = 'resource'; task.resourceData = V7.clone(draft); task.attachments = V7.clone(draft.attachments || []); task.customFields = V7.clone(draft.customFields || []);
-    const resource = saveResourceV7(draft, { defer: true, allowTaskCreator: true });
+    const resource = await saveResourceV7(draft, { defer: true, allowTaskCreator: true });
     task.resourceId = resource.id;
     task.resourceData = V7.clone(resource);
     const savedTask = M.saveTask(state, me(), task);
     saveTaskResourceV7(savedTask);
     if (draft.pendingAssetDocument && !state.documents.some(doc => doc.id === draft.pendingAssetDocument.id)) state.documents.push(draft.pendingAssetDocument);
     state.officials = state.documents; state.docs = state.documents;
-    commitTaskAttachments(); persist(); resourceDraftV7 = null; closeOverlay(); render(); toast('Đã lưu tài nguyên và công việc đi kèm.');
+    commitTaskAttachments();
+    const saved = await persist();
+    if (saved === false) { state = backup; throw Error('Không lưu được tài nguyên và công việc đi kèm. Hãy kiểm tra kết nối rồi thử lưu lại.'); }
+    resourceDraftV7 = null; closeOverlay(); render(); toast('Đã lưu tài nguyên và công việc đi kèm.');
     return resource;
-  } catch (error) { state = backup; throw error; }
+  } catch (error) {
+    state = backup;
+    Object.assign(taskDraftFiles, stagedFiles);
+    Object.assign(taskDraftDocuments, stagedDocuments);
+    throw error;
+  }
 }
 
 function resourceDetailV7(id, revisionId = '') {
-  const r = state.resourceRecords.find(item => item.id === id); if (!r) return;
+  const r = state.resourceRecords.find(item => String(item.id) === String(id));
+  if (!r) return toast('Không tìm thấy tài nguyên để xem chi tiết.');
   const linkedTasks = linkedResourceTasksV7(r);
   const history = [
     ...(r.revisions || []).map(item => ({ ...item, kind: 'resource', key: `resource:${item.id}` })),
@@ -821,7 +913,13 @@ function resourceDetailV7(id, revisionId = '') {
   $('#overlay .drawer')?.classList.add('resource-v7-drawer');
   $$('[data-resource-history-v7]').forEach(b => b.onclick = () => resourceDetailV7(id, b.dataset.resourceHistoryV7));
   $('#editResourceV7')?.addEventListener('click', () => resourceFormV7(id));
-  $('#deleteResourceV7')?.addEventListener('click', () => { const at = V7.now(); linkedTasks.forEach(task => { if (task.resourceId === id) { delete task.resourceId; delete task.resourceData; M.revision(task, session, 'Gỡ liên kết do xóa tài nguyên', [{ field: 'Tài nguyên', old: id, new: '—' }], at) } }); state.resourceRecords = state.resourceRecords.filter(x => x.id !== id); persist(); render(); toast('Đã xóa tài nguyên và giữ nguyên các task liên quan.') });
+  $('#deleteResourceV7')?.addEventListener('click', async () => {
+    const backup = V7.clone(state), at = V7.now();
+    linkedTasks.forEach(task => { if (task.resourceId === id) { delete task.resourceId; delete task.resourceData; M.revision(task, session, 'Gỡ liên kết do xóa tài nguyên', [{ field: 'Tài nguyên', old: id, new: '—' }], at) } });
+    state.resourceRecords = state.resourceRecords.filter(x => x.id !== id);
+    if (!await persist()) { state = backup; return; }
+    closeOverlay(); render(); toast('Đã xóa tài nguyên và giữ nguyên các task liên quan.');
+  });
 }
 
 function bindV7() {
@@ -848,7 +946,6 @@ function bindV7() {
     exportResourceExcelV7(recs);
   });
   $('#clearResourceV7')?.addEventListener('click', () => { resourceSearchV7 = ''; resourceFilters = { documents: [], groups: [], levels: [], month: '', self: false }; render() });
-  $$('[data-resource-v7-detail]').forEach(btn => btn.onclick = e => { e.stopPropagation(); resourceDetailV7(btn.dataset.resourceV7Detail) });
   $$('[data-resource-delete-col-v7]').forEach(btn => btn.onclick = e => { e.stopPropagation(); resourceDeleteColumnV7(btn.dataset.resourceDeleteColV7, btn.dataset.resourceDeleteColNameV7) });
   $$('[data-resource-link-edit-v7]').forEach(btn => btn.onclick = e => { e.stopPropagation(); resourceLinksEditV7(btn.dataset.resourceLinkRecordV7, btn.dataset.resourceLinkEditV7) });
   $$('[data-resource-task-v7]').forEach(btn => btn.onclick = e => { e.stopPropagation(); taskDrawer(btn.dataset.resourceTaskV7) });
@@ -886,7 +983,13 @@ action = function (name) {
   return actionBeforeV7(name);
 };
 
-// Load any stored v6 prototype once, preserving the old data while switching to the decoupled resource model.
-const persistedV7Snapshot = localStorage.getItem('c12-prototype-v7');
-if (persistedV7Snapshot) { try { const current = JSON.parse(persistedV7Snapshot); if (current?.version === 7) state = current } catch { } }
+// Delegate this action so dynamic table rerenders/rowspans cannot leave an unbound eye button.
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-resource-v7-detail]');
+  if (!button) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  resourceDetailV7(button.dataset.resourceV7Detail);
+});
+
 render();

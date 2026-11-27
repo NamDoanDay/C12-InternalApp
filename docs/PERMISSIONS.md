@@ -1,6 +1,6 @@
 # Ma trận quyền
 
-Cập nhật 26/11/2026. Chuẩn nghiệp vụ tại [SPEC.md](SPEC.md). App có hai role: `admin` và `user`; chức danh Person không tạo thêm role. Bảng dưới là chuẩn đã chốt, không phải khẳng định backend đã enforce.
+Cập nhật 27/11/2026. Chuẩn nghiệp vụ tại [SPEC.md](SPEC.md). App có hai role: `admin` và `user`; chức danh Person không tạo thêm role. Bảng dưới là chuẩn đã chốt; mục “Hiện trạng API” ghi những phần backend đã enforce.
 
 | Hành động | Admin | User tạo task | User được giao (không tạo) | User chỉ xem qua nhóm |
 |---|---|---|---|---|
@@ -22,11 +22,12 @@ Quyền xem task theo chuẩn: admin OR creator OR assignee OR user thuộc nhó
 
 Yêu cầu trước đây cho phép CRUD danh mục và kiến thức; trong code thao tác CRUD hiện không nhất thiết phân biệt admin/user. Nếu cần thay đổi quyền này, yêu cầu cần được chốt lại; không tự nâng quyền dựa vào chức vụ graph.
 
-## Khoảng lệch hiện tại
+## Hiện trạng API (27/11/2026)
 
-- Prototype kiểm tra quyền bằng JavaScript phía client; không đủ làm ranh giới bảo mật production.
-- Resource là collection riêng nhưng có `taskIds` và task có `resourceId`; UI cấp sửa cho admin, người tạo resource, hoặc người tạo/assignee của ít nhất một task liên kết. Quyền chỉ xem task qua nhóm không cấp quyền sửa resource.
+- API xác thực JWT và trạng thái account từ MySQL; user được cấp task thuộc phạm vi xem theo nhóm/creator/assignee. Workspace PUT giữ lại task ngoài phạm vi user và kiểm tra thay đổi task/resource.
+- Resource là collection riêng nhưng có `taskIds` và task có `resourceId`; API kiểm tra quyền sửa theo người tạo Resource hoặc creator/assignee của ít nhất một task liên kết.
+- Group/personnel/user/account/counters/schema column mutations bị giới hạn admin ở API snapshot.
 - Resource filter “Được giao cho tôi” lọc resource có ít nhất một task liên kết đang giao cho user hiện tại.
-- Cây graph và nhóm thay đổi client-side; không có kiểm tra API/server.
+- API mutation vẫn nhận snapshot chung; cần rà soát `backend/src/modules/permissions.js` khi thêm loại state mới. Đây là kiểm tra nghiệp vụ cơ bản, chưa phải audit bảo mật độc lập.
 
-Khi triển khai backend, mọi rule trong bảng phải được enforce ở API/query, không dựa trên việc ẩn button.
+Không coi trạng thái ẩn button phía client là ranh giới quyền; mọi quyền mới phải được enforce ở API/query.

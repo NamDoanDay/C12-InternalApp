@@ -31,7 +31,7 @@ function action(a) {
       break;
     case 'account': account = !account; render(); break;
     case 'switch': login(admin() ? 'user' : 'admin'); toast('Đã chuyển vai trò demo'); break;
-    case 'logout': session = ''; localStorage.setItem('c12-session', ''); auth(); break;
+    case 'logout': session = ''; auth(); break;
     case 'reset':
       if (confirm('Xóa thay đổi cục bộ và khôi phục dữ liệu mẫu?')) {
         state = seed(); save(); $('#overlay').innerHTML = ''; login('admin');

@@ -264,15 +264,23 @@ function renderTaskForm() {
   form.oninput = capture;
   form.onchange = capture;
 
-  form.onsubmit = e => {
+  form.onsubmit = async e => {
     e.preventDefault();
     capture();
     const backup = M.clone(state);
+    const stagedFiles = { ...taskDraftFiles }, stagedDocuments = M.clone(taskDraftDocuments);
     try {
       const savedTask = M.saveTask(state, me(), formTask);
       if (savedTask.type === 'resource' || savedTask.resourceId) saveTaskResourceV7(savedTask);
       commitTaskAttachments();
-      persist();
+      const saved = await persist();
+      if (saved === false) {
+        state = backup;
+        Object.assign(taskDraftFiles, stagedFiles);
+        Object.assign(taskDraftDocuments, stagedDocuments);
+        $('#taskError').textContent = 'Không lưu được công việc. Hãy kiểm tra kết nối rồi thử lưu lại.';
+        return;
+      }
       formTask = null;
       $('#overlay').innerHTML = '';
       page = 'tasks';
@@ -280,6 +288,8 @@ function renderTaskForm() {
       toast('Đã lưu công việc và gửi thông báo');
     } catch (err) {
       state = backup;
+      Object.assign(taskDraftFiles, stagedFiles);
+      Object.assign(taskDraftDocuments, stagedDocuments);
       $('#taskError').textContent = err.message;
     }
   };
@@ -630,21 +640,33 @@ function catalogEdit(kind, id, insideTask = false) {
     // Explicitly saving a catalog record commits its files independently of a task draft.
     state.files||={};for(const ref of files)if(taskDraftFiles[ref.id]){state.files[ref.id]=taskDraftFiles[ref.id];delete taskDraftFiles[ref.id]}
     delete obj.catalogFile;
+    const backup = M.clone(state), stagedFiles = { ...taskDraftFiles };
     if (id) Object.assign(d, obj); else state[kind].push(obj);
-    persist();
+    const saved = await persist();
+    if (saved === false) {
+      state = backup;
+      Object.assign(taskDraftFiles, stagedFiles);
+      throw Error('Không lưu được văn bản. Hãy kiểm tra kết nối rồi thử lại.');
+    }
     if (insideTask) {
       let key = kind === 'officials' ? 'officialIds' : 'documentIds';
       if (!formTask[key].includes(obj.id)) formTask[key].push(obj.id);
       renderTaskForm();
       toast('Đã lưu vào danh mục');
-    } else done('Đã lưu ' + label);
+    } else {
+      closeOverlay();
+      render();
+      toast('Đã lưu ' + label);
+    }
   });
 
-  $('#archiveCatalog')?.addEventListener('click', () => {
+  $('#archiveCatalog')?.addEventListener('click', async () => {
+    const backup = M.clone(state);
     d.archived = true;
-    persist();
-    if (insideTask) renderTaskForm();
-    else done('Đã lưu trữ');
+    if (insideTask) {
+      if (!await persist()) { state = backup; return; }
+      renderTaskForm();
+    } else await done('Đã lưu trữ');
   });
 }
 

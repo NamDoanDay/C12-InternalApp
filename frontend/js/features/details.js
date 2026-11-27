@@ -117,24 +117,26 @@ function shortValue(v) {
 
 function bindTaskDetails(current, readonly = false) {
   $('#editTaskDetail')?.addEventListener('click', () => taskForm(current.id));
-  $('#archiveTaskDetail')?.addEventListener('click', () => {
+  $('#archiveTaskDetail')?.addEventListener('click', async () => {
     if (!(admin() || current.creatorId === session)) return;
     if (confirm('Lưu trữ công việc? Lịch sử vẫn được giữ.')) {
+      const backup = M.clone(state);
       current.archived = true;
       M.revision(current, session, 'Lưu trữ công việc');
-      persist();
-      $('#overlay').innerHTML = '';
+      if (!await persist()) { state = backup; return; }
+      closeOverlay();
       render();
     }
   });
-  $('#commentForm')?.addEventListener('submit', e => {
+  $('#commentForm')?.addEventListener('submit', async e => {
     e.preventDefault();
     if (!M.canEdit(state, me(), current)) return;
     let text = $('#commentText').value.trim();
     if (!text) return;
+    const backup = M.clone(state);
     current.comments.push({ id: M.id(), userId: session, at: M.now(), text });
     M.revision(current, session, 'Bình luận', [{ field: 'Bình luận', new: text }]);
-    persist();
+    if (!await persist()) { state = backup; return; }
     taskDrawer(current.id);
   });
 }

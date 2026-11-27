@@ -1,12 +1,12 @@
 # Đặc tả chuẩn — C12 / P4 - T1 Internal App
 
-> Cập nhật 26/11/2026. Đây là nguồn nghiệp vụ chuẩn hiện hành. Hãy đọc cùng [INDEX.md](INDEX.md), [PERMISSIONS.md](PERMISSIONS.md), [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) và [FRONTEND_RULES.md](FRONTEND_RULES.md).
+> Cập nhật 27/11/2026. Đây là nguồn nghiệp vụ chuẩn hiện hành. Hãy đọc cùng [INDEX.md](INDEX.md), [PERMISSIONS.md](PERMISSIONS.md), [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) và [FRONTEND_RULES.md](FRONTEND_RULES.md).
 >
 > Quy ước: **Chuẩn đã chốt** là yêu cầu người dùng xác nhận; **Hiện trạng code** là hành vi đọc thấy trong phiên bản hiện tại; **Lệch/chưa hỗ trợ** ghi rõ phần không nên suy diễn thành đã triển khai. Khi hai phần khác nhau, giữ nguyên chuẩn và báo khoảng lệch.
 
 ## 1. Sản phẩm và phân hệ
 
-C12 / P4 - T1 Internal App là prototype nội bộ quản lý công việc, văn bản, tài nguyên, kiến thức và nhân sự trong cùng workspace. Giao diện dùng tiếng Việt, HTML, Tailwind CSS và JavaScript thuần; chưa có backend/auth sản xuất.
+C12 / P4 - T1 Internal App là workspace nội bộ quản lý công việc, văn bản, tài nguyên, kiến thức và nhân sự. Giao diện dùng tiếng Việt, HTML, Tailwind CSS và JavaScript thuần; runtime gồm Node.js/Express, Socket.IO, MySQL và Nginx. Mô hình lưu state hiện tương thích bằng workspace JSON snapshot cùng các bảng domain mirror; không coi đây là mô hình quan hệ đã chuẩn hóa hoàn toàn.
 
 Các view: Trang chính; For you (Công việc) gồm Quản lý công việc, Thống kê, Quản lý tài nguyên, Danh mục văn bản; Chuyên môn tổ gồm Kiến thức tổ và Cây sơ đồ tổ; Quản lý nhân sự dành cho admin. Header có tìm kiếm, chuyển LIGHT/DARK, chủ đề cá nhân, thông báo và tài khoản.
 
@@ -56,7 +56,7 @@ Workflow status hiện dùng: Khởi tạo, Đang xử lý, Đang lấy số, Đ
 2. Nếu chưa hoàn thành và hiện tại đã quá due date thì **Chậm muộn**.
 3. Còn lại là **Đang xử lý**. Task chưa tới start date vẫn thuộc nhóm này.
 
-Quá hạn được tính theo thời điểm ngày + giờ/phút. Tại đúng due time chưa trễ; trễ một phần ngày tính 1 ngày, sau 24 giờ tính 2 ngày (ceiling theo khoảng thời gian quá hạn). Mã thời gian sử dụng local date/time của trình duyệt; chính sách timezone backend chưa áp dụng.
+Quá hạn được tính theo thời điểm ngày + giờ/phút. Tại đúng due time chưa trễ; trễ một phần ngày tính 1 ngày, sau 24 giờ tính 2 ngày (ceiling theo khoảng thời gian quá hạn). Form tạo/sửa dùng thời gian local của trình duyệt; API so sánh timestamp ISO theo epoch UTC. Chưa có cấu hình timezone nghiệp vụ riêng cho ngày hạn.
 
 ### 3.3 Danh sách, bộ lọc, biểu đồ
 
@@ -156,10 +156,10 @@ Thống kê task phải dùng quyền và aggregate status như Quản lý công
 
 Ma trận chi tiết tại [PERMISSIONS.md](PERMISSIONS.md). Quy tắc cốt lõi: admin xem/sửa toàn cục; người tạo/assignee xem task; user thuộc nhóm quản lý hoặc nhóm assignee có thể xem task nhưng chỉ xem. User chỉ được chỉnh sửa các trường task theo vai trò đã nêu; admin hoặc người tạo được đổi due date. Nhóm chỉ lọc picker, không assign tự động.
 
-Prototype chỉ enforcement ở client, không phải ranh giới bảo mật sản xuất.
+Code hiện kiểm tra JWT/account status ở API; API cũng chặn một số thay đổi role, task và resource. Do UI đang ghi theo workspace snapshot, đối chiếu rule chi tiết trong `backend/src/modules/permissions.js`; không suy diễn mọi quyền đã được enforce hoàn toàn chỉ từ việc ẩn nút UI.
 
-## 13. Migrations, dữ liệu và giới hạn
+## 13. Dữ liệu, migrations và giới hạn
 
-Không reset storage để đổi schema. Migration phải giữ dữ liệu cũ và backup trước nâng cấp. Không tự dựng task/history hoặc timestamp không có trong nguồn. Storage là localStorage; session identity riêng từng tab trong sessionStorage. BroadcastChannel/storage event chỉ đồng bộ tab cùng browser/origin, không phải nhiều máy.
+Không reset storage để đổi schema. SQL migration phải giữ dữ liệu đã có; database seed chỉ chạy khi chưa có workspace. Theo quyết định hiện hành, không import các khóa `c12-prototype-v*`; giữ nguyên chúng trên trình duyệt và dùng MySQL seed mới. Không tự dựng task/history hoặc timestamp ngoài bộ dữ liệu seed khai báo. JWT session nằm trong sessionStorage; tùy chọn theme vẫn dùng localStorage. Workspace và domain mirror lưu trong MySQL.
 
-Không có backend, auth an toàn, API authorization, realtime đa thiết bị hoặc lưu trữ bền vững. CDN XLSX/Mammoth cần tải được; tính năng phụ thuộc thư viện phải hiển thị lỗi rõ nếu thiếu. Không khẳng định parser/OCR ngoài phần code thực sự xử lý.
+Socket.IO phát `workspace.updated` sau khi API commit MySQL thành công; không phát trước commit. API mutations hiện tập trung ở snapshot endpoint, chưa tách thành endpoint riêng cho từng form/use case. XLSX/Mammoth còn phụ thuộc CDN; tính năng phụ thuộc thư viện phải hiển thị lỗi rõ nếu thiếu. Không khẳng định parser/OCR ngoài phần code thực sự xử lý.

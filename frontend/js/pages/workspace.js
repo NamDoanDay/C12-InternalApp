@@ -29,48 +29,14 @@ let activeTaskFilter = { groups: [], documents: [], types: [], bucket: '' },
   selectedResourceDoc = '',
   themeOpen = false;
 
-let savedV7, savedV6, savedV5;
-try { savedV7 = JSON.parse(localStorage.getItem('c12-prototype-v7')); savedV6 = JSON.parse(localStorage.getItem('c12-prototype-v6')); savedV5 = JSON.parse(localStorage.getItem('c12-prototype-v5')) } catch { }
-if (savedV7?.version === 7) state = savedV7;
-else if (savedV6?.version === 6 || savedV5?.version === 5) {
-  state = M.upgradeV6(savedV6 || savedV5);
-  localStorage.setItem('c12-prototype-v7', JSON.stringify(state));
-} else {
-  localStorage.setItem('c12-backup-v4', JSON.stringify(state));
-  state = M.migrate(state);
-  seedTaskDemo();
-  localStorage.setItem('c12-prototype-v7', JSON.stringify(state));
-}
-
-session = sessionStorage.getItem('c12-v5-session') !== null ? sessionStorage.getItem('c12-v5-session') : session;
+// Business state is hydrated from the API. Existing browser storage is intentionally untouched.
+state = M.migrate(state);
+seedTaskDemo();
 
 const persist = () => {
-  try {
-    localStorage.setItem('c12-prototype-v7', JSON.stringify(state));
-    syncChannel?.postMessage({ at: Date.now() });
-  } catch {
-    throw Error('Bộ nhớ trình duyệt đã đầy. Hãy giảm tệp; phiếu chưa được lưu.');
-  }
+  return window.C12Api?.persist(state);
 };
 window.C12SaveV5 = persist;
-
-let syncChannel;
-try { syncChannel = new BroadcastChannel('c12-v7') } catch { }
-
-function incoming() {
-  let next;
-  try { next = JSON.parse(localStorage.getItem('c12-prototype-v7')) } catch { }
-  if (next?.version === 7) {
-    state = next;
-    if ($('#notifyAll')) {
-      render();
-      notificationsDialog($('#notifyUnread')?.classList.contains('primary') ? 'unread' : 'all');
-    } else if (!$('#editForm') && !$('#taskEditor')) render();
-    else toast('Có cập nhật mới. Đóng phiếu để tải dữ liệu mới nhất.');
-  }
-}
-syncChannel && (syncChannel.onmessage = incoming);
-window.addEventListener('storage', e => { if (e.key === 'c12-prototype-v7') incoming() });
 
 const groupName = id => state.taskGroups.find(g => g.id === id)?.name || 'Chưa phân nhóm';
 const userName = id => state.users.find(u => u.id === id)?.name || 'Người dùng';
@@ -81,67 +47,145 @@ const badge = t => `<span class="task-status ${M.bucket(t)}">${BUCKET[M.bucket(t
 const localTime = v => v ? new Date(new Date(v).getTime() - new Date(v).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
 
 function seedTaskDemo() {
-  let u = state.users.find(x => x.id === 'admin') || state.users[0];
-  if (!u) return;
-  for (let [i, g] of state.taskGroups.entries()) {
-    if (!state.people.some(p => p.groupId === g.id && Number(p.rank) === 3)) {
-      state.people.push({
-        id: 'demo-p-' + g.id,
-        name: ['Nguyễn Văn An', 'Trần Minh Bình', 'Lê Ngọc Chi', 'Phạm Quốc Dũng', 'Vũ Hoàng Hà', 'Đỗ Gia Khôi'][i],
-        position: 'Thành viên tổ',
-        rank: 3,
-        type: 'Cán bộ',
-        groupId: g.id,
-        email: '', phone: '', note: 'Dữ liệu mẫu'
-      });
-    }
-    let p = state.people.find(p => p.groupId === g.id && Number(p.rank) === 3);
-    if (!state.users.some(x => x.personId === p.id)) {
-      state.users.push({
-        id: 'demo-u-' + g.id,
-        name: p.name,
-        email: g.code.toLowerCase() + '@c12.demo',
-        role: 'user',
-        status: 'approved',
-        personId: p.id
-      });
-    }
-  }
+  if (state.demoSeedVersion >= 2) return;
+  let adminUser = state.users.find(x => x.id === 'admin' && x.status === 'approved') || state.users.find(x => x.role === 'admin' && x.status === 'approved');
+  if (!adminUser) return;
 
-  let existing = { id: M.id(), no: 'CV-DEMO-01', date: '2026-11-10', summary: 'Đăng ký tài nguyên hạ tầng đám mây', documentType: 'Công văn', type: 'Công văn', note: 'Mục dùng chung', files: [] };
-  state.documents.push(existing);
-  state.officials = state.documents;
-
-  let a = state.users.find(x => x.role === 'user' && x.status === 'approved') || u,
-    b = state.users.find(x => x.id !== a.id && x.role === 'user' && x.status === 'approved') || a;
-
-  for (let i = 0; i < 3; i++) {
-    let at = new Date(),
-      start = new Date(at.getTime() - 86400000),
-      due = new Date(at.getTime() + (i === 1 ? -86400000 : 86400000 * 3));
-    M.saveTask(state, u, {
-      type: i === 2 ? 'daily' : 'document',
-      title: ['Rà soát tài nguyên hệ thống văn bản', 'Đối chiếu phương án hạ tầng', 'Kiểm tra vận hành trực nhật'][i] + ' (mẫu)',
-      description: 'Công việc minh họa để trải nghiệm phân công và lịch sử.',
-      managementGroupId: 'g-HT',
-      unit: 'Cà Mau',
-      agency: 'VP UBND tỉnh',
-      assigneeIds: i === 0 ? [a.id, b.id] : [a.id],
-      start: start.toISOString(),
-      due: due.toISOString(),
-      status: i === 2 ? 'done' : 'processing',
-      documentType: i === 2 ? '' : 'Công văn',
-      documentNumber: i === 2 ? '' : existing.no,
-      documentSummary: i === 2 ? '' : existing.summary,
-      officialIds: i === 2 ? [] : [existing.id],
-      documentIds: [],
-      resources: [],
-      resourceColumns: [],
-      customFields: [],
-      attachments: [],
-      customTable: { name: 'Bảng theo dõi trực nhật', columns: ['STT', 'Hạng mục công việc', 'Người phụ trách', 'Kết quả kiểm tra'], rows: [{ STT: '1', 'Hạng mục công việc': 'Kiểm tra phòng máy chủ', 'Người phụ trách': 'Nguyễn Văn An', 'Kết quả kiểm tra': 'Hoạt động bình thường' }] }
+  const groups = state.taskGroups.filter(group => !group.archived),
+    namesByGroup = [
+      ['Nguyễn Văn An', 'Trần Minh Bình'], ['Lê Hoàng Chi', 'Phạm Quốc Dũng'],
+      ['Vũ Hoàng Hà', 'Đỗ Gia Khôi'], ['Hoàng Thu Trang', 'Bùi Đức Long'],
+      ['Nguyễn Hải Yến', 'Phan Anh Tuấn'], ['Đặng Minh Phúc', 'Lý Thanh Tâm']
+    ],
+    docTypes = ['Công văn', 'Thông tư', 'Nghị định', 'Quyết định', 'Luật', 'Nghị quyết'],
+    now = Date.now(), days = value => new Date(now + value * 86400000).toISOString(),
+    makeDoc = (documentType, no, summary, index) => ({
+      id: `demo-doc-${index + 1}`, documentType, type: documentType, no,
+      date: new Date(now - (index + 5) * 86400000).toISOString().slice(0, 10),
+      summary, agency: ['Cục C12', 'Bộ Công an', 'Chính phủ'][index % 3], note: 'Dữ liệu demo', files: [], createdAt: days(-30)
     });
-  }
+
+  // A compact but representative catalog: every supported type has a record.
+  let docs = [
+    makeDoc('Công văn', '952', 'Đăng ký nhu cầu tài nguyên hạ tầng điện toán đám mây', 0),
+    makeDoc('Công văn', '4651', 'Rà soát nhu cầu tài nguyên và phương án an toàn thông tin', 1),
+    makeDoc('Công văn', 'CV-HTM-2026-07', 'Đề xuất kết nối hạ tầng mạng', 2),
+    makeDoc('Công văn', 'CV-DN-2026-04', 'Rà soát phương án cấp điện dự phòng', 3),
+    ...[
+      ['Thông tư', '18/2026/TT-BCA', 'Quy định quy trình quản lý hệ thống thông tin'],
+      ['Nghị định', '42/2026/NĐ-CP', 'Quy định về dữ liệu và dịch vụ số'],
+      ['Quyết định', '2439/QĐ-TTg', 'Ban hành Khung kiến trúc dữ liệu quốc gia'],
+      ['Luật', '12/2026/QH16', 'Luật chuyển đổi số'],
+      ['Nghị quyết', '28/NQ-CP', 'Nhiệm vụ bảo đảm an toàn thông tin'],
+      ['Báo cáo', 'BC-C12-2026-11', 'Báo cáo hiện trạng tài nguyên'],
+      ['Văn bản cấp tài nguyên', 'VTN-2026-015', 'Phê duyệt cấp tài nguyên dùng chung'],
+      ['Các loại văn bản khác', 'TB-C12-2026-09', 'Thông báo phối hợp triển khai']
+    ].map(([type, no, summary], i) => makeDoc(type, no, summary, i + 4))
+  ];
+  const currentDocs = state.documents || [];
+  const catalog = docs.map(doc => currentDocs.find(current =>
+    String(current.documentType || current.type || '').trim().toLocaleLowerCase('vi') === doc.documentType.toLocaleLowerCase('vi') &&
+    String(current.no || '').trim().toLocaleLowerCase('vi') === doc.no.toLocaleLowerCase('vi')
+  ) || doc);
+  docs = catalog;
+  state.documents = [...currentDocs.filter(current => !catalog.some(doc => doc.id === current.id)), ...catalog];
+  state.officials = state.documents;
+  state.docs = state.documents;
+
+  const peopleByGroup = new Map();
+  groups.forEach((group, index) => {
+    const deputyId = `demo-deputy-${group.code}`;
+    if (!state.people.some(person => person.id === deputyId)) state.people.push({
+      id: deputyId, name: `Phụ trách ${group.name}`, position: 'Tổ phó, phụ trách nhóm', rank: 2,
+      type: 'Cán bộ', groupId: group.id, email: `${group.code.toLowerCase()}.lead@c12.demo`, phone: '', note: 'Dữ liệu demo'
+    });
+    const members = namesByGroup[index] || [`Thành viên ${group.code} 1`, `Thành viên ${group.code} 2`];
+    const users = members.map((name, memberIndex) => {
+      const personId = `demo-member-${group.code}-${memberIndex + 1}`;
+      let person = state.people.find(item => item.id === personId);
+      if (!person) {
+        person = { id: personId, name, position: memberIndex ? 'Cán bộ' : 'Cán bộ phụ trách', rank: 3, type: memberIndex ? 'Cán bộ' : 'Tạm tuyển', groupId: group.id, email: `${group.code.toLowerCase()}${memberIndex + 1}@c12.demo`, phone: '', note: 'Dữ liệu demo' };
+        state.people.push(person);
+      }
+      let user = state.users.find(item => item.personId === person.id);
+      if (!user) {
+        const preferredId = group.code === 'HT' && memberIndex === 0 ? 'demo-u-g-HT' : `demo-user-${group.code}-${memberIndex + 1}`;
+        user = { id: state.users.some(item => item.id === preferredId) ? `demo-seed-user-${group.code}-${memberIndex + 1}` : preferredId, name: person.name, email: person.email, role: 'user', status: 'approved', personId: person.id };
+        state.users.push(user);
+      }
+      return user;
+    });
+    let deputy = state.users.find(item => item.personId === deputyId);
+    if (!deputy) state.users.push({ id: `demo-user-deputy-${group.code}`, name: `Phụ trách ${group.name}`, email: `${group.code.toLowerCase()}.lead@c12.demo`, role: 'user', status: 'approved', personId: deputyId });
+    peopleByGroup.set(group.id, users);
+  });
+
+  state.resourceRecords ||= [];
+  const resourceDocs = docs.filter(doc => doc.documentType === 'Công văn'),
+    assetDoc = docs.find(doc => doc.documentType === 'Văn bản cấp tài nguyên');
+  const appendicesFor = (doc, seed) => ({
+    columns: doc.no === '952' ? ['vCPU', 'RAM (GB)', 'Disk / Block (TB)', 'Disk / File Storage (TB)', 'Disk / Object (TB)', 'License', 'Giải pháp ATTT', 'Kênh truyền'] :
+      doc.no === '4651' ? ['vCPU', 'RAM (GB)', 'GPU (GB)', 'Disk / Block SSD (TB)', 'Disk / Block HDD (TB)', 'Disk / File Storage SSD (TB)', 'Disk / File Storage HDD (TB)', 'Disk / Object (TB)', 'Sizing 3 vùng', 'Sizing / DMZ', 'Sizing / DB', 'Sizing / APP', 'License thương mại', 'Kênh truyền', 'Giải pháp ATTT', 'Kế hoạch'] :
+        ['vGPU', 'RAM (GB)', 'Disk / Block (TB)', 'Disk / File Storage (TB)', 'Disk / Object (TB)', 'License'],
+    rows: [{ 'vCPU': String(8 + seed * 4), 'vGPU': String(seed), 'RAM (GB)': String(32 * (seed + 1)), 'GPU (GB)': String(seed * 8), 'Disk / Block (TB)': String(seed + 1), 'Disk / Block SSD (TB)': String(seed + 1), 'Disk / Block HDD (TB)': '0', 'Disk / File Storage (TB)': String(seed + 2), 'Disk / File Storage SSD (TB)': '1', 'Disk / File Storage HDD (TB)': String(seed + 1), 'Disk / Object (TB)': '0', 'License': 'Linux; PostgreSQL', 'License thương mại': 'Microsoft SQL Server', 'Giải pháp ATTT': 'Giải pháp giám sát tập trung', 'Kênh truyền': 'Mạng nội bộ', 'Sizing 3 vùng': 'Đã khai báo', 'Sizing / DMZ': 'Có', 'Sizing / DB': 'Có', 'Sizing / APP': 'Có', 'Kế hoạch': 'Theo lộ trình C12' }], privateRows: []
+  });
+
+  groups.forEach((group, index) => {
+    const people = peopleByGroup.get(group.id), registered = [resourceDocs[index % resourceDocs.length]],
+      resource = {
+        id: `demo-resource-${group.code}`, unit: 'Cà Mau', agency: `Đơn vị phụ trách ${group.name}`, system: `Hệ thống demo ${group.code}`,
+        level: 'Địa phương', registeredDocumentIds: registered.map(doc => doc.id), assetDocumentIds: [assetDoc.id], exchangeDocumentIds: [assetDoc.id],
+        sharedHardwareRowCount: 1, documentAppendices: Object.fromEntries(registered.map(doc => [doc.id, appendicesFor(doc, index + 1)])),
+        attachments: [], customFields: [{ id: `demo-field-${group.code}`, name: 'Môi trường', value: index % 2 ? 'Dự phòng' : 'Chính' }], taskIds: [],
+        hardwareColumns: ['STT', 'Tên tài nguyên', 'Văn bản nguồn'], hardwareRows: [{ STT: '1', 'Tên tài nguyên': `Hệ thống demo ${group.code}` }],
+        revisions: [], createdBy: 'admin', editors: people.map(user => user.id), createdAt: days(-20), updatedAt: days(-1)
+      };
+    state.resourceRecords = state.resourceRecords.filter(item => item.id !== resource.id);
+    state.resourceRecords.push(resource);
+
+    const groupDocs = docs.filter(doc => doc.documentType !== 'Công văn' && doc.documentType !== 'Văn bản cấp tài nguyên'),
+      doc = groupDocs[index % groupDocs.length];
+    [
+      { type: 'document', status: ['init', 'processing', 'number', 'signing', 'processing', 'init'][index], due: 7, title: `Xử lý ${doc.documentType.toLocaleLowerCase('vi')} ${doc.no}` },
+      { type: 'resource', status: 'done', due: -2, title: `Cập nhật tài nguyên ${group.name}` },
+      { type: 'daily', status: 'processing', due: -2, title: `Rà soát định kỳ ${group.name}` }
+    ].forEach((spec, taskIndex) => {
+      const task = M.saveTask(state, adminUser, {
+        type: spec.type, title: `${spec.title} (demo)`, description: `Nhiệm vụ minh họa thuộc nhóm ${group.name}.`,
+        managementGroupId: group.id, assigneeIds: [people[taskIndex % people.length].id],
+        start: days(-5), due: days(spec.due), status: spec.status, documentType: spec.type === 'document' ? doc.documentType : '',
+        documentNumber: spec.type === 'document' ? doc.no : '', documentSummary: spec.type === 'document' ? doc.summary : '',
+        documentId: spec.type === 'document' ? doc.id : '', documentIds: [], officialIds: [],
+        customFields: spec.type === 'resource' ? M.clone(resource.customFields) : [], attachments: spec.type === 'resource' ? M.clone(resource.attachments) : [],
+        customTable: { name: 'Bảng dữ liệu tùy chỉnh', columns: ['STT', 'Hạng mục', 'Trạng thái'], rows: [{ STT: '1', 'Hạng mục': 'Rà soát và cập nhật', 'Trạng thái': spec.status === 'done' ? 'Hoàn thành' : 'Đang thực hiện' }] }
+      });
+      if (spec.type === 'resource') {
+        task.resourceId = resource.id;
+        resource.taskIds.push(task.id);
+        task.resourceData = M.clone(resource);
+        M.revision(task, adminUser.id, 'Liên kết tài nguyên demo', [{ field: 'Tài nguyên', old: '—', new: resource.id }], task.createdAt);
+        resource.revisions.push({ id: `demo-resource-rev-${group.code}`, at: task.createdAt, actorId: 'admin', action: 'Tạo dữ liệu demo', changes: [], data: M.clone(resource) });
+      }
+    });
+  });
+
+  state.knowledge ||= [];
+  const knowledgeSeed = [
+    ['Cấp ban hành', 'Trung ương', 'Bộ Công an'], ['Cấp ban hành', 'Trung ương', 'Chính phủ'],
+    ['Cấp ban hành', 'Địa phương', 'UBND tỉnh Cà Mau']
+  ];
+  knowledgeSeed.forEach(([type, level, agency], index) => {
+    const id = `demo-knowledge-${index + 1}`;
+    if (!state.knowledge.some(item => item.id === id)) state.knowledge.push({
+      id, title: ['Quy trình rà soát an toàn hệ thống', 'Hướng dẫn quản lý dữ liệu dùng chung', 'Quy trình phối hợp xử lý sự cố'][index],
+      no: ['HD-C12-2026-01', 'QT-C12-2026-02', 'QT-C12-2026-03'][index],
+      type: ['Hướng dẫn', 'Quy định', 'Quy trình'][index], docType: docTypes[index], level, agency,
+      date: new Date(now - (index + 1) * 86400000).toISOString().slice(0, 10), effectiveDate: '',
+      summary: 'Tài liệu mẫu phục vụ kiểm tra danh mục, bộ lọc và thẻ kiến thức.', content: 'Nội dung minh họa về quy trình phối hợp và quản lý hệ thống.',
+      related: '', note: 'Dữ liệu demo', files: []
+    });
+  });
+  state.demoSeedVersion = 2;
 }
 
 // =========================================================
@@ -184,24 +228,13 @@ view = function () {
 
 action = function (a) {
   if (a === 'switch') {
-    let next = admin() ? state.users.find(u => u.role === 'user' && u.status === 'approved') : state.users.find(u => u.role === 'admin' && u.status === 'approved');
-    session = next.id;
-    sessionStorage.setItem('c12-v5-session', session);
-    account = false;
-    return render();
+    return window.C12Api?.loginDemo(admin() ? 'user' : 'admin');
   }
   if (a === 'logout') {
-    sessionStorage.setItem('c12-v5-session', '');
-    return originalAction(a);
+    return window.C12Api?.logout();
   }
   if (a === 'reset') {
-    if (confirm('Khôi phục dữ liệu mẫu v5.1?')) {
-      state = M.migrate(JSON.parse(localStorage.getItem('c12-backup-v4')) || seed());
-      seedTaskDemo();
-      persist();
-      render();
-    }
-    return;
+    return window.C12Api?.resetWorkspace();
   }
   if (a === 'new-task') return taskForm();
   if (a === 'themes') return themesDialog();
@@ -212,21 +245,21 @@ action = function (a) {
   return originalAction(a);
 };
 
-done = function (message) {
-  persist();
-  $('#overlay').innerHTML = '';
+done = async function (message) {
+  const saved = await persist();
+  if (saved === false) {
+    const error = $('#formError');
+    if (error) error.textContent = 'Không lưu được thay đổi. Hãy kiểm tra kết nối rồi thử lưu lại.';
+    return false;
+  }
+  closeOverlay();
   render();
   if (message) toast(message);
+  return true;
 };
 
 login = function (id) {
-  let u = state.users.find(x => x.id === id);
-  if (!u || u.status !== 'approved') return toast('Tài khoản chưa được duyệt.');
-  session = id;
-  sessionStorage.setItem('c12-v5-session', id);
-  account = false;
-  $('#overlay').innerHTML = '';
-  render();
+  return window.C12Api?.loginDemo(id === 'admin' ? 'admin' : 'user');
 };
 
 // =========================================================
@@ -815,11 +848,13 @@ function bindWorkspace() {
   $$('[data-person-drag]').forEach(e => { e.ondragstart = ev => ev.dataTransfer.setData('text/plain', e.dataset.personDrag) });
   $$('[data-group-drop]').forEach(e => {
     e.ondragover = ev => { if (admin()) ev.preventDefault() };
-    e.ondrop = ev => {
+    e.ondrop = async ev => {
       ev.preventDefault();
+      const backup = M.clone(state);
       try {
         M.movePerson(state, me(), ev.dataTransfer.getData('text/plain'), e.dataset.groupDrop);
-        persist(); render(); toast('Đã chuyển nhóm và cập nhật task');
+        if (!await persist()) { state = backup; return; }
+        render(); toast('Đã chuyển nhóm và cập nhật task');
       } catch (err) { toast(err.message) }
     };
   });

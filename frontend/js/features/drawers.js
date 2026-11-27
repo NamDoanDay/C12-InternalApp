@@ -20,6 +20,7 @@ function auth(register = false) {
       </section>
     </div>
   </div>`;
+  if (window.C12Api?.error) $('#authError').textContent = window.C12Api.error;
 
   document.onclick = e => {
     let a = e.target.closest('[data-action]')?.dataset.action;
@@ -42,6 +43,13 @@ function auth(register = false) {
   $('#authForm').onsubmit = e => {
     e.preventDefault();
     let d = Object.fromEntries(new FormData(e.target));
+    if (window.C12Api) {
+      const error = $('#authError');
+      error.textContent = '';
+      (register ? window.C12Api.register(d) : window.C12Api.loginCredentials(d.username, d.password))
+        .catch(err => { if (error) error.textContent = err.message || 'Không thể xác thực.' });
+      return;
+    }
     if (register) {
       if (state.users.some(u => u.email.toLowerCase() === d.email.toLowerCase())) return $('#authError').textContent = 'Email đã tồn tại.';
       state.users.push({ id: uid(), name: d.name, email: d.email, role: 'user', status: 'pending', personId: '' });
@@ -56,8 +64,8 @@ function auth(register = false) {
 }
 
 function login(id) {
+  if (window.C12Api) return window.C12Api.loginDemo(id === 'admin' ? 'admin' : 'user');
   session = id;
-  localStorage.setItem('c12-session', id);
   page = 'home';
   render();
 }
@@ -200,7 +208,7 @@ function docDrawer(id) {
     if (typeof catalogEdit !== 'undefined') {
       let kind = state.officials?.some(x => x.id === id) ? 'officials' : 'documents';
       let item = state[kind]?.find(x => x.id === id);
-      if (item) { item.archived = true; persist(); done('Đã lưu trữ mục'); }
+      if (item) { item.archived = true; done('Đã lưu trữ mục'); }
     } else {
       state.docs = state.docs.filter(x => x.id !== id);
       done('Đã xóa công văn');
@@ -338,9 +346,11 @@ function personForm(id) {
 
 function userForm() {
   if (!admin()) return;
-  modal('Tạo tài khoản trực tiếp', `${field('Họ và tên', 'name', '', 'text', true)}${field('Email', 'email', '', 'email', true)}<label class="field"><span>Vai trò</span><select name="role"><option value="user">User</option><option value="admin">Admin</option></select></label><label class="field"><span>Liên kết hồ sơ</span><select name="personId"><option value="">Chưa liên kết</option>${state.people.filter(p => !state.users.some(u => u.personId === p.id)).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label><div class="notice">Tài khoản demo không lưu mật khẩu.</div>`, d => {
+  modal('Tạo tài khoản trực tiếp', `${field('Họ và tên', 'name', '', 'text', true)}${field('Email', 'email', '', 'email', true)}${field('Mật khẩu tạm thời (tối thiểu 8 ký tự)', 'password', '', 'password', true)}<label class="field"><span>Vai trò</span><select name="role"><option value="user">User</option><option value="admin">Admin</option></select></label><label class="field"><span>Liên kết hồ sơ</span><select name="personId"><option value="">Chưa liên kết</option>${state.people.filter(p => !state.users.some(u => u.personId === p.id)).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>`, async d => {
     if (state.users.some(u => u.email.toLowerCase() === d.email.toLowerCase())) throw Error('Email đã tồn tại.');
-    state.users.push({ id: uid(), ...d, status: 'approved' });
+    const user = { id: uid(), name: d.name, email: d.email, role: d.role, personId: d.personId, status: 'approved' };
+    if (window.C12Api) await window.C12Api.createAccount(user, d.password);
+    state.users.push(user);
     done('Đã tạo tài khoản');
   });
 }

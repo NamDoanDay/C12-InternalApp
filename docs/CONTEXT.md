@@ -1,6 +1,6 @@
 # Bối cảnh dự án và thuật ngữ
 
-Cập nhật 26/11/2026. Đây là prototype quản trị nội bộ C12/P4-T1, hiện chạy hoàn toàn phía trình duyệt. Mục tiêu là duyệt và hoàn thiện luồng công việc; chưa phải hệ thống production.
+Cập nhật 27/11/2026. Đây là workspace quản trị nội bộ C12/P4-T1: SPA trên frontend, Node.js/Express + Socket.IO, MySQL và Nginx. Dữ liệu nghiệp vụ chạy từ MySQL; localStorage cũ không được import hoặc sửa.
 
 ## Thuật ngữ
 
@@ -24,11 +24,12 @@ Cập nhật 26/11/2026. Đây là prototype quản trị nội bộ C12/P4-T1, 
 
 Các quyết định quan trọng nhất: ba loại task (xử lý văn bản, quản lý tài nguyên, task thường); danh mục văn bản thống nhất; Resource có collection riêng nhưng có thể liên kết với task; graph có nhánh nhóm; phân quyền admin/user; Floating Glassmorphism tối giản. Chi tiết ở [SPEC.md](SPEC.md).
 
-## Giới hạn prototype
+## Giới hạn triển khai hiện tại
 
-- State chính lưu localStorage, identity demo theo tab lưu sessionStorage.
-- BroadcastChannel và `storage` events chỉ chia sẻ thay đổi giữa các tab cùng browser/origin.
-- Không có API/backend, đăng nhập bảo mật, authorization phía server, multi-device sync hay lịch sử phía server.
+- Snapshot JSON trong `workspace_state` là nguồn render hiện tại; entity có bảng MySQL mirror với JSON payload.
+- Frontend lưu JWT theo tab trong sessionStorage; theme/palette vẫn lưu localStorage.
+- API module có route đọc theo domain; UI hiện ghi qua endpoint workspace snapshot, chưa tách đầy đủ mutation endpoint theo use-case.
+- Socket.IO đồng bộ event sau commit; API có kiểm tra auth/role và một phần quyền Task/Resource.
 - Các dữ liệu seed/demo và fixture phải được phân biệt với dữ liệu live.
 - Không giả định các thư viện CDN luôn sẵn có; luồng phụ thuộc thư viện cần báo lỗi có thể xử lý được.
 

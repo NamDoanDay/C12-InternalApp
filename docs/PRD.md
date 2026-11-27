@@ -1,10 +1,10 @@
 # PRD — C12 / P4 - T1 Internal App
 
-Cập nhật 26/11/2026. Đây là tóm tắt mục tiêu sản phẩm. Nghiệp vụ chi tiết tại [SPEC.md](SPEC.md), quyền tại [PERMISSIONS.md](PERMISSIONS.md), kiến trúc đang chạy tại [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md), quy tắc UI tại [FRONTEND_RULES.md](FRONTEND_RULES.md).
+Cập nhật 27/11/2026. Đây là tóm tắt mục tiêu sản phẩm. Nghiệp vụ chi tiết tại [SPEC.md](SPEC.md), quyền tại [PERMISSIONS.md](PERMISSIONS.md), kiến trúc đang chạy tại [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md), quy tắc UI tại [FRONTEND_RULES.md](FRONTEND_RULES.md).
 
 ## Mục tiêu
 
-Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục văn bản, dữ liệu tài nguyên, kiến thức chuyên môn và nhân sự tổ. Đây là prototype chạy phía trình duyệt, không phải hệ thống production.
+Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục văn bản, dữ liệu tài nguyên, kiến thức chuyên môn và nhân sự tổ. Runtime hiện gồm SPA, API Node.js, MySQL và Socket.IO; giới hạn còn lại nằm trong `TECH_ARCHITECTURE.md`.
 
 ## Phân hệ
 
@@ -30,4 +30,4 @@ Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục vă
 
 ## Giới hạn hiện tại
 
-State lưu localStorage và session identity trong sessionStorage; chỉ đồng bộ tab cùng origin. Không có backend, API, xác thực an toàn, phân quyền server, hoặc đồng bộ nhiều thiết bị. Tệp và thư viện CDN phụ thuộc môi trường tải. Export tài nguyên cần được rà soát với workbook nếu yêu cầu tương đương hoàn toàn về merge cells/appendix nhiều dòng.
+Snapshot workspace lưu MySQL; Socket.IO thông báo thay đổi sau transaction commit. State localStorage cũ không được import; theme vẫn lưu cục bộ. API mutation hiện dùng snapshot endpoint nên cần tiếp tục tách theo use-case trước khi tối ưu scale. XLSX/Mammoth và một số font/CDN phụ thuộc môi trường tải. Export tài nguyên cần được rà soát với workbook nếu cần tương đương hoàn toàn về merge cells/appendix nhiều dòng.

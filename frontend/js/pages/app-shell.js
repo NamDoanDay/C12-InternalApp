@@ -50,6 +50,10 @@ function renderHeader() {
 }
 
 function render() {
+  if (window.C12Api && !window.C12Api.ready) {
+    $('#app').innerHTML = '<div class="app-loading" role="status">Đang kết nối không gian làm việc…</div>';
+    return;
+  }
   if (!me()) return auth();
   if (['personnel', 'accounts'].includes(page) && !admin()) page = 'home';
   applyContrastEngine();
@@ -96,7 +100,7 @@ function render() {
     <div class="account-menu-actions">
       <button data-action="settings">${icon('settings')} Cài đặt tài khoản</button>
       <button data-action="switch">${icon('refresh')} Chuyển sang vai trò ${admin() ? 'User' : 'Admin'} demo</button>
-      <button data-action="reset">${icon('reload')} Khôi phục dữ liệu mẫu</button>
+      ${admin() ? `<button data-action="reset">${icon('reload')} Khôi phục dữ liệu mẫu</button>` : ''}
       <button data-action="logout" style="color:#ef4444">${icon('logout')} Đăng xuất</button>
     </div>
   </div>`: ''}`;

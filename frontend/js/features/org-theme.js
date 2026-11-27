@@ -74,7 +74,7 @@ function groupForm(id){
     ${field('Tên nhóm','name',g.name,'text',true)}
     ${field('Mã nhóm (viết tắt không dấu)','code',g.code,'text',true)}
     ${id?'<button type="button" class="btn danger" id="archiveGroup" style="margin-top:12px">Lưu trữ nhóm này</button>':''}
-  `,d=>{
+  `,async d=>{
     if(!admin())throw Error('Chỉ admin được quản lý nhóm.');
     d.code=d.code.trim().toUpperCase();
     if(!/^[A-Z0-9]+$/.test(d.code))throw Error('Mã nhóm chỉ gồm chữ hoa không dấu và số.');
@@ -101,7 +101,7 @@ function movePersonDialog(pid){
         ${state.taskGroups.filter(g=>!g.archived).map(g=>`<option value="${g.id}" ${p.groupId===g.id?'selected':''}>${esc(g.name)} (${esc(g.code)})</option>`).join('')}
       </select>
     </label>
-  `,d=>{
+  `,async d=>{
     M.movePerson(state,me(),pid,d.groupId);
     done('Đã chuyển nhóm và ghi lịch sử');
   });
@@ -239,15 +239,13 @@ function themesDialog(){
       <input id="customBackground" type="file" accept="image/*">
     </label>
     <div class="notice" style="margin-top:10px">Tùy biến chủ đề áp dụng riêng cho tài khoản ${esc(me()?.name||'')}.</div>
-  `,d=>{
+  `,async d=>{
     if(d.backgroundUrl){
       if(!/^https:\/\//i.test(d.backgroundUrl))throw Error('Chỉ dùng URL ảnh HTTPS.');
       s.background=d.backgroundUrl;
     }
     state.themeByUser[session]=s;
-    persist();
-    applyPersonalTheme();
-    done('Đã lưu chủ đề không gian làm việc');
+    if (await done('Đã lưu chủ đề không gian làm việc')) applyPersonalTheme();
   });
 
   $$('[data-color]').forEach(b=>b.onclick=()=>{
@@ -341,17 +339,18 @@ function notificationsDialog(tab='all'){
 
   $('#notifyAll').onclick=()=>notificationsDialog('all');
   $('#notifyUnread').onclick=()=>notificationsDialog('unread');
-  $('#notifyReadAll').onclick=()=>{
+  $('#notifyReadAll').onclick=async()=>{
+    const backup = M.clone(state);
     all.forEach(n=>n.read=true);
-    persist();
+    if (!await persist()) { state = backup; }
     notificationsDialog(tab);
   };
-  $$('[data-notification-read]').forEach(b=>b.onclick=()=>{
+  $$('[data-notification-read]').forEach(b=>b.onclick=async()=>{
     let n=all.find(n=>n.id===b.dataset.notificationRead);
-    if(n){n.read=true;persist();notificationsDialog(tab)}
+    if(n){const backup=M.clone(state); n.read=true; if(!await persist()) state=backup; notificationsDialog(tab)}
   });
-  $$('[data-notification]').forEach(b=>b.onclick=()=>{
+  $$('[data-notification]').forEach(b=>b.onclick=async()=>{
     let n=all.find(n=>n.id===b.dataset.notification);
-    if(n){n.read=true;persist();taskDrawer(n.taskId)}
+    if(n){const backup=M.clone(state); n.read=true; if(!await persist()) { state=backup; notificationsDialog(tab); return; } taskDrawer(n.taskId)}
   });
 }

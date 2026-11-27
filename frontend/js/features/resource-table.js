@@ -102,18 +102,14 @@ function globalCellEditor(row, c) {
 // =========================================================
 function decorateResourceTable() {
   if (page !== 'resources' || resourceLegacy || !$('#resourcePanel table')) return;
-  let table = $('#resourcePanel table'),
-    top = table.tHead.rows[0],
-    sub = table.tHead.rows[1],
-    let table = $('#resourcePanel table');
+  let table = $('#resourcePanel table');
   if (table.classList.contains('resource-v7-table')) return;
   let top = table.tHead?.rows?.[0],
     sub = table.tHead?.rows?.[1],
     allRows = M.projectCells(state, me()),
-    common = state.tableColumns.filter(c => !c.docId),
-    docs = [...top.querySelectorAll('th.group')].map(th => state.officials.find(d => th.textContent.trim() === 'Công văn ' + d.no)?.id).filter(Boolean);
-  common = (state.tableColumns || []).filter(c => !c.docId),
-    docs = [...top?.querySelectorAll('th.group') || []].map(th => (state.officials || state.documents || []).find(d => th.textContent.trim() === 'Công văn ' + d.no)?.id).filter(Boolean);
+    common = (state.tableColumns || []).filter(c => !c.docId),
+    docs = [...(top?.querySelectorAll('th.group') || [])].map(th => (state.officials || state.documents || []).find(d => th.textContent.trim() === 'Công văn ' + d.no)?.id).filter(Boolean);
+  if (!top || !sub) return;
 
   // Insert common columns into thead
   for (let c of common) {
@@ -180,8 +176,8 @@ function decorateResourceTable() {
   }
 
   $$('[data-global-column]').forEach(b => b.onclick = () => globalColumnForm(b.dataset.globalColumn));
-  $('#addProjectionColumn').onclick = () => globalColumnForm();
-  $('#addProjectionColumnBottom').onclick = () => globalColumnForm();
+  $('#addProjectionColumn')?.addEventListener('click', () => globalColumnForm());
+  $('#addProjectionColumnBottom')?.addEventListener('click', () => globalColumnForm());
 }
 
 function customTd(row, c) {
