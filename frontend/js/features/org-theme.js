@@ -132,6 +132,21 @@ personForm=function(id){
 };
 
 const COLOR_PRESETS=['#2563eb','#0284c7','#0d9488','#16a34a','#d97706','#dc2626','#7c3aed','#4f46e5','#0891b2','#475569'];
+const PERSONAL_THEME_KEY='c12-personal-themes';
+function personalThemeSettings(){
+  try{
+    const stored=JSON.parse(localStorage.getItem(PERSONAL_THEME_KEY)||'{}');
+    return stored&&typeof stored==='object'&&!Array.isArray(stored)?(stored[session]||{}):{};
+  }
+  catch{return {}}
+}
+function savePersonalThemeSettings(settings){
+  let all={};
+  try{all=JSON.parse(localStorage.getItem(PERSONAL_THEME_KEY)||'{}')||{}}catch{}
+  if(!all||typeof all!=='object'||Array.isArray(all))all={};
+  all[session]=settings;
+  localStorage.setItem(PERSONAL_THEME_KEY,JSON.stringify(all));
+}
 const GRADIENTS=[
   'linear-gradient(135deg,#eff6ff,#dbeafe)',
   'linear-gradient(135deg,#ecfdf5,#d1fae5)',
@@ -163,7 +178,7 @@ function calcLuminanceFromHex(hex){
 }
 
 function applyPersonalTheme(){
-  let settings=state.themeByUser[session]||{},
+  let settings=personalThemeSettings(),
       root=document.documentElement;
   root.dataset.theme=localStorage.getItem('c12-style')||'glassmorphism';
 
@@ -194,7 +209,7 @@ function applyPersonalTheme(){
 // YÊU CẦU 8: POPUP THEME DẠNG RIGHT SIDEBAR DRAWER
 // =========================================================
 function themesDialog(){
-  let s=state.themeByUser[session]||{};
+  let s={...personalThemeSettings()};
   let textPreference=getTextPalettePreference(), textState=getTextColorState();
   modal('Chủ đề không gian làm việc',`
     <section class="text-palette-panel" aria-labelledby="textPaletteHeading">
@@ -244,13 +259,13 @@ function themesDialog(){
       if(!/^https:\/\//i.test(d.backgroundUrl))throw Error('Chỉ dùng URL ảnh HTTPS.');
       s.background=d.backgroundUrl;
     }
-    state.themeByUser[session]=s;
+    savePersonalThemeSettings(s);
     if (await done('Đã lưu chủ đề không gian làm việc')) applyPersonalTheme();
   });
 
   $$('[data-color]').forEach(b=>b.onclick=()=>{
     s.color=b.dataset.color;
-    state.themeByUser[session]=s;
+    savePersonalThemeSettings(s);
     applyPersonalTheme();
     $$('[data-color]').forEach(x=>x.classList.toggle('selected',x===b));
   });
@@ -287,7 +302,7 @@ function themesDialog(){
 
   $$('[data-background]').forEach(b=>b.onclick=()=>{
     s.background=b.dataset.background;
-    state.themeByUser[session]=s;
+    savePersonalThemeSettings(s);
     applyPersonalTheme();
     let urlInput=$('#editForm input[name=backgroundUrl]');
     if(urlInput)urlInput.value='';
@@ -303,7 +318,7 @@ function themesDialog(){
         r.onload=()=>resolve(r.result);
         r.readAsDataURL(file);
       });
-      state.themeByUser[session]=s;
+      savePersonalThemeSettings(s);
       applyPersonalTheme();
     }catch(err){
       $('#formError').textContent=err.message;

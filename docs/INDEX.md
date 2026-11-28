@@ -5,10 +5,14 @@ Ngày rà soát: 27/11/2026. Đây là điểm vào duy nhất cho AI/IDE. Đọ
 1. [AGENTS.md](../AGENTS.md) — quy tắc nhanh cho agent và thứ tự nguồn chuẩn.
 2. [SPEC.md](SPEC.md) — nghiệp vụ đã chốt, hiện trạng code và khoảng lệch; bao gồm luồng liên kết Task–Resource–Văn bản và sinh nhóm cột Công văn.
 3. [PERMISSIONS.md](PERMISSIONS.md) — ma trận quyền theo role/quan hệ task.
-4. [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) — cấu trúc SPA, state localStorage và cách chạy/build.
+4. [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) — cấu trúc SPA, backend modules, runtime/state và migrations.
 5. [FRONTEND_RULES.md](FRONTEND_RULES.md) — thiết kế, CSS/theme, layout và tương tác.
-6. [CONTEXT.md](CONTEXT.md) — thuật ngữ, phạm vi và cách xử lý mâu thuẫn.
-7. [PRD.md](PRD.md) — mục tiêu, phạm vi và các khoảng cách triển khai đã biết.
+6. [BACKEND_RULES.md](BACKEND_RULES.md) — stack, bảo mật, SQL, transaction, migrations và archive (API nghiệp vụ đang được kiểm chứng).
+7. [API_CONTRACT.md](API_CONTRACT.md) — REST, JWT, lỗi, Swagger và Socket.IO contract (các API auth, nghiệp vụ và notification đã có; một số schema/coverage còn thiếu).
+8. [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — phase, checklist và điều kiện nghiệm thu.
+9. [DEPLOYMENT.md](DEPLOYMENT.md) — Compose, ports, secret bootstrap, volumes, run/stop/logs.
+10. [CONTEXT.md](CONTEXT.md) — thuật ngữ, phạm vi và cách xử lý mâu thuẫn.
+11. [PRD.md](PRD.md) — mục tiêu, phạm vi và các khoảng cách triển khai đã biết.
 
 ## Tra cứu theo chức năng
 
@@ -21,6 +25,9 @@ Ngày rà soát: 27/11/2026. Đây là điểm vào duy nhất cho AI/IDE. Đọ
 | Kiến thức, Trang chính, Thống kê, tìm kiếm, notification | [SPEC.md §8, §10–11](SPEC.md#8-kien-thuc-to) |
 | Đăng nhập demo, theme, localStorage, seed/migration và giới hạn runtime | [SPEC.md §1.1, §13](SPEC.md#11-dang-nhap-demo-phien-va-thiet-lap-nguoi-dung), [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) |
 | Quy tắc layout, token, typography, responsive, modal và table | [FRONTEND_RULES.md](FRONTEND_RULES.md) |
+| Node/Express, MySQL schema/security/migration | [BACKEND_RULES.md](BACKEND_RULES.md) |
+| REST routes, error codes, Swagger, Socket.IO | [API_CONTRACT.md](API_CONTRACT.md) |
+| Trạng thái triển khai, checklist phase, nghiệm thu | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) |
 
 ## Thứ tự ưu tiên
 
@@ -50,4 +57,4 @@ Chi tiết cách chạy SPA, lưu state và giới hạn bảo mật nằm trong
 
 ## Lưu ý sử dụng
 
-Ứng dụng được phục vụ như static SPA; `npm run build:css` tạo bundle CSS từ Tailwind. State workspace được lưu trong localStorage `c12-workspace-v7`, còn phiên và một số tùy chọn giao diện dùng key riêng. Không có backend/database; các role demo chỉ mô phỏng phía client. Lưu ý seed version và migration có thể bổ sung/chuẩn hóa dữ liệu demo trên workspace đã tồn tại; xem [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) trước khi thao tác storage.
+Frontend hiện vẫn là static SPA dùng mock workspace/localStorage; **chưa kết nối API**. Backend có MySQL schema/bootstrap, auth, CRUD các miền nghiệp vụ, notification API, resource XLSX, uploads và Socket.IO outbox. Backend integration suite đạt 9/9 trên MySQL 8.4 test container tạm không gắn volume; Swagger/OpenAPI còn thiếu coverage đầy đủ. Docker/Nginx và E2E chưa hoàn thành. Mục tiêu và trạng thái theo [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Không import workspace localStorage cũ vào database; script dọn schema một lần không chạy khi khởi động thường.

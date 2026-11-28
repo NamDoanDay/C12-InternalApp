@@ -1,10 +1,10 @@
 # PRD — C12 / P4 - T1 Internal App
 
-Cập nhật 27/11/2026. Đây là tóm tắt mục tiêu sản phẩm. Nghiệp vụ chi tiết tại [SPEC.md](SPEC.md), quy tắc role giao diện tại [PERMISSIONS.md](PERMISSIONS.md), runtime tại [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md), quy tắc UI tại [FRONTEND_RULES.md](FRONTEND_RULES.md).
+Cập nhật 28/11/2026. Đây là tóm tắt mục tiêu sản phẩm. Nghiệp vụ chi tiết tại [SPEC.md](SPEC.md), quyền tại [PERMISSIONS.md](PERMISSIONS.md), runtime tại [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md), giao diện tại [FRONTEND_RULES.md](FRONTEND_RULES.md), stack/API/plan full-stack tại [BACKEND_RULES.md](BACKEND_RULES.md), [API_CONTRACT.md](API_CONTRACT.md), [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 ## Mục tiêu
 
-Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục văn bản, dữ liệu tài nguyên, kiến thức chuyên môn và nhân sự tổ. Runtime hiện là SPA tĩnh với lưu trữ localStorage; không có backend/database.
+Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục văn bản, dữ liệu tài nguyên, kiến thức chuyên môn và nhân sự tổ. Frontend runtime hiện vẫn là SPA tĩnh/localStorage; backend schema/bootstrap đã nghiệm thu, auth/account API cơ bản đã có, nhưng business API, Socket.IO và Nginx chưa hoàn tất. Trạng thái theo từng phase trong `IMPLEMENTATION_PLAN.md`.
 
 ## Phân hệ
 
@@ -34,6 +34,6 @@ Workspace nội bộ tiếng Việt để theo dõi công việc, danh mục vă
 
 ## Giới hạn hiện tại
 
-Workspace lưu cục bộ trong trình duyệt; không đồng bộ nhiều user hoặc nhiều thiết bị. Vai trò demo phía client không phải cơ chế bảo mật. XLSX/Mammoth và một số font/CDN phụ thuộc môi trường tải. Resource export hiện dựng file XLSX từ tập dữ liệu đang lọc, gồm header nhóm/cột con, merge ô định danh và các dòng phụ lục chung/riêng; việc khẳng định khớp hoàn toàn một workbook tham chiếu vẫn cần đối chiếu trực quan.
+Hiện tại workspace lưu cục bộ trong trình duyệt; chưa đồng bộ nhiều user/thiết bị và role demo không phải bảo mật. XLSX/Mammoth/font còn phụ thuộc CDN. Resource export hiện dựng XLSX từ tập filter, nhưng chưa được đối chiếu trực quan để khẳng định giống tuyệt đối workbook tham chiếu.
 
-Đăng nhập hiện không kiểm tra mật khẩu, đăng ký không lưu mật khẩu và checkbox “Ghi nhớ đăng nhập” chưa có tác dụng thực tế. Activity/lịch Thống kê là fixture tĩnh tháng 11/2026, không phải audit feed live. CRUD quyền User thường cho Danh mục văn bản/Kiến thức chưa được chốt thống nhất; xem [PERMISSIONS.md](PERMISSIONS.md) và mục điểm cần xác nhận trong [SPEC.md](SPEC.md).
+Đăng nhập hiện không kiểm tra mật khẩu, đăng ký không lưu mật khẩu và checkbox “Ghi nhớ đăng nhập” chưa có tác dụng. Activity/lịch Thống kê là fixture tĩnh tháng 11/2026. Khi chuyển đổi, dữ liệu localStorage cũ không import; database sạch chỉ khởi tạo admin, còn nhóm/người/task/resource/văn bản do admin tạo sau. Backend đích sẽ dùng archive giữ quan hệ, JWT, transaction và outbox như các tài liệu kỹ thuật; chưa áp dụng cho tới khi phase được nghiệm thu.

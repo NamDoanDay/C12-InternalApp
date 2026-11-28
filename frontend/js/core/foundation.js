@@ -38,7 +38,12 @@ const btn = (t, a, i = '', k = '') => `<button type="button" class="btn ${k}" da
 const ib = (n, a, l) => `<button type="button" class="icon-btn" data-action="${a}" aria-label="${l}" title="${l}">${icon(n)}</button>`;
 const field = (l, n, v = '', t = 'text', req = false) => `<label class="field"><span>${esc(l)}</span><input name="${n}" type="${t}" value="${esc(v)}" ${req ? 'required' : ''}></label>`;
 const fmt = v => { if (!v) return '—'; let d = new Date(v), pad = n => String(n).padStart(2, '0'); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` };
-const day = v => v ? new Date(v + 'T12:00:00').toLocaleDateString('vi-VN') : '—';
+const day = v => {
+  if (!v) return '—';
+  const value = v instanceof Date ? v : String(v);
+  const date = value instanceof Date ? value : new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('vi-VN');
+};
 
 const schemas = {
   '952': ['vCPU', 'RAM (GB)', 'Disk / Block (TB)', 'Disk / File Storage (TB)', 'Disk / Object (TB)', 'License', 'Giải pháp ATTT', 'Kênh truyền'],
@@ -47,30 +52,10 @@ const schemas = {
 
 const workbookSeed = { "A1": "STT", "B1": "Tên đơn vị", "C1": "Cơ quan quản lý", "D1": "Hệ thống", "E1": "Công văn đăng ký", "F1": "952", "N1": "4651", "F2": "vCPU", "G2": "RAM (GB)", "H2": "Disk (TB)", "K2": "License", "L2": "Giải pháp ATTT", "M2": "Kênh truyền", "N2": "vCPU", "O2": "RAM (GB)", "P2": "GPU (GB)", "Q2": "Disk (TB)", "V2": "Sizing 3 vùng", "W2": "Đã chia sizing 3 vùng", "Z2": "License thương mại", "AA2": "Kênh truyền ", "AB2": "Giải pháp ATTT", "AC2": "Kế hoạch", "AD2": "Thời gian đề nghị cấp tài nguyên theo 4267", "AE2": "Đặc thù", "AF2": "Hệ thống có trong danh mục theo các văn bản 278/2025/NĐ-CP; Nghị quyết 214/NQ-CP và Quyết định số 1132/QĐ-TTg", "AG2": "Ghi chú", "Q3": "Block Storage ", "S3": "File Storage", "U3": "Object Storage", "W3": "DMZ", "X3": "DB", "Y3": "APP", "H4": "Block Storage \t", "I4": "File Storage", "J4": "Object Storage", "Q4": "SSD", "R4": "HDD", "S4": "SSD", "T4": "HDD", "A5": "1", "B5": "Cà Mau\n(01 hệ thống)", "C5": "Trung tâm giải quyết TTHC", "D5": "HTTT giải quyết thủ tục hành chính", "E5": "952 và 4651", "F5": "272", "G5": "384", "H5": "0", "I5": "8", "J5": "0", "K5": "Linux; Oracle Database; Kaspersky Enpoint Security, License, 10 License, hết hạn ngày 04/4/2026; DLP, thời hạn License 08/10/2027; WAF; Imperva SecureSphere DBF (VM), số lượng: 04 license\nLicense giám sát Oracle & MS SQL, hạn 31/8/2027 ", "L5": "Giải pháp log tập trung hiện tại: Splunk\nGiải pháp giám sát hiện tại: SOC\nNguồn log thu thập: Firewall; Anti-DDoS; IPS; Ứng dụng", "M5": "- Internet trong nước 200 Mbps\n- Internet quốc tế 10Mbps\n- Băng thông WAN: 200Mbps", "N5": "608", "O5": "740", "Q5": "23", "T5": "0", "U5": "0", "V5": "x", "W5": "-", "X5": "x", "Y5": "x", "Z5": "Linux; Oracle; DLP, Imperva", "AB5": "Có đăng ký license về: Firewall; DLP; IDS/IPS", "AC5": "Theo lộ trình C12", "AG5": "Rút", "A6": "2", "B6": "Cà Mau\n(01 hệ thống)", "C6": "VP UBND tỉnh", "D6": "Hệ thống quản lý văn bản và điều hành", "E6": "952 và 4651", "F6": "900", "G6": "1600", "H6": "0", "I6": "8", "J6": "0", "K6": "Windows Server 2019; MySQL; Kaspersky Enpoint Security, License, 3 License, hết hạn ngày 04/4/2026; DLP, thời hạn License 08/10/2027; WAF; Imperva SecureSphere DBF (VM), số lượng: 02 license\nLicense giám sát Oracle & MS SQL, hạn 30/09/2026", "L6": "Giải pháp log tập trung hiện tại: Splunk\nGiải pháp giám sát hiện tại: SOC\nNguồn log thu thập: Firewall; Anti-DDoS; IPS; Ứng dụng", "M6": "- Internet trong nước 200 Mbps\n- Internet quốc tế 10Mbps\n- Băng thông WAN: 200Mbps", "N6": "576", "O6": "1536", "Q6": "24", "T6": "0", "U6": "0", "V6": "x", "W6": "-", "X6": "x", "Y6": "x", "Z6": "Window; Orcle; PostgreSQL; DLP; Imperva", "AB6": "Có đăng ký license về: Firewall; DLP; IDS/IPS", "AC6": "Theo lộ trình C12", "AG6": "Tạm rút", "A7": "3", "B7": "Cà Mau\n(01 hệ thống)", "C7": "Sở KHCN", "D7": "Hệ thống thư điện tử công vụ tỉnh Cà Mau", "E7": "952 và 4651 rút", "F7": "112", "G7": "192", "H7": "0", "I7": "8", "J7": "0", "K7": "Windows Server 2019; MySQL; Kaspersky Enpoint Security, License, 3 License, hết hạn ngày 04/4/2026; DLP, thời hạn License 08/10/2027; WAF; Imperva SecureSphere DBF (VM), số lượng: 02 license\nLicense giám sát Oracle & MS SQL, hạn 30/09/2026", "L7": "Giải pháp log tập trung hiện tại: Splunk\nGiải pháp giám sát hiện tại: SOC\nNguồn log thu thập: Firewall; Anti-DDoS; IPS; Ứng dụng", "M7": "- Internet trong nước 200 Mbps\n- Internet quốc tế 10Mbps\n- Băng thông WAN: 200Mbps", "AG7": "Xin rút", "A8": "4", "B8": "Cà Mau\n(01 hệ thống)", "C8": "Trung tâm CĐS", "D8": "Hệ thống thông tin báo cáo cấp tỉnh   ", "E8": "952 và 4651", "F8": "48", "G8": "96", "H8": "0", "I8": "8", "J8": "0", "K8": "Linux; Microsoft SQL Server Standard; Kaspersky Enpoint Security, License, 5 License, hết hạn ngày 04/4/2026; DLP, thời hạn License 08/10/2027; WAF; Imperva SecureSphere DBF (VM), số lượng: 02 license\nLicense giám sát Oracle & MS SQL, hạn 30/09/2026", "L8": "Giải pháp log tập trung hiện tại: Splunk\nGiải pháp giám sát hiện tại: SOC\nNguồn log thu thập: Firewall; Anti-DDoS; IPS; Ứng dụng", "M8": "- Internet trong nước 200 Mbps\n- Internet quốc tế 10Mbps\n- Băng thông WAN: 200Mbps", "N8": "48", "O8": "96", "Q8": "1.5", "T8": "0", "U8": "0", "V8": "x", "W8": "-", "X8": "x", "Y8": "x", "Z8": "Window; PostgreSQL; DLP; Imperva", "AB8": "Có đăng ký license về: Firewall; DLP; IDS/IPS", "AC8": "Theo lộ trình C12", "AG8": "Tạm rút", "A9": "5", "B9": "Cà Mau\n(01 hệ thống)", "C9": "UBND", "D9": "Hệ thống iCaMau", "E9": "4267", "N9": "128", "O9": "256", "Q9": "1", "AD9": "Quý II/2027" };
 
-const WORKSPACE_STORAGE_KEY = 'c12-workspace-v7';
-const SESSION_STORAGE_KEY = 'c12-local-session';
-function seed() { return window.C12DemoWorkspace.create(); }
-function loadWorkspace() {
-  try { return JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY)) || seed(); }
-  catch (error) { console.error('Không đọc được dữ liệu cục bộ; dùng bộ dữ liệu mẫu.', error); return seed(); }
-}
-function loadLocalSession(users) {
-  const saved = localStorage.getItem(SESSION_STORAGE_KEY);
-  if (saved !== null) return saved;
-  const initial = users.find(u => u.id === 'demo-u-g-HT')?.id || users.find(u => u.role === 'user')?.id || '';
-  localStorage.setItem(SESSION_STORAGE_KEY, initial);
-  return initial;
-}
-
-// Data is stored in this browser. Other legacy localStorage keys remain untouched.
-let state = loadWorkspace();
-if (state) {
-  state.documents ||= state.docs || [];
-  state.officials ||= state.documents;
-  state.docs ||= state.documents;
-}
-
-let session = loadLocalSession(state.users),
+const emptyWorkspace = () => ({ version: 7, users: [], people: [], taskGroups: [], tasks: [], documents: [], docs: [], officials: [], resourceRecords: [], resourceAppendixSchemas: {}, resourcePrivateColumns: [], tableColumns: [], rows: [], schemas: {}, knowledge: [], notifications: [], files: {}, counters: {}, accountRegistrations: [] });
+// Business data and authentication are loaded from the API, never from localStorage.
+let state = emptyWorkspace();
+let session = '',
   page = location.hash.slice(1) || 'home',
   q = '',
   collapsed = false,
@@ -81,15 +66,15 @@ let session = loadLocalSession(state.users),
   drawerState = null,
   returnFocus = null;
 
-const save = () => {
-  try { localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(state)); return true; }
-  catch (error) { console.error('Không lưu được dữ liệu cục bộ.', error); toast('Không lưu được dữ liệu trên trình duyệt. Kiểm tra dung lượng lưu trữ.'); return false; }
+const save = async () => {
+  if (!window.C12Api?.authenticated) { toast('Đăng nhập lại để lưu thay đổi.'); return false; }
+  try { state = await C12Api.persistWorkspace(state); render(); return true; }
+  catch (error) { C12Api.report(error); try { state = await C12Api.loadWorkspace(); render(); } catch {} return false; }
 };
 
 const me = () => state.users.find(u => u.id === session) || null;
 function setLocalSession(id) {
   session = id;
-  localStorage.setItem(SESSION_STORAGE_KEY, id || '');
 }
 const admin = () => me()?.role === 'admin';
 const key = r => [r.unit, r.agency, r.system].map(x => String(x).trim().toLocaleLowerCase('vi')).join('|');

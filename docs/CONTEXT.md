@@ -1,6 +1,6 @@
 # Bối cảnh dự án và thuật ngữ
 
-Cập nhật 27/11/2026. Đây là workspace quản trị nội bộ C12/P4-T1 dạng SPA tĩnh. Runtime hiện không có backend, Socket.IO, MySQL hoặc Nginx; dữ liệu nghiệp vụ của bản demo được lưu trong localStorage của trình duyệt.
+Cập nhật 28/11/2026. Đây là workspace quản trị nội bộ C12/P4-T1. Frontend hiện vẫn là SPA localStorage, chưa nối business API. Phase 1 backend/schema đã nghiệm thu trên MySQL 8.4 riêng; auth/account API cơ bản đã có. API nghiệp vụ, Socket.IO, frontend migration và Docker/Nginx còn dang dở. Theo dõi tiến độ tại [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md); tài liệu mục tiêu không phải bằng chứng nghiệm thu.
 
 ## Thuật ngữ
 
@@ -34,6 +34,14 @@ Các quyết định quan trọng nhất: ba loại task (xử lý văn bản, q
 - Tìm kiếm header hiện chỉ truy vấn task; các entity như resource/catalog/person/knowledge được tìm qua từng view. Activity và lịch ở Thống kê là fixture tháng 11/2026.
 - Các dữ liệu seed/demo và fixture phải được phân biệt với dữ liệu live.
 - Không giả định các thư viện CDN luôn sẵn có; luồng phụ thuộc thư viện cần báo lỗi có thể xử lý được.
+
+## Kiến trúc đích đã xác nhận
+
+- Node LTS/Express + MySQL 8.4/mysql2 + Socket.IO, Docker Compose/Nginx; hợp đồng tại [API_CONTRACT.md](API_CONTRACT.md), rule tại [BACKEND_RULES.md](BACKEND_RULES.md).
+- Khởi tạo DB chỉ có admin; không có mock domain data; dữ liệu localStorage không import. `.env` chứa runtime secrets, mật khẩu bootstrap đi qua Docker secret file và được hash; admin buộc đổi password lần đầu.
+- Migration/versioning bảo toàn dữ liệu sau cài đặt; thao tác dọn một lần chỉ nhắm schema `c12_internalapp` theo quyết định không backup, không chạy cùng startup thường.
+- Archive thay hard delete, giữ nguyên mọi relationship, revision và history; account inactive không đăng nhập/nhận việc mới.
+- Plan có checklist nghiệm thu theo phase; không dùng tài liệu đích để tuyên bố chức năng đã xong.
 
 ## Tham chiếu
 

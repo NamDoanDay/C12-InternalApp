@@ -1,12 +1,12 @@
 # Đặc tả chuẩn — C12 / P4 - T1 Internal App
 
-> Cập nhật 27/11/2026. Đây là nguồn nghiệp vụ chuẩn hiện hành. Hãy đọc cùng [INDEX.md](INDEX.md), [PERMISSIONS.md](PERMISSIONS.md), [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) và [FRONTEND_RULES.md](FRONTEND_RULES.md).
+> Cập nhật 28/11/2026. Đây là nguồn nghiệp vụ chuẩn hiện hành. Hãy đọc cùng [INDEX.md](INDEX.md), [PERMISSIONS.md](PERMISSIONS.md), [TECH_ARCHITECTURE.md](TECH_ARCHITECTURE.md) và [FRONTEND_RULES.md](FRONTEND_RULES.md). Backend schema/bootstrap Phase 1 đã nghiệm thu; auth/account API Phase 2 đang triển khai; business API chưa hoàn tất. Quy tắc/contract/plan ở `BACKEND_RULES.md`, `API_CONTRACT.md`, `IMPLEMENTATION_PLAN.md`.
 >
 > Quy ước: **Chuẩn đã chốt** là yêu cầu người dùng xác nhận; **Hiện trạng code** là hành vi đọc thấy trong phiên bản hiện tại; **Lệch/chưa hỗ trợ** ghi rõ phần không nên suy diễn thành đã triển khai. Khi hai phần khác nhau, giữ nguyên chuẩn và báo khoảng lệch.
 
 ## 1. Sản phẩm và phân hệ
 
-C12 / P4 - T1 Internal App là workspace nội bộ quản lý công việc, văn bản, tài nguyên, kiến thức và nhân sự. Giao diện dùng tiếng Việt, HTML, Tailwind CSS và JavaScript thuần. **Hiện trạng triển khai:** SPA chạy trên trình duyệt, state workspace lưu trong localStorage; không có backend, API, realtime hoặc database. Đây là chế độ demo cục bộ, không phải triển khai nhiều người dùng.
+C12 / P4 - T1 Internal App là workspace nội bộ quản lý công việc, văn bản, tài nguyên, kiến thức và nhân sự. Giao diện dùng tiếng Việt, HTML, Tailwind CSS và JavaScript thuần. **Frontend hiện hành:** SPA chạy trên trình duyệt, state workspace lưu trong localStorage và chưa nối business API. Phase 1 đã thêm backend skeleton/health, migration runner và schema SQL, nhưng chưa kiểm chứng DB migrations; auth, business API, realtime, Docker Compose/Nginx chưa sẵn sàng. **Kiến trúc đích đã chốt:** Node.js/Express, MySQL 8.4, JWT, Socket.IO, Docker Compose/Nginx; chỉ tính là chức năng hiện hữu sau khi phase tương ứng được nghiệm thu.
 
 Các view: Trang chính; For you (Công việc) gồm Quản lý công việc, Thống kê, Quản lý tài nguyên, Danh mục văn bản; Chuyên môn tổ gồm Kiến thức tổ và Cây sơ đồ tổ; Quản lý nhân sự dành cho admin. Header có tìm kiếm, chuyển LIGHT/DARK, chủ đề cá nhân, thông báo và tài khoản.
 
@@ -188,9 +188,11 @@ Ma trận chi tiết tại [PERMISSIONS.md](PERMISSIONS.md). Quy tắc cốt lõ
 
 **Hiện trạng:** role và quyền được mô phỏng phía client để hỗ trợ demo. Người dùng có thể sửa state hoặc đổi role qua công cụ trình duyệt; đây không phải ranh giới bảo mật. Không lưu mật khẩu máy chủ hoặc JWT.
 
+**Kiến trúc đích:** mọi quyền trên API được server kiểm tra từ JWT và dữ liệu DB; không nhận role/actor từ payload để ủy quyền. Catalog/Knowledge ghi chỉ dành admin. Dùng archive/deactivate thay xóa vật lý; giữ nguyên mọi quan hệ nghiệp vụ, lịch sử và FK. Archived record mặc định không dùng cho liên kết mới nhưng vẫn xem được trong lịch sử/chi tiết; admin có thể khôi phục. Xem [BACKEND_RULES.md](BACKEND_RULES.md) và [API_CONTRACT.md](API_CONTRACT.md); đây là mục tiêu chưa triển khai.
+
 ## 13. Dữ liệu, migrations và giới hạn
 
-Workspace hiện lưu trong localStorage `c12-workspace-v7`, session demo trong `c12-local-session`; theme/palette cũng lưu cục bộ. `demo-workspace.js` cung cấp seed ban đầu cho workspace trống, còn `seedTaskDemo()` và `migrateResourceColumnsV7()` có các bước augmentation/chuẩn hóa một lần theo version khi khởi chạy/mở view liên quan. Không còn MySQL seed, SQL migration, JWT hoặc Socket.IO trong source hiện hành. XLSX/Mammoth còn phụ thuộc CDN; tính năng phụ thuộc thư viện phải hiển thị lỗi rõ nếu thiếu. Không khẳng định parser/OCR ngoài phần code thực sự xử lý.
+Workspace hiện lưu trong localStorage `c12-workspace-v7`, session demo trong `c12-local-session`; theme/palette cũng lưu cục bộ. `demo-workspace.js` cung cấp seed ban đầu cho workspace trống, còn `seedTaskDemo()` và `migrateResourceColumnsV7()` có các bước augmentation/chuẩn hóa một lần theo version khi khởi chạy/mở view liên quan. Không có MySQL migration, JWT hoặc Socket.IO trong source hiện hành. Full-stack DB được khởi tạo từ schema trống với một admin duy nhất, không seed mock business data; dữ liệu localStorage cũ không import. Từ sau khởi tạo, migration bảo toàn dữ liệu. XLSX/Mammoth hiện phụ thuộc CDN; tính năng phụ thuộc thư viện phải hiển thị lỗi rõ nếu thiếu. Xem plan phase tại [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
 
 **Rủi ro dữ liệu đã biết:** augmentation `seedTaskDemo()` thay các resource có ID demo trùng `demo-resource-{mã nhóm}` bằng fixture mới, ngoài việc thêm dữ liệu demo khác. Migration V7 cũng dọn schema/record demo cũ và giảm mật độ một phần dữ liệu nhu cầu địa phương theo điều kiện nhận diện thay đổi. Vì vậy mở workspace cũ chưa có `demoSeedVersion >= 2` có thể thay đổi state cục bộ; đây không chỉ là seed khi kho trống. Sao lưu dữ liệu trước khi mở phiên bản code có migration nếu cần giữ mọi chỉnh sửa demo. Không tự xóa/reset localStorage để khắc phục lỗi và không giả định các migration hiện tại có rollback.
 
@@ -201,3 +203,4 @@ Không tự import hoặc xóa các localStorage key legacy. Các khóa tùy ch�
 - Quyền CRUD của User thường với Danh mục văn bản và Kiến thức tổ chưa được chốt thành ma trận rõ. Code UI hiện cho thao tác thêm/sửa/xóa ở một số luồng mà không kiểm tra `admin()` đồng nhất. Tài liệu ghi nhận hành vi này, không khẳng định đó là chuẩn phân quyền cuối.
 - Ô mật khẩu/“Ghi nhớ đăng nhập” trên trang đăng nhập chưa có hành vi xác thực/lưu tương ứng; cần quyết định nếu muốn chuyển prototype thành đăng nhập thực.
 - Tìm kiếm toàn cục hiện hành chỉ tìm task; các entity khác có tìm kiếm riêng theo màn. Nếu yêu cầu tìm kiếm hợp nhất, cần chốt loại entity và quyền hiển thị.
+- Trong giai đoạn chuyển đổi, xác thực và dữ liệu cục bộ chưa được thay bằng server cho đến khi Phase 2/5 hoàn tất; xem [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) để biết trạng thái thực.

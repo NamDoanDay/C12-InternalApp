@@ -1,15 +1,17 @@
 # Hướng dẫn cho AI/IDE
 
-Trước khi sửa dự án, đọc [docs/INDEX.md](docs/INDEX.md), sau đó đọc tài liệu theo loại việc: `SPEC.md` (nghiệp vụ), `PERMISSIONS.md` (quy tắc role phía giao diện), `TECH_ARCHITECTURE.md` (runtime/state/lưu trữ cục bộ), `FRONTEND_RULES.md` (UI/CSS). `docs/SPEC.md` là nguồn chuẩn nghiệp vụ.
+Đọc [docs/INDEX.md](docs/INDEX.md) trước. Nguồn nghiệp vụ là [SPEC.md](docs/SPEC.md); quyền là [PERMISSIONS.md](docs/PERMISSIONS.md); thiết kế là [FRONTEND_RULES.md](docs/FRONTEND_RULES.md); mục tiêu backend/API là [BACKEND_RULES.md](docs/BACKEND_RULES.md) và [API_CONTRACT.md](docs/API_CONTRACT.md); tiến độ và nghiệm thu theo [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md). Đọc `TECH_ARCHITECTURE.md` để phân biệt trạng thái thực tế và kiến trúc đích.
 
-Luôn phân biệt yêu cầu đã chốt với hành vi hiện tại. Nếu code lệch SPEC, nêu khoảng lệch thay vì âm thầm hợp thức hóa code. Không xóa/reset dữ liệu localStorage, không thêm backend hoặc dependency nếu chưa được yêu cầu. Chỉ chạy test/build khi user yêu cầu. Giữ UI tiếng Việt và phong cách Floating Glassmorphism tối giản.
+Luôn ghi rõ đâu là hành vi code hiện tại, đâu là mục tiêu đã được chốt. Không mô tả tính năng trong plan như đã triển khai. Sau mỗi phase, cập nhật checklist và bằng chứng trong plan. Giữ UI tiếng Việt và phong cách Floating Glassmorphism tối giản.
 
-Khi hoàn tất thay đổi nghiệp vụ hoặc kiến trúc, cập nhật docs liên quan để khớp code; không ghi rằng một yêu cầu đã triển khai nếu chỉ mới đặc tả.
+Người dùng đã yêu cầu chuyển sang Node.js/Express + MySQL 8.4 + Socket.IO + Docker/Nginx. Phase tài liệu được thực hiện trước; chỉ bắt đầu code theo phase sau khi plan ghi nhận phase đó đủ điều kiện. Trong lần chuyển frontend, không dùng/import `c12-workspace-v7` hoặc `c12-local-session` làm nguồn nghiệp vụ/phiên; giữ tùy chọn giao diện cục bộ đã chốt và không xóa các key ngoài ứng dụng.
 
-## Kiến trúc hiện hành
+Các lệnh/test đã được yêu cầu trong plan full-stack; chỉ chạy test/build thuộc phase đang làm và dùng database/volume test tách biệt. Không chạy reset schema/database trong startup thông thường. Dọn mock data được cho phép duy nhất trong schema `c12_internalapp`, theo thao tác riêng có kiểm tra target; không đụng schema khác. Không tự mở rộng destructive scope.
 
-- Đây là SPA HTML/CSS/JavaScript thuần, entry tại `frontend/index.html`; có thể phục vụ tĩnh thư mục `frontend/`.
-- Dữ liệu demo và state nghiệp vụ chạy trong trình duyệt; workspace lưu tại localStorage `c12-workspace-v7`, session demo tại `c12-local-session`.
-- Không có backend, DBMS, API, Socket.IO hay cấu hình Docker/Nginx trong source tree hiện tại. Role là mô phỏng giao diện, không phải ranh giới bảo mật.
-- `frontend/js/data/demo-workspace.js` là dữ liệu khởi tạo; không xóa/reset localStorage người dùng.
-- Root `index.html` là preview tài liệu, không phải ứng dụng.
+## Trạng thái source hiện tại
+
+- `frontend/index.html` là entry SPA HTML/CSS/JavaScript thuần. Root `index.html` là preview tài liệu.
+- Frontend hiện vẫn lưu workspace/demo state vào localStorage; chưa có API client hoặc business API.
+- Backend đã có MySQL migrations/bootstrap, auth/account lifecycle, API CRUD cho task/resource/document/organization/knowledge/files/notifications, XLSX resource export và Socket.IO outbox relay. Integration suite 9/9 trên MySQL test riêng. Swagger coverage chưa đầy đủ; frontend vẫn localStorage/demo; Docker/Nginx đã có cấu hình nhưng cần E2E nghiệm thu. Theo dõi tiến độ trong `docs/IMPLEMENTATION_PLAN.md`.
+- Kiến trúc mục tiêu và phase được ghi trong `docs/`; phân biệt skeleton hiện có với chức năng đầy đủ đã nghiệm thu.
+- `frontend/js/data/demo-workspace.js` là seed cho phiên bản local hiện tại; khi chuyển API, không seed mock business rows vào database.

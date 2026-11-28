@@ -100,3 +100,12 @@ Không đổi schema/migration, seed data, quyền hoặc nghiệp vụ trong ta
 ## 9. Kiểm tra theo yêu cầu
 
 Không tự chạy test/build trừ khi user yêu cầu. Khi được yêu cầu validate UI, kiểm tra LIGHT/DARK, sidebar open/collapsed, màn nhỏ, modal mở/đóng, filter rỗng/đầy và nội dung dài. Phân biệt kiểm tra tĩnh code với kiểm tra trực quan trình duyệt.
+
+## 10. Tích hợp API (mục tiêu đã chốt, chưa triển khai)
+
+- Nghiệp vụ và phiên xác thực không lưu trong localStorage. Access JWT chỉ ở memory; refresh dùng cookie `HttpOnly` theo [API_CONTRACT.md](API_CONTRACT.md). Theme/palette/background preference tiếp tục lưu cục bộ.
+- API client tập trung xử lý JSON/error envelope; không tạo fetch/headers/refresh logic riêng cho từng view. Network failure được phân biệt với Backend/Database error.
+- Backend field errors hiển thị cạnh control; lỗi runtime báo rõ “Frontend”; API errors giữ `code`, `message`, `scope` và request ID dễ sao chép.
+- Realtime event là tín hiệu refetch qua API, không phải nguồn dữ liệu tin cậy. Khi nhận event, không ghi đè nội dung form đang nhập hoặc đóng modal/drawer; dùng version/conflict flow.
+- Loading, empty, unauthorized, archived và retry states phải giữ cùng layout/surface hiện hữu; archived links được hiển thị trong lịch sử/chi tiết nhưng không cho gán mới.
+- Chưa tuyên bố API integration đã có trong source cho tới khi Phase 5 của [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) được nghiệm thu.

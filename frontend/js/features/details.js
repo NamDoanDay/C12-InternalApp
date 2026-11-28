@@ -77,7 +77,7 @@ function taskDetailContent(t, current, readonly = false, docContext = '') {
   <div class="section-title"><h3>Bình luận & Trao đổi</h3></div>
   <div class="comment-list">
     ${(t.comments || []).map(c => `<article style="padding:10px 0;border-bottom:1px solid var(--border)">
-      <strong>${esc(userName(c.userId))}</strong>
+      <strong>${esc(c.authorName || userName(c.userId))}</strong>
       <small style="color:var(--muted);display:block;margin:2px 0 6px">${fmt(c.at)}</small>
       <p style="margin:0">${esc(c.text)}</p>
     </article>`).join('') || '<p class="muted">Chưa có bình luận.</p>'}
@@ -133,6 +133,11 @@ function bindTaskDetails(current, readonly = false) {
     if (!M.canEdit(state, me(), current)) return;
     let text = $('#commentText').value.trim();
     if (!text) return;
+    if (window.C12Api?.authenticated) {
+      try { await C12Api.post(`/tasks/${encodeURIComponent(current.id)}/comments`, { body: text }); await taskDrawer(current.id); }
+      catch (error) { C12Api.report(error); }
+      return;
+    }
     const backup = M.clone(state);
     current.comments.push({ id: M.id(), userId: session, at: M.now(), text });
     M.revision(current, session, 'Bình luận', [{ field: 'Bình luận', new: text }]);
@@ -141,9 +146,16 @@ function bindTaskDetails(current, readonly = false) {
   });
 }
 
-function taskDrawer(id, revisionId = '') {
+async function taskDrawer(id, revisionId = '') {
   let current = taskBy(id);
   if (!current || !M.canView(state, me(), current)) return toast('Bạn không có quyền xem công việc này.');
+  if (window.C12Api?.authenticated) {
+    try {
+      const [history, comments] = await Promise.all([C12Api.get(`/tasks/${encodeURIComponent(id)}/history`), C12Api.get(`/tasks/${encodeURIComponent(id)}/comments`)]);
+      current.revisions = history.slice().reverse().map(item => ({ id: item.id, action: item.action, at: item.createdAt, actorName: item.actorName, changes: typeof item.changes === 'string' ? JSON.parse(item.changes) : item.changes || [], data: typeof item.snapshot === 'string' ? JSON.parse(item.snapshot) : item.snapshot || current }));
+      current.comments = comments.map(item => ({ id: item.id, text: item.body, at: item.createdAt, authorName: item.authorName }));
+    } catch (error) { C12Api.report(error); }
+  }
   let rev = current.revisions.find(r => r.id === revisionId),
     shown = rev ? rev.data : current,
     readonly = !!rev && rev.id !== current.revisions.at(-1).id;
@@ -157,7 +169,7 @@ function taskDrawer(id, revisionId = '') {
           <button class="timeline-btn ${r.id === revisionId ? 'selected' : ''}" data-task-revision="${r.id}" style="width:100%;text-align:left">
             <strong>${esc(r.action)}</strong>
             <small style="display:block;color:var(--muted)">${fmt(r.at)}</small>
-            <span style="font-size:11px">${esc(userName(r.actorId))}</span>
+            <span style="font-size:11px">${esc(r.actorName || userName(r.actorId))}</span>
           </button>
         `).join('')}
       </aside>

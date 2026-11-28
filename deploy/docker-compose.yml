@@ -1,0 +1,82 @@
+name: c12-internalapp
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-c12_internalapp}
+      MYSQL_USER: ${MYSQL_USER:-c12_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in the root .env file}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in the root .env file}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    ports:
+      - "${MYSQL_PUBLISH_PORT:-3307}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+      API_PORT: 3000
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-c12_internalapp}
+      MYSQL_USER: ${MYSQL_USER:-c12_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in the root .env file}
+      MYSQL_POOL_SIZE: ${MYSQL_POOL_SIZE:-10}
+      ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+      FILE_STORAGE_DIR: /app/storage/uploads
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: "true"
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    secrets:
+      - admin_password
+    volumes:
+      - uploaded-files:/app/storage/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 4s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    volumes:
+      - ../frontend:/usr/share/nginx/html:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health/nginx || exit 1"]
+      interval: 15s
+      timeout: 4s
+      retries: 4
+
+volumes:
+  mysql-data:
+  uploaded-files:
+
+secrets:
+  admin_password:
+    file: ../secrets/admin_password

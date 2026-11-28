@@ -2,6 +2,8 @@
 
 Cập nhật 27/11/2026. Chuẩn nghiệp vụ tại [SPEC.md](SPEC.md). App demo có hai role UI: `admin` và `user`; chức danh Person không tạo thêm role. Bảng dưới mô tả hành vi/ý định giao diện, không phải kiểm soát bảo mật.
 
+**Mục tiêu đã chốt, chưa triển khai:** cùng ma trận sẽ được kiểm tra tại mọi API; role/actor chỉ lấy từ JWT. Các mục archived giữ liên kết và lịch sử; User inactive không đăng nhập/nhận phân công mới. Xem [BACKEND_RULES.md](BACKEND_RULES.md) và [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+
 | Hành động | Admin | User tạo task | User được giao (không tạo) | User chỉ xem qua nhóm |
 |---|---|---|---|---|
 | Xem task | Tất cả | Có | Có | Có nếu thuộc nhóm quản lý hoặc nhóm của assignee |
@@ -40,3 +42,11 @@ Yêu cầu trước đây cho phép CRUD danh mục và kiến thức; trong cod
 - Lần chạy đầu có thể tự tạo session User demo. Form đăng nhập không xác minh mật khẩu; form đăng ký không lưu password; checkbox ghi nhớ đăng nhập chưa điều khiển session.
 - Kiểm tra quyền trong UI có thể bị vượt qua bằng cách sửa state/client; không dùng để bảo vệ thông tin thật.
 - Không có kiểm soát truy cập database hoặc đồng bộ phiên giữa các thiết bị.
+
+## Quyền sau khi chuyển sang backend (mục tiêu)
+
+- User thường chỉ đọc/ghi theo ma trận phía trên; catalog/knowledge chỉ admin được tạo/sửa/archive. Admin tạo User hoặc duyệt đăng ký.
+- Mọi thao tác archive/restore được authorize server-side và audit; archive không xóa FK/link table, revision hay lịch sử. Không có hard-delete/purge trong phiên bản đầu.
+- Resource view hiện vẫn toàn bộ role; sửa Resource theo creator resource hoặc creator/assignee của ít nhất một task liên kết; API phải áp cùng điều kiện.
+- Socket.IO audience dùng cùng policy; client không tự join group/user room. Event không thay thế quyền API.
+- Đây là mục tiêu cần nghiệm thu theo Phase 2–4, không áp dụng cho source hiện tại cho tới khi backend được triển khai.

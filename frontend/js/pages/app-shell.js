@@ -90,13 +90,11 @@ function render() {
       <div class="account-menu-info">
         <strong>${esc(me()?.name || 'Người dùng')}</strong>
         <span>${esc(me()?.email || 'user@c12.demo')}</span>
-        <span class="chip active" style="margin-top:4px;width:fit-content">${admin() ? 'Quản trị viên' : 'Thành viên'} · Demo</span>
+        <span class="chip active" style="margin-top:4px;width:fit-content">${admin() ? 'Quản trị viên' : 'Thành viên'}</span>
       </div>
     </div>
     <div class="account-menu-actions">
       <button data-action="settings">${icon('settings')} Cài đặt tài khoản</button>
-      <button data-action="switch">${icon('refresh')} Chuyển sang vai trò ${admin() ? 'User' : 'Admin'} demo</button>
-      ${admin() ? `<button data-action="reset">${icon('reload')} Khôi phục dữ liệu mẫu</button>` : ''}
       <button data-action="logout" style="color:#ef4444">${icon('logout')} Đăng xuất</button>
     </div>
   </div>`: ''}`;

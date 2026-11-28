@@ -270,6 +270,17 @@ function renderTaskForm() {
     const backup = M.clone(state);
     const stagedFiles = { ...taskDraftFiles }, stagedDocuments = M.clone(taskDraftDocuments);
     try {
+      if (window.C12Api?.authenticated) {
+        const payload = C12Api.taskPayload(formTask);
+        if (formTask.id) {
+          delete payload.type; delete payload.resource;
+          await C12Api.patch(`/tasks/${encodeURIComponent(formTask.id)}`, { ...payload, version: formTask.version });
+        } else await C12Api.post('/tasks', payload);
+        state = await C12Api.loadWorkspace();
+        taskDraftFiles = {}; taskDraftDocuments = {}; formTask = null;
+        $('#overlay').innerHTML = ''; setModalScrollLock(false); page = 'tasks'; render(); toast('Đã lưu công việc trên máy chủ.');
+        return;
+      }
       const savedTask = M.saveTask(state, me(), formTask);
       if (savedTask.type === 'resource' || savedTask.resourceId) saveTaskResourceV7(savedTask);
       commitTaskAttachments();
@@ -290,7 +301,8 @@ function renderTaskForm() {
       state = backup;
       Object.assign(taskDraftFiles, stagedFiles);
       Object.assign(taskDraftDocuments, stagedDocuments);
-      $('#taskError').textContent = err.message;
+      const detail = Array.isArray(err.details) ? err.details.map(item => `${Array.isArray(item.path) ? item.path.join('.') : item.field || ''}${item.message ? `: ${item.message}` : ''}`).filter(Boolean).join(' · ') : '';
+      $('#taskError').textContent = `${err.scope ? `${err.scope} · ${err.code || 'ERROR'}: ` : ''}${err.message}${detail ? ` (${detail})` : ''}`;
     }
   };
 
@@ -567,7 +579,12 @@ async function storeFiles(files) {
   const draftAtStart=formTask, overlayAtStart=$('#overlay')?.firstElementChild;
   let refs=[], pending={};
   for(const file of files){
-    if(file.size>2*1024*1024)throw Error('Prototype giới hạn 2 MB mỗi tệp.');
+    if(file.size>2*1024*1024)throw Error('Mỗi tệp tối đa 2 MB.');
+    if (window.C12Api?.authenticated) {
+      const uploaded = await C12Api.uploadFile(file);
+      refs.push({ id: uploaded.id, name: uploaded.name, size: uploaded.size, mediaType: uploaded.mediaType });
+      continue;
+    }
     const url=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('Không đọc được tệp.'));r.readAsDataURL(file)});
     const id=M.id();pending[id]={id,name:file.name,size:file.size,type:file.type,url};refs.push({id,name:file.name,size:file.size});
   }
@@ -580,7 +597,7 @@ async function storeFiles(files) {
 function fileLinks(refs = [], remove = false) {
   return refs.map(f => {
     let source = taskDraftFiles[f.id] || state.files?.[f.id];
-    return `<span class="file-pill">${icon('file')}${source ? `<a href="${esc(source.url)}" download="${esc(f.name)}">${esc(f.name)}</a>` : esc(f.name)} <small>${Math.ceil((f.size || 0) / 1024)} KB</small></span>`;
+    return `<span class="file-pill">${icon('file')}${source?.url ? `<a href="${esc(source.url)}" download="${esc(f.name)}">${esc(f.name)}</a>` : `<button type="button" class="link-button" data-api-file="${esc(f.id)}" data-api-file-name="${esc(f.name)}">${esc(f.name)}</button>`} <small>${Math.ceil((f.size || 0) / 1024)} KB</small></span>`;
   }).join('');
 }
 

@@ -1,24 +1,12 @@
 function action(a) {
   if (a.startsWith('go-')) return navigate(a.slice(3));
-  if (a.startsWith('login-')) return login(a.slice(6));
+  if (a.startsWith('login-')) return toast('Đăng nhập bằng tài khoản và mật khẩu máy chủ.');
   if (a.startsWith('approve:')) return approve(a.split(':')[1]);
   if (a.startsWith('delete-user:')) {
     if (admin() && confirm('Xóa tài khoản? Hồ sơ nhân sự vẫn được giữ.')) {
       state.users = state.users.filter(u => u.id !== a.split(':')[1]);
-      save(); render();
+      save();
     }
-    return;
-  }
-  if (a === 'login-user') {
-    let u = state.users.find(x => x.role === 'user' && x.status === 'approved') || state.users.find(x => x.id === 'demo-u-g-HT') || state.users[0];
-    login(u.id);
-    toast('Đã đăng nhập tài khoản User demo');
-    return;
-  }
-  if (a === 'login-admin') {
-    let u = state.users.find(x => x.role === 'admin' && x.status === 'approved') || state.users.find(x => x.id === 'admin') || state.users[0];
-    login(u.id);
-    toast('Đã đăng nhập tài khoản Admin demo');
     return;
   }
   switch (a) {
@@ -30,13 +18,9 @@ function action(a) {
       render();
       break;
     case 'account': account = !account; render(); break;
-    case 'switch': login(admin() ? 'user' : 'admin'); toast('Đã chuyển vai trò demo'); break;
-    case 'logout': session = ''; auth(); break;
-    case 'reset':
-      if (confirm('Xóa thay đổi cục bộ và khôi phục dữ liệu mẫu?')) {
-        state = seed(); save(); $('#overlay').innerHTML = ''; login('admin');
-      }
-      break;
+    case 'switch': toast('Chuyển vai trò demo đã bị tắt; hãy đăng nhập bằng tài khoản máy chủ.'); break;
+    case 'logout': C12Api.logout().finally(() => { state = emptyWorkspace(); session = ''; auth(); }); break;
+    case 'reset': toast('Không hỗ trợ khôi phục dữ liệu mẫu trong chế độ máy chủ.'); break;
     case 'settings':
       modal('Cài đặt tài khoản', field('Tên hiển thị', 'name', me().name, 'text', true) + '<div class="notice">Phiên demo không có mật khẩu máy chủ.</div>', d => {
         me().name = d.name; done('Đã lưu tên hiển thị');
@@ -63,6 +47,10 @@ function closeOverlay() {
   setModalScrollLock(false);
   drawerState = null;
   restoreOverlayFocus();
+  if (window.c12PendingRealtimeRefresh && C12Api.authenticated) {
+    window.c12PendingRealtimeRefresh = false;
+    C12Api.loadWorkspace().then(next => { state = next; render(); }).catch(C12Api.report);
+  }
 }
 
 function restoreOverlayFocus() {
@@ -71,13 +59,15 @@ function restoreOverlayFocus() {
   if (target?.isConnected) requestAnimationFrame(() => target.isConnected && target.focus?.());
 }
 
-function done(message) {
-  save();
+async function done(message) {
+  const saved = await save();
+  if (!saved) return false;
   $('#overlay').innerHTML = '';
   setModalScrollLock(false);
   render();
   restoreOverlayFocus();
   if (message) toast(message);
+  return true;
 }
 
 let lockedPageScrollY = 0;

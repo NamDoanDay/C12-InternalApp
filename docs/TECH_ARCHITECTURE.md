@@ -1,43 +1,38 @@
 # Kiến trúc kỹ thuật
 
-Cập nhật 27/11/2026. Runtime hiện tại là SPA tĩnh chạy trên trình duyệt. Backend Node.js, MySQL, Socket.IO, Docker Compose và Nginx đã được gỡ khỏi source tree theo yêu cầu. Nghiệp vụ chuẩn vẫn ở [SPEC.md](SPEC.md); quy tắc quyền giao diện ở [PERMISSIONS.md](PERMISSIONS.md).
+Cập nhật 28/11/2026. Đây là ứng dụng SPA vanilla đang được chuyển từ demo cục bộ sang full-stack. Đăng nhập, bootstrap workspace, các luồng ghi chính và realtime hiện dùng API; migration frontend vẫn chưa nghiệm thu toàn bộ. Trạng thái và bằng chứng theo [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md); nghiệp vụ chuẩn tại [SPEC.md](SPEC.md), quyền tại [PERMISSIONS.md](PERMISSIONS.md), API/event tại [API_CONTRACT.md](API_CONTRACT.md).
 
-## Cấu trúc và runtime
+## Cấu trúc runtime
 
-- `frontend/index.html` là entry point. CSS/JavaScript được nạp bằng đường dẫn tương đối; có thể phục vụ thư mục `frontend/` bằng static web server.
-- `frontend/js/data/demo-workspace.js` tạo bộ dữ liệu demo trong trình duyệt.
-- `frontend/js/core/foundation.js` khởi tạo state, session demo và lưu workspace vào `localStorage` với khóa `c12-workspace-v7`.
-- `frontend/js/core/model.js`, `frontend/js/pages/` và `frontend/js/features/` giữ model, render và tương tác nghiệp vụ phía client.
-- `frontend/js/features/rework-v7.js` là implementation đang dùng cho bảng resource/catalog V7; file feature cũ vẫn được tải và một số hàm bị override theo thứ tự script. Xác định hàm cuối cùng sau toàn bộ script trước khi mô tả hoặc sửa một luồng.
-- `frontend/assets/app.css` là bundle hiện hành; root `package.json` chỉ giữ Tailwind CLI để build CSS.
-- Root `index.html` là preview tài liệu, không phải entry ứng dụng.
+- `frontend/index.html` là SPA entry; Nginx phục vụ nguyên cây `frontend/` để giữ đường dẫn tương đối. `frontend/js/core/api-client.js` là client same-origin cho `/api/v1`, JWT access trong memory, refresh cookie/CSRF, upload/download, xuất XLSX và Socket.IO.
+- `frontend/js/core/foundation.js` khởi tạo state rỗng và không đọc/ghi workspace/session nghiệp vụ vào localStorage. Chỉ tùy chọn giao diện như theme/palette còn dùng localStorage. `frontend/js/features/` và `frontend/js/pages/` vẫn chứa một số luồng legacy được bao bởi save adapter; cần tiếp tục loại các mutation chưa có API trực tiếp.
+- `backend/src/` là Node.js/Express modular monolith. Modules hiện có: auth, users/registrations, organization, documents, tasks, resources, knowledge, files và notifications. API prefix `/api/v1`; health endpoints, Swagger `/api/docs`, OpenAPI `/api/openapi.json`.
+- `database/migrations/` là migration có ledger; `database/seeds/` chỉ tạo admin bootstrap một lần, không seed dữ liệu nghiệp vụ mẫu. Các lần khởi động sau không xóa dữ liệu.
+- `deploy/docker-compose.yml` chạy MySQL, backend, Nginx frontend. Nginx proxy `/api/` và `/socket.io/`; MySQL và file uploads có named volumes. `.env` và secret bootstrap không được commit.
+- Root `index.html` là preview tài liệu, không phải app entry.
 
-## Lưu trữ, phiên và giới hạn bảo mật
+## State, auth và API sync
 
-- State workspace được lưu trên trình duyệt hiện tại. Workspace seed mới dùng khi chưa có `c12-workspace-v7`; ngoài ra có augmentation/migration demo một lần theo phiên bản state như mô tả bên dưới. Các khóa localStorage legacy không bị xóa hoặc nhập tự động.
-- Session demo lưu ở `c12-local-session`. Các nút User demo/Admin demo chỉ mô phỏng vai trò trong UI.
-- Nếu không có session key, foundation khởi tạo phiên bằng User demo `demo-u-g-HT` hoặc User đầu tiên; vì thế lần đầu có thể vào thẳng ứng dụng. Đăng xuất mới đưa về form đăng nhập. Form đăng nhập chỉ dò email/tên user approved, không kiểm tra password; form đăng ký hiện bỏ qua password và chỉ tạo user pending. Không dùng hai form này làm mẫu auth production.
-- Tùy chọn giao diện có các key riêng `c12-dark`, `c12-text-palette`, `c12-style`; accent/background cá nhân lưu trong `state.themeByUser`. Nền ảnh upload có thể lưu dạng data URL trong workspace localStorage và làm tăng dung lượng sử dụng.
-- Không có xác thực máy chủ, phân quyền an toàn, đồng bộ đa thiết bị, API hoặc cập nhật realtime. Dữ liệu và role phía client có thể bị người dùng sửa; không dùng cho dữ liệu nhạy cảm hoặc triển khai production.
-- `save()` ghi toàn bộ state JSON. Khi trình duyệt hết quota hoặc chặn storage, giao diện báo lỗi lưu. Tệp đính kèm lớn có thể vượt giới hạn localStorage.
-- `docs/PERMISSIONS.md` mô tả quy tắc UI nghiệp vụ; đây không còn là kiểm soát bảo mật phía server.
+- Cơ sở dữ liệu là nguồn dữ liệu nghiệp vụ; frontend không nhập dữ liệu localStorage cũ. `loadWorkspace()` lấy dữ liệu qua API sau đăng nhập. Ghi trực tiếp dùng endpoint domain; các màn legacy gọi save adapter so sánh state và gửi CRUD/archive qua API. Adapter hiện chưa thay thế được endpoint chuyên biệt cho mọi quan hệ và tệp.
+- Access JWT chỉ giữ trong memory; refresh cookie HttpOnly có CSRF token. Không đưa token hay dữ liệu nghiệp vụ vào localStorage. Theme settings vẫn cục bộ.
+- Lỗi API hiển thị scope, mã lỗi, message và request ID; lỗi runtime phía client được phân loại Frontend. Không hiển thị stack trace cho người dùng.
+- Socket.IO xác thực bằng JWT; server gán user room. Backend ghi outbox cùng transaction và relay sau commit. Frontend tải lại workspace khi nhận event; nếu modal đang mở thì trì hoãn refresh đến khi đóng để tránh ghi đè form.
+- Các luồng đã nối chính gồm đăng nhập/đăng ký/đổi mật khẩu, task, resource + task kèm theo, document, people/group, knowledge, archive, bình luận, notification read, resource XLSX và lịch sử. Vẫn cần hoàn thiện/kiểm chứng quản lý tệp document/knowledge, task file update, bảng legacy, E2E và các lỗi xung đột phiên bản.
 
-## Dữ liệu demo và migration
+## MySQL và bảo toàn dữ liệu
 
-- `demo-workspace.js` tạo bộ seed cho workspace rỗng. Ngoài seed ban đầu, `seedTaskDemo()` trong `pages/workspace.js` có one-time augmentation cho state cũ khi `demoSeedVersion < 2`: thêm/đồng bộ một số văn bản, nhóm/người, task, resource và knowledge; không chỉ khởi tạo khi thiếu workspace key.
-- **Rủi ro dữ liệu:** augmentation thay resource trùng ID `demo-resource-{mã nhóm}` bằng fixture; chỉnh sửa của người dùng trên đúng record đó có thể bị mất. Mở trang resource có thể chạy migration V7 cho schema/cột và mật độ dữ liệu demo; migration có thể loại cột demo cũ, giảm còn tối đa 12 resource seed chưa có dấu vết tùy chỉnh, và giữ record có task/revision/file/custom field/phụ lục riêng. Sao lưu workspace cũ trước khi nâng code qua migration; hiện không có rollback tự động.
-- `demo-workspace.js` và các bước augmentation/migration client độc lập với các database/volume Docker MySQL đã từng tồn tại.
-- `M.migrate()` là chuyển đổi định dạng V5 cũ, không gọi trong khởi động thường xuyên để tránh làm mất dữ liệu V7. Hãy thêm migration tường minh, có kiểm tra phiên bản và sao lưu state trước khi đổi schema.
-- Không tự xóa/reset localStorage. Khôi phục bộ dữ liệu mẫu qua giao diện là hành động thay thế workspace cục bộ và cần xác nhận.
+- MySQL 8.4 lưu thực thể quan hệ; dữ liệu bảng động/field linh hoạt được validate rồi lưu JSON có version.
+- Mọi input SQL dùng tham số. Ghi nhiều bước dùng transaction; history/audit và outbox được ghi cùng transaction; Socket.IO chỉ phát sau commit.
+- Archive là cách xóa mặc định; foreign keys dùng RESTRICT và liên kết/history được giữ. Không chạy reset/truncate khi ứng dụng khởi động.
+- Database mới chỉ có một tài khoản admin bootstrap đã hash và bắt đổi mật khẩu; các bảng nghiệp vụ rỗng. Không dùng mock data và không nhập workspace localStorage cũ.
+- File bytes lưu ngoài web root tại `FILE_STORAGE_DIR`; MySQL giữ metadata và link. Volume uploads cần được mount để giữ tệp.
 
-## Chạy và build
+## Khởi chạy và kiểm chứng
 
-Có thể mở `frontend/index.html` trực tiếp nếu trình duyệt cho phép các tài nguyên cục bộ, hoặc phục vụ thư mục `frontend/` bằng static server. Ví dụ từ root:
+Từ root repo, tạo `.env` từ `.env.example`, chuẩn bị `secrets/admin_password`, rồi dùng Docker Compose theo [DEPLOYMENT.md](DEPLOYMENT.md). Không dùng `python -m http.server` làm cách chạy full-stack vì static server không cấp API/Socket.IO.
 
-```powershell
-python -m http.server 8080 --directory frontend --bind 127.0.0.1
-```
+Kiểm tra hiện tại: JavaScript đã sửa qua `node --check`; backend `npm test` đạt 9 pass, 0 fail, 0 skip trên MySQL 8.4 container/database tạm biệt lập, không gắn volume ứng dụng. Suite tìm ra và xác nhận sửa PATCH đổi trạng thái không làm mất file links. Browser E2E, kiểm thử LIGHT/DARK/responsive và Compose/Nginx smoke chưa chạy. Xem [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) để biết hạng mục nào đã xong/chưa xong; không suy diễn checkbox mục tiêu thành nghiệm thu.
 
-Mở `http://127.0.0.1:8080`. Build CSS tại root bằng `npm run build:css`; theo dõi CSS bằng `npm run watch:css`.
+## Quy tắc mở rộng
 
-Các thư viện XLSX/Mammoth và font được nạp qua CDN; tính năng tương ứng cần mạng và phải xử lý trường hợp thư viện không sẵn có.
+Thêm module backend trong `backend/src/modules/<domain>/`, dùng schema validation, service/route theo convention, quyền trong API, prepared statements và transaction cho writes. Ghi revision + outbox trước commit; relay event chỉ sau commit. Thêm migration append-only trong `database/migrations/`; không chỉnh migration đã chạy và không seed business mock. Frontend gọi API qua `C12Api`, giữ token trong memory, hiển thị lỗi có scope/request ID và không ghi business state vào localStorage. Cập nhật API contract, SPEC/permissions nếu nghiệp vụ thay đổi và plan bằng bằng chứng kiểm chứng.

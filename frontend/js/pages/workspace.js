@@ -46,6 +46,7 @@ const badge = t => `<span class="task-status ${M.bucket(t)}">${BUCKET[M.bucket(t
 const localTime = v => v ? new Date(new Date(v).getTime() - new Date(v).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '';
 
 function seedTaskDemo() {
+  if (window.C12Api) return;
   if (state.demoSeedVersion >= 2) return;
   let adminUser = state.users.find(x => x.id === 'admin' && x.status === 'approved') || state.users.find(x => x.role === 'admin' && x.status === 'approved');
   if (!adminUser) return;
@@ -226,18 +227,8 @@ view = function () {
 };
 
 action = function (a) {
-  if (a === 'switch') {
-    const target = admin() ? state.users.find(u => u.id === 'demo-u-g-HT') || state.users.find(u => u.role === 'user') : state.users.find(u => u.role === 'admin');
-    return target && login(target.id);
-  }
   if (a === 'logout') {
-    setLocalSession(''); auth(); return;
-  }
-  if (a === 'reset') {
-    if (confirm('Khôi phục bộ dữ liệu mẫu? Các thay đổi đã lưu trong trình duyệt sẽ bị thay thế.')) {
-      state = seed(); save(); setLocalSession(state.users.find(u => u.id === 'demo-u-g-HT')?.id || ''); page = 'home'; render();
-    }
-    return;
+    C12Api.logout().finally(() => { state = emptyWorkspace(); setLocalSession(''); auth(); }); return;
   }
   if (a === 'new-task') return taskForm();
   if (a === 'themes') return themesDialog();
@@ -262,9 +253,9 @@ done = async function (message) {
 };
 
 login = function (id) {
-  setLocalSession(id);
-  page = 'home';
-  render();
+  const user = state.users.find(item => item.id === id);
+  if (!user) return;
+  toast('Đăng nhập bằng mật khẩu qua biểu mẫu để xác thực với máy chủ.');
 };
 
 // =========================================================
